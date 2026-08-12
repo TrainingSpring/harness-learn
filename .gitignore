@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.Python
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test, type-checking and tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local development settings
+.idea/
+.vscode/
+.ppt_build/
+
+# CodeGraph generated index
+.codegraph/
+
+# Local caches and temporary build files
+.cache/
+.ppt_build/rendered/
+
+# Generated presentation and video assets
+presentations/*.pptx.inspect.ndjson
+video/frames/
+video/*.mp4
+video/*-preview.png
+video/*-title.png
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+
+video/
+presentations/
