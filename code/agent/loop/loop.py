@@ -20,10 +20,11 @@ class AgentLoop:
 
 
     def register_tool(self, tool:Tool):
+        # 注册工具
         schema = tool.schema
         if schema is None:
             raise Exception("Tool schema is required")
-
+        # 添加工具到列表和映射
         if self.tools_map.get(schema["name"]) is None:
             self.tools.append(schema)
             self.tools_map[schema["name"]] = tool

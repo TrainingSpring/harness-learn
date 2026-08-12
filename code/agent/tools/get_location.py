@@ -1,7 +1,7 @@
 from tools.types import Tool
 
 def get_location():
-    return {"location":"中国四川省成都市青白江区"}
+    return {"location":"四川省达州市通川区"}
 
 
 GET_LOCATION_REGISTER = Tool({

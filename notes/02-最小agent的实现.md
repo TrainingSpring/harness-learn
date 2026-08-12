@@ -261,6 +261,108 @@ class LLM:
                     yield {"type":"error","message":event}
 ```
 
+# Agent 的核心实现
+我这里整个Agent是抽象的一个类，主要将一个简单的Agent核心实现， 主要有工具的注册，调用，Agent Loop的实现，以及大模型的调用 
+
+## Tool类型的定义
+> 这不是必要的, 主要看开发者如何实现
+
+
+```python
+from dataclasses import dataclass
+from typing import Callable
+
+@dataclass
+class Tool:
+    schema:dict   # 工具的结构信息
+    function:Callable   # 工具的函数
+```
+
+## 类的和构造函数的实现
+```python
+class Agent:
+  def __init__(self):
+      self.sid = f"sid_{secrets.token_hex(12)}"  # Agent的唯一标识符
+      self.llm = LLM(API_KEY, MODEL, BASE_URL,system_prompt=SYSTEM_PROMPT) # 大模型实例
+      self.tools = [] # tools列表（给大模型调用）
+      self.tools_map:dict[str,Tool] = {}  # tools映射，用于快速查找工具的信息（懒得去遍历查找）
+      self.message = [] # 当前Agent的上下文消息列表
+```
+
+## 工具的注册
+
+思路： 获取schema，名称， 然后self.tools只要添加schema，在tools_map中按名称映射对应的tool，用于快速查找tool的内容。 
+```python
+def register_tool(self, tool:Tool):
+    schema = tool.schema
+    if schema is None:
+        raise Exception("Tool schema is required")
+
+    if self.tools_map.get(schema["name"]) is None:
+        self.tools.append(schema)
+        self.tools_map[schema["name"]] = tool
+```
+## 工具调用
+
+```python
+"""
+@description: 调用工具
+@params:
+    name: 工具名称
+    arguments: 工具参数
+"""
+def eval(self, name, arguments):
+    # 获取工具
+    tool = self.tools_map.get(name)
+    if not tool:
+        raise Exception(f"Tool {name} not found")
+    try:
+        # 解析参数
+        args = json.loads(arguments) if isinstance(arguments, str) else arguments
+    except Exception as e:
+        raise Exception(f"bad arguments: {e}")
+
+    try:
+        # 调用工具方法
+        func = tool.function(**args)
+        return func
+    except Exception as e:
+        raise Exception(f"tool function error: {e}")
+```
+
+## 工具实现
+这里实现的是一段伪代码
+```python
+# 引用Tool的声明
+import datetime
+from tools.types import Tool
+
+# 获取天气的实现（伪代码）
+def get_weather(date:str=datetime.date.today().strftime("%Y-%m-%d")):
+    return {
+        "date": date,
+        "weather": "sunny",
+        "temperature": "25℃"
+    }
+
+# tool的注册器 , 这里明显能看出schema参数是给大模型看的， 主要是方法名，作用，以及参数描述
+GET_WEATHER_REGISTER = Tool(function=get_weather,schema={
+        "type":"function",
+        "name":"get_weather",
+        "description":"Get weather information for a specific date",
+        "parameters":{
+            "type":"object",
+            "properties":{
+                "date":{
+                    "type":"string",
+                    "description":"日期，格式为YYYY-MM-DD，可不填，默认为当天"
+                }
+            },
+            "required":[], # 必填参数
+            "additionalProperties": False
+        }
+    })
+```
 ## 核心Agent Loop的实现。 
 本质就是，将用户信息和可调用的工具列表发给大模型， 大模型根据用户需求来推理是否需要调用工具， 默认没有调用tool的时候，意味着停止本次loop， 否则调用tool，并将tool结果返回给大模型。 
 
@@ -317,3 +419,102 @@ def run(self,message = None):
             else:
                 yield chunk
 ```
+
+# 测试
+
+实现了一个cli，用于测试: 
+
+cli 主要用了python的input进行实现： 
+```python
+from loop.loop import AgentLoop
+from tools import get_weather,get_location
+
+def print_help():
+    print("可用命令:")
+    print("  /help   查看帮助")
+    print("  /exit   退出")
+    print("  /clear  清空当前会话上下文")
+    print("  /tools  查看已注册工具")
+
+
+def render_event(event):
+    event_type = event.get("type")
+
+    if event_type == "text":
+        print(event.get("text", ""), end="", flush=True)
+
+    elif event_type == "reasoning_summary":
+        print(f"\n[reasoning] {event.get('text', '')}")
+
+    elif event_type == "function_call":
+        print(f"\n[tool] {event.get('name')}({event.get('arguments')})")
+
+    elif event_type == "error":
+        print(f"\n[error] {event.get('message', 'unknown error')}")
+
+    elif event_type == "done":
+        print()
+
+
+def main():
+    agent = AgentLoop()
+
+    agent.register_tools([
+        get_weather.GET_WEATHER_REGISTER,
+        get_location.GET_LOCATION_REGISTER,
+    ])
+
+    print("Agent CLI 已启动，输入 /help 查看命令。")
+
+    while True:
+        try:
+            user_input = input("\n> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n退出。")
+            break
+
+        if not user_input:
+            continue
+
+        if user_input == "/exit":
+            print("退出。")
+            break
+
+        if user_input == "/help":
+            print_help()
+            continue
+
+        if user_input == "/tools":
+            print("已注册工具:")
+            for tool in agent.tools:
+                print(f"- {tool.get('name')}")
+            continue
+
+        if user_input == "/clear":
+            agent.message = []
+            print("会话上下文已清空。")
+            continue
+
+        try:
+            for event in agent.run(user_input):
+                render_event(event)
+        except Exception as e:
+            print(f"\n[error] {e}")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+```shell
+> 我现在在哪， 只告诉我位置即可
+
+[tool] get_location({})
+您当前位于：四川省达州市通川区
+> 天气现在如何？ 
+
+[tool] get_weather({})
+今天（2026-08-12）四川省达州市通川区的天气是晴天，温度25℃。
+> 
+```
+
