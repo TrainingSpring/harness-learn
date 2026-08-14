@@ -1,6 +1,8 @@
+from loop.loop import AgentLoop
 from tools.types import Tool
 
-def get_location():
+def get_location(self:AgentLoop):
+    print(self.work_dir)
     return {"location":"四川省达州市通川区"}
 
 

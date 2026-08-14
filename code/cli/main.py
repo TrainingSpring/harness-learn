@@ -1,5 +1,5 @@
 from loop.loop import AgentLoop
-from tools import get_weather,get_location
+from tools import get_weather,get_location, read
 
 def print_help():
     print("可用命令:")
@@ -34,13 +34,14 @@ def main():
     agent.register_tools([
         get_weather.GET_WEATHER_REGISTER,
         get_location.GET_LOCATION_REGISTER,
+        read.READ_REGISTER
     ])
 
     print("Agent CLI 已启动，输入 /help 查看命令。")
 
     while True:
         try:
-            user_input = input("\n> ").strip()
+            user_input = input("\n>").strip()
         except (EOFError, KeyboardInterrupt):
             print("\n退出。")
             break
@@ -76,3 +77,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # agent = AgentLoop()
+    #
+    # agent.register_tools([
+    #     read.READ_REGISTER
+    # ])
+    # agent.eval("read", {
+    #     "target_path":"屏幕截图 2026-08-14 221707.png"
+    # })

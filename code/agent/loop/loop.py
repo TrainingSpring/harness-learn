@@ -1,3 +1,5 @@
+import os
+
 from head.llm import LLM
 import secrets
 import json
@@ -8,7 +10,7 @@ def set_message(role="user", content=""):
 
 BASE_URL = "https://token-plan-cn.xiaomimimo.com"
 API_KEY = "tp-c7mv9tn67kvmm90hfn48kyoruxkhua9t70zymm8hh43atcvw"
-MODEL = "mimo-v2.5-pro"
+MODEL = "mimo-v2.5"
 SYSTEM_PROMPT = "你是一个智能助手，帮助解决问题，实现用户的需求。 "
 class AgentLoop:
     def __init__(self):
@@ -17,6 +19,7 @@ class AgentLoop:
         self.tools = [] # tools列表
         self.tools_map:dict[str,Tool] = {}  # tools映射
         self.message = []
+        self.workspace = os.getcwd()
 
 
     def register_tool(self, tool:Tool):
@@ -41,8 +44,10 @@ class AgentLoop:
         name: 工具名称
         arguments: 工具参数
     """
-    def eval(self, name, arguments):
+    def eval(self, name, arguments=None):
         # 获取工具
+        if arguments is None:
+            arguments = {}
         tool = self.tools_map.get(name)
         if not tool:
             raise Exception(f"Tool {name} not found")
@@ -54,7 +59,7 @@ class AgentLoop:
 
         try:
             # 调用工具方法
-            func = tool.function(**args)
+            func = tool.function(self,**args)
             return func
         except Exception as e:
             raise Exception(f"tool function error: {e}")
