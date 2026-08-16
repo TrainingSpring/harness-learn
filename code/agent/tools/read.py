@@ -85,7 +85,7 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
         ]
 
 
-READ_REGISTER = Tool({
+REGISTER = Tool({
         "type":"function",
         "name":"read",
         "description":"读取图片，文本文件或者目录",

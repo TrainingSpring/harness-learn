@@ -1,5 +1,5 @@
 from loop.loop import AgentLoop
-from tools import get_weather,get_location, read
+from tools import get_weather,edit, read , write
 
 def print_help():
     print("可用命令:")
@@ -15,8 +15,10 @@ def render_event(event):
     if event_type == "text":
         print(event.get("text", ""), end="", flush=True)
 
+    elif event_type == "reasoning":
+        print(f"{event.get('text', '')}", end="",flush=True)
     elif event_type == "reasoning_summary":
-        print(f"\n[reasoning] {event.get('text', '')}")
+        print(f"\n[reasoning_summary] {event.get('text', '')}")
 
     elif event_type == "function_call":
         print(f"\n[tool] {event.get('name')}({event.get('arguments')})")
@@ -24,17 +26,17 @@ def render_event(event):
     elif event_type == "error":
         print(f"\n[error] {event.get('message', 'unknown error')}")
 
-    elif event_type == "done":
-        print()
+    elif event_type == "done" and event.get("is_stop"):
+        print("[finished]")
 
 
 def main():
     agent = AgentLoop()
 
     agent.register_tools([
-        get_weather.GET_WEATHER_REGISTER,
-        get_location.GET_LOCATION_REGISTER,
-        read.READ_REGISTER
+#        write.REGISTER,
+        read.REGISTER,
+        edit.REGISTER
     ])
 
     print("Agent CLI 已启动，输入 /help 查看命令。")

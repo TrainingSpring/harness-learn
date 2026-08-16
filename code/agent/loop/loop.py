@@ -93,7 +93,7 @@ class AgentLoop:
                     # 处理工具调用结果
                     if chunk.get("is_stop"):
                         # 如果标记了结束，则退出循环体
-                        return
+                        return chunk
                     else:
                         # 处理工具调用结果
                         for item in data:
