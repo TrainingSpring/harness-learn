@@ -143,3 +143,223 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
             }
         ]
 ```
+
+# Write 创建/覆盖写入文件工具
+> 写入文件很简单，就是覆盖文件内容，如果没有就新建
+> 
+> 唯一要注意的就是判定路径是否存在，如果不存在要创建路径
+> 
+> 比较简单
+> 
+> 用python的write就够了
+> 
+
+## 代码示例
+
+我这里写得复杂了点， 还加了一个创建文件夹的功能，其实完全没啥必要。  
+
+```python
+def write(self:AgentLoop,target_path:str,content:str=""):
+    cur_path = target_path
+    # 判定是否是相对路径
+    if not os.path.isabs(target_path):
+        if target_path.startswith("/"):
+            target_path = target_path[1:]
+        cur_path = os.path.join(self.workspace, target_path)
+    # 如果目录路径不存在，创建目录
+    try:
+        parent_dir = os.path.dirname(target_path)
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+    except Exception as e:
+        return {
+            "status":"error",
+            "type":"make_dir",
+            "path":target_path,
+            "error":str(e)
+        }
+
+    # 判定路径是文件路径还是目录路径
+    if not cur_path.endswith("/"):
+        try:
+            with open(target_path, 'w', encoding='utf-8') as file:
+                file.write(content)
+            return {
+                "status": "ok",
+                "type": "write_file",
+                "path": target_path,
+                "size": len(content)
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "type": "write_file",
+                "path": target_path,
+                "error": str(e)
+            }
+    else:
+        return {
+            "status":"ok",
+            "type":"make_dir",
+            "path":target_path
+        }
+```
+
+# Edit 编辑文件
+> 编辑文件就要复杂一点了
+> 
+> 基本的编辑文件的本质就是replace，替换文本。 
+> 
+> 需要注意的是，旧的文本内容的唯一性， 如果在一个文档中找到多个相同的旧文本，也许会导致替换掉的文本并非是目标文本
+
+## edit 代码示例
+
+> 这里我做了一个字段来判定是否全部替换，可以允许agent使用全部替换功能，但是默认为False
+
+```python
+
+# 查找唯一文本
+def find_unique_text(content:str,text:str):
+    first_find = content.find(text)
+    if first_find == -1:
+        raise Exception(f"'{text}'文本不存在。")
+    else:
+        second_find = content.find(text, first_find + 1)
+        if second_find == -1:
+            return {
+                "index":first_find,
+                "length":len(text)
+            }
+        else:
+            raise Exception(f"'{text}'文本不唯一。")
+
+"""
+@description: 编辑文件内容
+@param {AgentLoop} self - Agent Loop对象
+@param {str} target_path - 目标文件路径
+@param {list} edits - 编辑内容列表
+@returns {dict} - 编辑结果
+"""
+def edit(self:AgentLoop,target_path:str,edits:list[dict]):
+    # 检查目标文件是否存在
+    if not os.path.exists(target_path) or not os.path.isfile(target_path):
+        return {
+            "status":"error",
+            "message":"目标文件不存在。"
+        }
+    # 检查编辑内容是否为空
+    if not edits or len(edits) == 0:
+        return {
+            "status":"error",
+            "message":"编辑内容为空。"
+        }
+    # 读取目标文件内容
+    with open(target_path, 'r', encoding='utf-8') as file:
+        content = file.read()
+    # 检查目标文件内容是否为空
+    if not content or len(content) == 0:
+        return {
+            "status":"error",
+            "message":"目标文件内容为空。"
+        }
+    # 遍历编辑内容
+    for item in edits:
+        old_str = item.get("old_text") or ""
+        new_str = item.get("new_text") or ""
+        is_replace_all = item.get("replace_all") or False
+        # 检查旧文本是否为空,为空的话则不进行替换
+        if old_str:
+            try:
+                find_unique_text(content, old_str or "")
+                # 是否是替换全部
+                if not is_replace_all:
+                    content = content.replace(old_str, new_str,1)
+                else:
+                    content = content.replace(old_str, new_str)
+            except Exception as e:
+                return {
+                    "status":"error",
+                    "message":str(e)
+                }
+
+    # 将修改后的内容写回
+    with open(target_path, 'w', encoding='utf-8') as file:
+        file.write(content)
+    return{
+        "status":"success",
+        "message":"编辑成功。",
+    }
+```
+
+# Bash 工具
+
+> bash工具比较危险，但是实现也比较简单，就是调用终端命令。
+> 
+> 一个基本的bash，主要要解决的是bash的调用，输出解码（因为不是每个命令的输出编码格式都相同）
+> 
+> 还有就是超时的问题， 不能让命令一直跑，比如一个无意义的命令，ping 让它一直跑下去，那么agent会卡住
+> 
+
+## 示例
+
+```python
+"""
+@description: 解码输出 , 为啥要自己解码： 因为自动解码的话会出现硬解码不同导致乱码的问题
+@param data: bytes
+
+"""
+def decode_output(data: bytes | None) -> str:
+    if not data:
+        return ""
+
+    # 获取当前系统偏好的文本编码
+    preferred_encoding = locale.getpreferredencoding(False)
+
+    encodings = [
+        "utf-8-sig",          # 支持带 BOM 的 UTF-8
+        "utf-8",              # Node、Git、Python 等经常使用
+        preferred_encoding,   # 中文 Windows 通常是 cp936
+        "gb18030",            # 比 GBK 覆盖范围更大
+    ]
+
+    # 尝试使用不同的编码解码数据
+    for encoding in encodings:
+        try:
+            return data.decode(encoding)
+        except (UnicodeDecodeError, LookupError):
+            continue
+
+    return data.decode("utf-8", errors="replace")
+
+def bash(self:AgentLoop,command:str,timeout:int|None = None):
+
+    if os.name == "nt":
+        # command = ["powershell.exe","-NoProfile","-NonInteractive", "-Command", command]
+        command = "powershell.exe"+" -NoProfile"+" -NonInteractive"+ " -Command " +  command
+    else:
+        command = [
+            "bash",
+            "-lc",
+            command,
+        ]
+    result = subprocess.run(
+        command,
+        stdin=subprocess.DEVNULL,
+        timeout=timeout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=self.workspace
+    )
+    if result.returncode == 0:
+        return {
+            "type": "text",
+            "text": decode_output(result.stdout),
+            "status":"ok"
+        }
+    else:
+        return {
+            "type": "text",
+            "text": decode_output(result.stderr),
+            "status":"error"
+        }
+```

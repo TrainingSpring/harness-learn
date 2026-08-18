@@ -3,11 +3,11 @@ import json
 
 
 class LLM:
-    def __init__(self, api_key, model, base_url,screen_token=256,system_prompt=""):
+    def __init__(self, api_key, model, base_url,system_prompt=""):
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
-        self.screen_token = screen_token  # 上下文窗口大小，单位为token
+        # self.screen_token = screen_token  # 上下文窗口大小，单位为token
         self.system_prompt = system_prompt  # 系统提示
 
     """
@@ -31,7 +31,6 @@ class LLM:
             "instructions":self.system_prompt,
             "input":input,
             "tools":tools,
-            "max_completion_tokens": self.screen_token,
             "reasoning": {
                 "effort": "high",
                 "summary": "detailed"
@@ -87,7 +86,8 @@ class LLM:
                 # 处理输出完成事件
                 if event_type == "response.completed":
                     content = event.get("response").get("output")
-                    yield {"type":"done","data":content,"is_stop":not has_call}
+                    usage = event.get("response").get("usage")
+                    yield {"type":"done","data":content,"is_stop":not has_call,"usage":usage}
                 # 处理错误事件
                 elif event_type == "error":
                     yield {"type":"error","message":event}

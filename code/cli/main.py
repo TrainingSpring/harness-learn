@@ -1,5 +1,5 @@
 from loop.loop import AgentLoop
-from tools import get_weather,edit, read , write
+from tools import bash  ,edit, read , write
 
 def print_help():
     print("可用命令:")
@@ -34,9 +34,10 @@ def main():
     agent = AgentLoop()
 
     agent.register_tools([
-#        write.REGISTER,
+        write.REGISTER,
         read.REGISTER,
-        edit.REGISTER
+        edit.REGISTER,
+        bash.REGISTER
     ])
 
     print("Agent CLI 已启动，输入 /help 查看命令。")

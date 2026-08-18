@@ -15,11 +15,22 @@ SYSTEM_PROMPT = "你是一个智能助手，帮助解决问题，实现用户的
 class AgentLoop:
     def __init__(self):
         self.sid = f"sid_{secrets.token_hex(12)}"
+        self.max_context_tokens = 256*1024  # 上下文窗口大小
         self.llm = LLM(API_KEY, MODEL, BASE_URL,system_prompt=SYSTEM_PROMPT)
         self.tools = [] # tools列表
         self.tools_map:dict[str,Tool] = {}  # tools映射
-        self.message = []
+        self.message = [{
+            "type":"message",
+            "role":"developer",
+            "content":[
+                {
+                    "type":"input_text",
+                    "text":f"当前系统环境：{ 'windows' if os.name == 'nt' else 'linux' }"
+                }
+            ]
+        }]
         self.workspace = os.getcwd()
+        self.used_tokens = 0   # 已使用的token数
 
 
     def register_tool(self, tool:Tool):
@@ -50,19 +61,25 @@ class AgentLoop:
             arguments = {}
         tool = self.tools_map.get(name)
         if not tool:
-            raise Exception(f"Tool {name} not found")
+            return {"status":"error","message":"Tool not found"}
         try:
             # 解析参数
             args = json.loads(arguments) if isinstance(arguments, str) else arguments
         except Exception as e:
-            raise Exception(f"bad arguments: {e}")
+            return {
+                "status":"error",
+                "message":str(e)
+            }
 
         try:
             # 调用工具方法
             func = tool.function(self,**args)
             return func
         except Exception as e:
-            raise Exception(f"tool function error: {e}")
+            return {
+                "status":"error",
+                "message":str(e)
+            }
 
     """
     @description: 运行Agent循环
@@ -90,6 +107,7 @@ class AgentLoop:
                 # 处理请求结果，请求结束后触发
                 if chunk.get("type") == "done":
                     data = chunk.get("data")
+                    self.used_tokens = chunk.get("usage").get("total_tokens")
                     # 处理工具调用结果
                     if chunk.get("is_stop"):
                         # 如果标记了结束，则退出循环体
