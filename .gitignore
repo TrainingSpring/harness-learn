@@ -29,6 +29,7 @@ htmlcov/
 # Local caches and temporary build files
 .cache/
 .ppt_build/rendered/
+.training/
 
 # Generated presentation and video assets
 presentations/*.pptx.inspect.ndjson

@@ -44,7 +44,7 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
                 image_base64 = base64.b64encode(image_types).decode("ascii")
                 return [
                     {
-                        "type":"text",
+                        "type":"input_text",
                         "text":f"读取到图片{mime_type or ""}",
                     },
                     {
@@ -72,15 +72,23 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
                 }
             ]
     elif os.path.isdir(cur_path):
+        dir_list = []
+        for target in os.listdir(cur_path):
+            target_path = os.path.join(cur_path, target)
+            dir_list.append({
+                "type":"dir" if os.path.isdir(target_path) else "file",
+                "name":target,
+                "path":target_path
+            })
         return [
             {
-                "type":"text",
+                "type":"input_text",
                 "text":f"读取到目录{cur_path}",
             },
             {
                 "type":"input_text",
                 "path":cur_path,
-                "text":os.listdir(cur_path)
+                "text":dir_list
             }
         ]
 
