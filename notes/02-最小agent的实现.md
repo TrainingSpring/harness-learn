@@ -2,12 +2,14 @@
 
 > 我想既然要从头学起， 第一步应该是怎么调用大模型。 
 > 网上找了很多相关参考资料 ， 都是先实现一个Agent Loop ， 然后实现一些虚拟的tools ， mock一些数据，先跑通agent循环， 再做大模型接入
-> 我不太喜欢这个顺序，所以我打算从大模型的接入开始了解。
-> 代码以python为主。
+> 我不太喜欢这个顺序，所以我打算从大模型的接入开始。
+> 正如我简介里写的，我是一名9年前端，最熟悉的语言是JS、TS，所以我决定，用Python ... 
 
 ## 大模型的接入
 
-大模型的接入有多种形式， 一个是SDK的方式， 比如Anthropic ， OpenAI， 在python中都有对应的包, 通过引入的方式来调用。 如下
+每一个大模型几乎都有自己的请求格式， 大模型提供商也会提供SDK，来请求模型推理， 比如Anthropic ， OpenAI， 在python中都有对应的包, 通过引入的方式来调用。 
+
+如下
 
 ``` pyton
 from openai import OpenAI
@@ -17,18 +19,20 @@ from anthropic import Anthropic
 ```
 
 
-虽然大多数模型都兼容了OpenAI的格式， 但我认为既然是学习， 应当学原理， 在应用的时候更加得心应手， 所以我选择直接发送http请求。 后续再用SDK。
+如今市面上的大多数模型都兼容OpenAI 和Anthropic的API请求格式， 学习阶段选选一个就好了， 由于我用Codex比较多， 所以选择OpenAI。
 
-### OpenAI请求体
+
+
+### OpenAI的请求体
 > OpenAI请求体有两种模式
 > composition  一个比较通用的请求体格式
-> responses    OpenAI新的请求格式
-> 我们先以Responses格式为主
+> responses    OpenAI新的请求格式（只有新的模型会兼容）
 
+是的，我选择了最新的response。。。 
 
 #### Responses 请求格式
 
-本来是看的官方文档，但是感觉官方文档写的示例太基础，不太符合实际场景，然后直接抓了个codex数据包，来分析codex的请求体。 
+官方文档不太符合实际，所以我直接抓了个codex数据包，来分析codex的请求体。 
 
 总体请求格式如下：
 
@@ -128,12 +132,16 @@ let input = {
 看着很大一坨，比较复杂的就是input和tools
 input中传递的是上下文和消息， 根据官方文档， 你甚至可以直接给input传递字符串
 tools 可用的工具， agent在执行任务的时候，可能会用到工具，从这里面选， description就是用来描述工具用途的
+##### model
+model : 一个模型提供商可能提供多个大模型，比如OpenAI有gpt-5.4 ,gpt-5.5,gpt-5.6 ， 通俗的讲，就是为Agent指定一个脑子。
+
 
 ##### instructions 字段
 
 也就是系统提示词，用来定义智能体
 
 ##### input字段 
+
 > input 字段可以是数组，也可以是一个字符串， 如果是一个字符串，则没有上下文，也就是一次性的会话，在agent中用不到。 
 > 以下是字段基本描述
 
