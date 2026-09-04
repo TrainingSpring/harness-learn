@@ -6,9 +6,9 @@ import json
 from tools.types import Tool
 
 
-BASE_URL = "https://token-plan-cn.xiaomimimo.com"
-API_KEY = "tp-c7mv9tn67kvmm90hfn48kyoruxkhua9t70zymm8hh43atcvw"
-MODEL = "mimo-v2.5"
+BASE_URL = "http://192.168.31.6:18080"
+API_KEY = "sk-5c206cdd7da2521f5949d6f78f9f40d1320caf8414eb187423c0e23e0619c8a8"
+MODEL = "gpt-5.4"
 SYSTEM_PROMPT = "你是一个智能助手，帮助解决问题，实现用户的需求。 "
 class AgentLoop:
     def __init__(self):

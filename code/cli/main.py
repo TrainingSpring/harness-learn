@@ -113,9 +113,6 @@ def resume_record(current_agent):
         elif key == "down":
             selected = (selected + 1) % len(records)
         elif key == "enter":
-            print("=======record_dir=========  "+record_dir)
-            print(f"=======selected=========  {selected}")
-            print(f"=======records=========  {records}")
             try:
                 loaded_agent = read_record(os.path.join(record_dir, records[selected]))
                 loaded_agent.tools = []
@@ -161,16 +158,6 @@ def render_event(event,agent):
 
 def main():
     agent = AgentLoop()
-    agent = read_record(os.path.join(agent.workspace,".training","sid_e8317d01f81f20abcc5cd51c.json"))
-    agent.register_tools([
-        write.REGISTER,
-        read.REGISTER,
-        edit.REGISTER,
-        bash.REGISTER
-    ])
-
-    _show_context(agent)
-    # agent.compact_context()
     print("Agent CLI 已启动，输入 /help 查看命令。")
 
     while True:
