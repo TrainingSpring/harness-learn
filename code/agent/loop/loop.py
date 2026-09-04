@@ -5,8 +5,6 @@ import secrets
 import json
 from tools.types import Tool
 
-def set_message(role="user", content=""):
-    return {"role": role, "content": content}
 
 BASE_URL = "https://token-plan-cn.xiaomimimo.com"
 API_KEY = "tp-c7mv9tn67kvmm90hfn48kyoruxkhua9t70zymm8hh43atcvw"
