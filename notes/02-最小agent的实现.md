@@ -3,7 +3,8 @@
 > 我想既然要从头学起， 第一步应该是怎么调用大模型。 
 > 网上找了很多相关参考资料 ， 都是先实现一个Agent Loop ， 然后实现一些虚拟的tools ， mock一些数据，先跑通agent循环， 再做大模型接入
 > 我不太喜欢这个顺序，所以我打算从大模型的接入开始。
-> 正如我简介里写的，我是一名9年前端，最熟悉的语言是JS、TS，所以我决定，用Python ... 
+> 正如我简介里写的，我是一名9年前端，最熟悉的语言是JS、TS，所以我决定，用Python ...
+> 不是我移情别恋，Python我也挺熟悉的，而python在AI领域，有庞大的第三方库的支撑，学习阶段可以快速上手。
 
 ## 大模型的接入
 
@@ -28,15 +29,16 @@ from anthropic import Anthropic
 > composition  一个比较通用的请求体格式
 > responses    OpenAI新的请求格式（只有新的模型会兼容）
 
-是的，我选择了最新的response。。。 
+是的，本着学新不学旧的原则，我选择了response。。。 
 
 #### Responses 请求格式
 
-官方文档不太符合实际，所以我直接抓了个codex数据包，来分析codex的请求体。 
+我直接抓了个codex数据包，配合官方API文档，来分析codex的请求体。 
 
 总体请求格式如下：
 
 ```javascript
+
 let input = {
     "model": "gpt-5.6-sol",  // 指定模型
     "instructions": "You are Codex, an agent based on GPT-5. You and the user share one workspace, and your job ...", // 系统提示词
@@ -131,47 +133,50 @@ let input = {
 
 看着很大一坨，比较复杂的就是input和tools
 input中传递的是上下文和消息， 根据官方文档， 你甚至可以直接给input传递字符串
-tools 可用的工具， agent在执行任务的时候，可能会用到工具，从这里面选， description就是用来描述工具用途的
+tools 是可用的工具，工具的description就是用来描述工具用途的， agent在执行任务的时候，如果要用到工具， 会从这里选择。
 ##### model
 model : 一个模型提供商可能提供多个大模型，比如OpenAI有gpt-5.4 ,gpt-5.5,gpt-5.6 ， 通俗的讲，就是为Agent指定一个脑子。
 
 
 ##### instructions 字段
 
-也就是系统提示词，用来定义智能体
+instructions： 是系统提示词，用来定义智能体
 
 ##### input字段 
 
 > input 字段可以是数组，也可以是一个字符串， 如果是一个字符串，则没有上下文，也就是一次性的会话，在agent中用不到。 
 > 以下是字段基本描述
 
-- type， 输入类型 一般有： `message`,`reasoning`,`web_search_call`,`function_call`
-  - message 常规的消息， 包括用户消息和大模型的回复消息
-  - reasoning  来自模型的思考消息
-  - web_search_call  模型调用网页搜索
-  - function_call 模型调用tools中的函数
-不难看出， 其实这些类型来说， 只有message对我们是有效的
+- type， 输入类型， 一般有： `message`,`reasoning`,`web_search_call`,`function_call`,`function_call_output`
+  - message: 常规的消息， 包括用户消息和大模型的回复消息.
+  - reasoning: 来自模型的思考消息.
+  - web_search_call: 模型调用网页搜索.
+  - function_call: 模型调用tools的请求函数.
+  - function_call_output: 用于告诉大模型tools的调用结果。 
+  
+不难看出， 其实这些类型来说， 只有message对我们是有效的.
 
-- id 很好理解， 这条消息的id
+- id， 很好理解， 这条消息的唯一标识。
+- call_id， 调用id， 用于标识一次工具调用。
 - role ， 这条消息的所属角色， 目前我所知道的就四种角色
-  - user  用户消息
-  - assistant 来自大模型的消息
-  - developer  开发者的消息， 这个一般定义开发者的规则，替代system 角色（codex告诉我的）
-  - system  基本被`developer`和`instructions`参数替代了
+  - user:  用户消息
+  - assistant: 来自大模型的消息
+  - developer:  开发者的消息， 这个一般定义开发者的规则，替代system 角色（codex告诉我的）
+  - system:  基本被`developer`和`instructions`参数替代了
 - content  消息内容， 消息内容是一个数组,或者null 数组中包含多个对象，对象参数如下：
-  - type ， 定义消息的类型
-    - input_text   消息文本
-    - input_image   图片
-    - input_file    文件
+  - type : 定义消息的类型
+    - input_text: 消息文本
+    - input_image: 图片
+    - input_file: 文件
   - text 是input_text专有的
-  - image_url： input_image专用 可以用网络url 也可以用base64                       （codex告诉我的） 因为抓的数据包里暂时没有这类信息。 
-  - file_url：  input_file 专用， 外部文件的url    .                              （codex告诉我的） 因为抓的数据包里暂时没有这类信息。 
-  - file_data： input_file 专用， base64文件                                      （codex告诉我的） 因为抓的数据包里暂时没有这类信息。 
-  - file_id  ： input_file和input_image都可用，目前我还不知道咋用。                （codex告诉我的） 因为抓的数据包里暂时没有这类信息。 
+  - image_url： input_image专用 可以用网络url 也可以用base64         
+  - file_url：  input_file 专用， 外部文件的url    .              
+  - file_data： input_file 专用， base64文件                   。 
+  - file_id  ： input_file和input_image都可用，目前我还不知道咋用。      
 
 ### LLM调用代码示例
 
-由于本项目只是作为Agent 的示例，所以只实现了一个LLM的调用，实际应用中，需要根据具体需求，实现不同的LLM调用。或者编写一个适配器，用于适配市面上常见的大模型。
+由于本项目只是作为Agent 的示例，所以只实现了一个LLM的调用，实际应用中，需要根据具体需求，实现不同的LLM调用。或者编写适配器，用于适配市面上常见的大模型。
 
 ```python
 import requests
@@ -270,6 +275,7 @@ class LLM:
 ```
 
 # Agent 的核心实现
+
 我这里整个Agent是抽象的一个类，主要将一个简单的Agent核心实现， 主要有工具的注册，调用，Agent Loop的实现，以及大模型的调用 
 
 ## Tool类型的定义
@@ -299,7 +305,7 @@ class Agent:
 
 ## 工具的注册
 
-思路： 获取schema，名称， 然后self.tools只要添加schema，在tools_map中按名称映射对应的tool，用于快速查找tool的内容。 
+思路： 获取schema，名称， 然后self.tools只要添加schema，在tools_map中按名称映射对应的tool，用于快速查找tool。 
 ```python
 def register_tool(self, tool:Tool):
     schema = tool.schema
@@ -339,7 +345,7 @@ def eval(self, name, arguments):
 ```
 
 ## 工具实现
-这里实现的是一段伪代码
+初始实现了两个tools，一个get_weather获取天气， 一个get_location获取位置信息，都是mock数据，它们只是为了后续测试服务。
 ```python
 # 引用Tool的声明
 import datetime
@@ -372,8 +378,8 @@ GET_WEATHER_REGISTER = Tool(function=get_weather,schema={
     })
 ```
 ## 核心Agent Loop的实现。 
-本质就是，将用户信息和可调用的工具列表发给大模型， 大模型根据用户需求来推理是否需要调用工具， 默认没有调用tool的时候，意味着停止本次loop， 否则调用tool，并将tool结果返回给大模型。 
 
+本质就是，将用户信息和可调用的工具列表发给大模型， 大模型根据用户需求来推理是否需要调用工具， 当不需要调用tools的时候，意味着停止本次循环， 否则调用tool，并将tool结果返回给大模型。 
 
 Agent Loop核心代码的实现
 ```python

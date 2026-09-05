@@ -27,6 +27,7 @@ def is_img(path):
 """
 def read(self:AgentLoop,target_path:str,offset=None,limit=None):
     cur_path = target_path
+    limit = min(limit,20000)
     # 判定是否是相对路径
     if not os.path.isabs(target_path):
         cur_path = os.path.join(self.workspace,target_path)
@@ -91,6 +92,7 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
                 "text":dir_list
             }
         ]
+    return None
 
 
 REGISTER = Tool({

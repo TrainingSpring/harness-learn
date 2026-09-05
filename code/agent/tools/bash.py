@@ -29,7 +29,7 @@ def decode_output(data: bytes | None) -> str:
     # 尝试使用不同的编码解码数据
     for encoding in encodings:
         try:
-            return data.decode(encoding)
+            return data.decode(encoding)[-20000:]
         except (UnicodeDecodeError, LookupError):
             continue
 
