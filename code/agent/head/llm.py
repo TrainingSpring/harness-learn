@@ -3,11 +3,10 @@ import json
 
 
 class LLM:
-    def __init__(self, api_key, model, base_url,system_prompt=""):
+    def __init__(self, base_url, api_key, model,system_prompt=""):
         self.api_key = api_key
         self.model = model
         self.base_url = base_url
-        # self.screen_token = screen_token  # 上下文窗口大小，单位为token
         self.system_prompt = system_prompt  # 系统提示
 
     """

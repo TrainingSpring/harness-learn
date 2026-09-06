@@ -161,7 +161,7 @@ def render_event(event,agent):
 
 def main():
     agent = AgentLoop()
-    agent = read_record(os.path.join(agent.workspace,".training","sid_e8317d01f81f20abcc5cd51c.json"))
+    # agent = read_record(os.path.join(agent.workspace,".training","sid_e8317d01f81f20abcc5cd51c.json"))
     agent.register_tools([
         write.REGISTER,
         read.REGISTER,

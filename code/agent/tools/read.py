@@ -1,3 +1,4 @@
+import json
 import os.path
 import base64
 import mimetypes
@@ -56,8 +57,7 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
             return [
                 {
                     "type":"input_text",
-                    "text":"图片格式未知!",
-                    "error":True
+                    "text":"Error： 图片格式未知!",
                 }
             ]
         with open(cur_path, 'r', encoding='utf-8') as f:
@@ -66,10 +66,12 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
             return [
                 {
                     "type":"input_text",
-                    "text":content,
-                    "offset":offset,
-                    "limit":limit,
-                    "path":cur_path
+                    "text":json.dumps({
+                        "content": content,
+                        "offset":offset,
+                        "limit": limit,
+                        "path": cur_path
+                    })
                 }
             ]
     elif os.path.isdir(cur_path):
@@ -88,8 +90,11 @@ def read(self:AgentLoop,target_path:str,offset=None,limit=None):
             },
             {
                 "type":"input_text",
-                "path":cur_path,
-                "text":dir_list
+
+                "text":json.dumps({
+                    "path": cur_path,
+                    "listdir": dir_list
+                })
             }
         ]
     return None

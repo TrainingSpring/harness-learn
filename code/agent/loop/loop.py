@@ -10,9 +10,9 @@ from collections import deque
 def set_message(role="user", type:str="message",content=""):
     return {"role": role, "content": content,"type":type}
 
-BASE_URL = "https://token-plan-cn.xiaomimimo.com"
-API_KEY = "tp-c7mv9tn67kvmm90hfn48kyoruxkhua9t70zymm8hh43atcvw"
-MODEL = "mimo-v2.5"
+BASE_URL = "http://192.168.31.6:18080"
+API_KEY = "sk-5c206cdd7da2521f5949d6f78f9f40d1320caf8414eb187423c0e23e0619c8a8"
+MODEL = "gpt-5.6-luna"
 SYSTEM_PROMPT = "你是一个智能助手，帮助解决问题，实现用户的需求。 "
 
 
@@ -28,7 +28,7 @@ class AgentLoop:
     def __init__(self):
         self.sid = f"sid_{secrets.token_hex(12)}"
         self.max_context_tokens = 256*1024  # 上下文窗口大小
-        self.llm = LLM(API_KEY, MODEL, BASE_URL,system_prompt=SYSTEM_PROMPT)
+        self.llm = LLM(BASE_URL,API_KEY, MODEL, system_prompt=SYSTEM_PROMPT)
         self.tools = [] # tools列表
         self.tools_map:dict[str,Tool] = {}  # tools映射
         self.workspace = os.getcwd()
@@ -287,19 +287,27 @@ class AgentLoop:
                             # 将大模型处理数据添加进上下文
                             self.append_message(item)
                         elif item.get("type") == "function_call":
-                            self.append_message(item)
                             # 调用方法名
                             name = item.get("name")
                             # 参数
                             arguments = item.get("arguments")
+
+                            call_id = item.get("call_id")
+                            self.append_message({
+                                "type": "function_call",
+                                "id": item.get("id"),
+                                "name": name,
+                                "arguments": arguments,
+                                "call_id": call_id,
+                            })
                             # 调用工具
                             res = self.eval(name, arguments)
                             # 将工具调用结果添加进上下文
                             self.append_message({
                                 "type": "function_call_output",
-                                "name": name,
+                                # "name": name,
                                 "output": res,
-                                "call_id":item.get("call_id"),
+                                "call_id":call_id,
                             })
 
                     if chunk.get("is_stop"):
