@@ -1,6 +1,5 @@
 import locale
 
-from loop.loop import AgentLoop
 import subprocess
 import os
 
@@ -35,7 +34,7 @@ def decode_output(data: bytes | None) -> str:
 
     return data.decode("utf-8", errors="replace")
 
-def bash(self:AgentLoop,command:str,timeout:int|None = None):
+def bash(self,command:str,timeout:int|None = None):
 
     if os.name == "nt":
         # command = ["powershell.exe","-NoProfile","-NonInteractive", "-Command", command]

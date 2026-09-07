@@ -1,21 +1,9 @@
 from typing import Any, Generator
-
-import requests
 import json
-from openai import OpenAI,types
-from openai.types.responses.response import Response,ResponseUsage,ResponseOutputItem
+from openai import OpenAI
+from head.types import LLMResponseOutputItem,LLMUsage,LLMResponse
 
-from dataclasses import dataclass
-@dataclass
-class LLMResponse:
-    type: str
-    text: str|None = None
-    data: list[ResponseOutputItem]|None = None
-    is_stop: bool|None = None
-    arguments:str|None = None
-    name:str|None = None
-    usage:ResponseUsage|None=None
-    message:Any|None = None
+
 
 class LLM:
     def __init__(self, base_url, api_key, model,system_prompt=""):
@@ -48,11 +36,6 @@ class LLM:
                 if not event:
                     continue
 
-                # 如果数据为"[DONE]"，则表示数据接收完毕
-                # if data == "[DONE]":
-                #     break
-                # # 解析字符串为json
-                # event = json.loads(data)
                 event_type = event.type
                 # 处理输出字符串（数据流实时）
                 if event_type == "response.output_text.delta":
@@ -76,7 +59,7 @@ class LLM:
                 if event_type == "response.completed":
                     content = event.response.output
                     usage = event.response.usage
-                    yield LLMResponse("done",data=content,is_stop=not has_call,usage=usage)
+                    yield LLMResponse("done",data=LLMResponseOutputItem.to_LLMResponseOutputItems(content),is_stop=not has_call,usage=LLMUsage.to_LLMUsage(usage))
                 # 处理错误事件
                 elif event_type == "error":
                     yield LLMResponse("error",message=event)
@@ -90,12 +73,3 @@ class LLM:
             tools=tools,
         )
         return response
-# BASE_URL = "https://token-plan-cn.xiaomimimo.com"
-# API_KEY = "tp-c7mv9tn67kvmm90hfn48kyoruxkhua9t70zymm8hh43atcvw"
-# MODEL = "mimo-v2.5-pro"
-# call_llm = LLM(API_KEY, MODEL, BASE_URL,system_prompt="你是一个智能助手，帮助解决问题，实现用户的需求。 ").call_responses
-# for chunk in call_llm("今天的天气如何？ ",tools=tools):
-#     if chunk.get("type") == "text" or chunk.get("type") == "reasoning":
-#         print(chunk.get("text"), end="", flush=True)
-#     if chunk.get("type") == "tool_call":
-#         print(chunk.get("name"))

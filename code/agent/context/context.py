@@ -1,6 +1,7 @@
 import json
+import secrets
 
-from head.llm import LLM
+from head.llm import LLM, LLMUsage, LLMResponseOutputItem
 
 
 def rough_tokens(text: str) -> int:
@@ -37,17 +38,26 @@ class Context:
         self.llm = llm
         self.call_result_num = 5
         self.screen_size = 128*1024
-        self.usage = {}
+        self.usage = None
+        self.sid = f"s_{secrets.token_hex(10)}"
 
-    def add_msg(self,msg:dict):
+    def append_msg(self,msg:LLMResponseOutputItem|dict|str, type:str="message", role:str="user",usage:LLMUsage|None= None):
         """
         添加消息
         :param  msg:dict
+        :param  type:str
+        :param  role:str
+        :param  usage:Any
         :return : messages:list[dict]
         """
+        if isinstance(msg,str):
+            msg = {"type": type, "role": role, "content": msg}
+        elif isinstance(msg,LLMResponseOutputItem):
+            msg = msg.to_dict()
+
         self.messages.append(msg)
-
-
+        if usage:
+            self.set_usage(usage)
     def function_call_manager(self):
         """
         管理函数调用历史
@@ -111,11 +121,23 @@ class Context:
         print("上下文压缩完成~")
         return self.messages
 
-    def set_usage(self,usage:dict):
+    def set_usage(self,usage:LLMUsage):
         """
         设置使用情况
         :param  usage:dict
         """
+        print("==============================================")
+        cached_token = usage.cached_token
+        input_tokens = usage.input_tokens
+        output_tokens = usage.output_tokens
+        total_tokens = usage.total_tokens
+        print(f"缓存命中率:{cached_token / input_tokens * 100} %")
+        print(f"缓存命中:{cached_token}")
+        print(f"输出token :{output_tokens}")
+        print(f"输入token:{input_tokens}")
+        print(f"输入未命中:{input_tokens - cached_token}")
+        print(f"token总量:{total_tokens}")
+        print("==============================================")
         self.usage = usage
         self.check_point()
 
@@ -132,3 +154,16 @@ class Context:
             pass
 
         return self.messages
+
+    def get_msg(self,prev:list[dict]|None = None):
+        """
+        获取消息
+        :param  prev:list[dict]|None
+        :return : messages:list[dict]
+        """
+        return self.messages if prev is None else prev + self.messages
+
+
+    def load_history(self,sid:str,context:list[dict]):
+        self.messages = context
+        self.sid = sid

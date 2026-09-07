@@ -3,15 +3,13 @@ import os
 import sys
 from pathlib import Path
 
+from head.types import LLMConfig
+from runtime.agent import Agent
+
 # 支持直接执行 `python code/cli/main.py`。
 AGENT_PATH = Path(__file__).resolve().parents[1] / "agent"
 if str(AGENT_PATH) not in sys.path:
     sys.path.insert(0, str(AGENT_PATH))
-
-from records import get_record_list, read_record, write_record
-from loop.loop import AgentLoop
-import tools
-from tools import bash  ,edit, read , write
 
 def print_help():
     print("可用命令:")
@@ -92,84 +90,36 @@ def _show_context(agent):
     print("--- 上下文结束 ---")
 
 
-def resume_record(current_agent):
-    record_dir = os.path.join(current_agent.workspace, ".training")
-    records = get_record_list(record_dir)
-    if not records:
-        print("暂无历史记录。")
-        return current_agent
-
-    selected = 0
-    while True:
-        print("\033[2J\033[H", end="")
-        print("选择要恢复的会话（上下键选择，回车确认，Esc取消）：\n")
-        for index, record in enumerate(records):
-            marker = ">" if index == selected else " "
-            print(f"{marker} {record}")
-
-        key = _read_key()
-        if key == "up":
-            selected = (selected - 1) % len(records)
-        elif key == "down":
-            selected = (selected + 1) % len(records)
-        elif key == "enter":
-            print("=======record_dir=========  "+record_dir)
-            print(f"=======selected=========  {selected}")
-            print(f"=======records=========  {records}")
-            try:
-                loaded_agent = read_record(os.path.join(record_dir, records[selected]))
-                loaded_agent.tools = []
-                loaded_agent.tools_map = {}
-                loaded_agent.register_tools([
-                    write.REGISTER,
-                    read.REGISTER,
-                    edit.REGISTER,
-                    bash.REGISTER,
-                ])
-                print("\n会话加载成功。")
-                _show_context(loaded_agent)
-                return loaded_agent
-            except Exception as error:
-                print(f"\n加载记录失败：{error}")
-                return current_agent
-        elif key == "escape":
-            print("\n已取消恢复。")
-            return current_agent
-
-
 def render_event(event,agent):
-    event_type = event.get("type")
+    event_type = event.type
 
     if event_type == "text":
-        print(event.get("text", ""), end="", flush=True)
+        print(event.text, end="", flush=True)
 
     elif event_type == "reasoning":
-        print(f"{event.get('text', '')}", end="",flush=True)
+        print(f"{event.text}", end="",flush=True)
     elif event_type == "reasoning_summary":
-        print(f"\n[reasoning_summary] {event.get('text', '')}")
+        print(f"\n[reasoning_summary] {event.text}")
 
     elif event_type == "function_call":
-        print(f"\n[tool] {event.get('name')}({event.get('arguments')})")
+        print(f"\n[tool] {event.name}({event.arguments})")
 
     elif event_type == "error":
-        print(f"\n[error] {event.get('message', 'unknown error')}")
+        print(f"\n[error] {event.message}")
 
-    elif event_type == "done" and event.get("is_stop"):
-        write_record(agent)
+    elif event_type == "done" and event.is_stop:
+        # write_record(agent)
         print("[finished]")
-
+BASE_URL = "http://192.168.31.6:18080"
+API_KEY = "sk-5c206cdd7da2521f5949d6f78f9f40d1320caf8414eb187423c0e23e0619c8a8"
+MODEL = "gpt-5.6-luna"
+SYSTEM_PROMPT = "你是一个智能助手，帮助解决问题，实现用户的需求。 "
 
 def main():
-    agent = AgentLoop()
+    agent = Agent(LLMConfig(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),["read","write"])
     # agent = read_record(os.path.join(agent.workspace,".training","sid_e8317d01f81f20abcc5cd51c.json"))
-    agent.register_tools([
-        write.REGISTER,
-        read.REGISTER,
-        edit.REGISTER,
-        bash.REGISTER
-    ])
 
-    _show_context(agent)
+    agent.tools.eval("read",{"target_path":"屏幕截图 2026-08-14 221707.png"})
     # agent.compact_context()
     print("Agent CLI 已启动，输入 /help 查看命令。")
 
@@ -193,21 +143,21 @@ def main():
 
         if user_input == "/tools":
             print("已注册工具:")
-            for tool in agent.tools:
-                print(f"- {tool.get('name')}")
+            for tool in agent.tools.list:
+                print(f"- {tool.name}")
             continue
 
         if user_input == "/resume":
-            agent = resume_record(agent)
+            # agent = resume_record(agent)
             continue
 
         if user_input == "/clear":
-            agent.message = []
+            agent.context.messages = []
             print("会话上下文已清空。")
             continue
 
         try:
-            for event in agent.run(user_input):
+            for event in agent.send(user_input):
                 render_event(event,agent)
         except Exception as e:
             print(f"\n[error] {e}")

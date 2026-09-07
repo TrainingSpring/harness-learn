@@ -4,7 +4,6 @@ import base64
 import mimetypes
 from tools.types import Tool
 
-from loop.loop import AgentLoop
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif",
     ".webp", ".bmp"
@@ -26,7 +25,7 @@ def is_img(path):
     "limit": "string",  # 读取的最大字符数
 }
 """
-def read(self:AgentLoop,target_path:str,offset=None,limit=None):
+def read(self,target_path:str,offset=None,limit=None):
     cur_path = target_path
     limit = min(limit,20000)
     # 判定是否是相对路径

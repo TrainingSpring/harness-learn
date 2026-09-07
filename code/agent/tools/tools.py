@@ -1,6 +1,7 @@
+import importlib
 import json
 
-from types import Tool
+from tools.types import Tool
 
 
 class Tools:
@@ -63,3 +64,23 @@ class Tools:
             return tool.function(self,**args)
         except Exception as e:
             return "[Error]: " + str(e)
+
+    def register_by_names(self,names:list[str]):
+        """
+        根据名称注册工具
+        :param names : list[str] : 工具名称列表
+        :return : list[dict] : 工具集
+        """
+        res = []
+        for name in names:
+            module_name = "tools."+name
+            module = importlib.import_module(module_name)
+            tool = getattr(module,"REGISTER",None)
+            if not isinstance(tool, Tool):
+                raise TypeError(f"{name}.REGISTER 不是有效的 Tool")
+            if tool.schema.get("name") != name:
+                raise ValueError(
+                    f"工具名称不一致: 配置名={name}, schema名称={tool.schema.get('name')}"
+                )
+            self.register(tool)
+        return self

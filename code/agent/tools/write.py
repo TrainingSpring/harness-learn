@@ -1,4 +1,3 @@
-from loop.loop import AgentLoop
 import os
 from tools.types import Tool
 
@@ -9,7 +8,7 @@ from tools.types import Tool
 @param content: 文件内容
 
 """
-def write(self:AgentLoop,target_path:str,content:str=""):
+def write(self,target_path:str,content:str=""):
     cur_path = target_path
     # 判定是否是相对路径
     if not os.path.isabs(target_path):

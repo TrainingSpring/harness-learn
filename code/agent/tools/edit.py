@@ -1,6 +1,4 @@
 import os.path
-
-from loop.loop import AgentLoop
 from tools.types import Tool
 
 
@@ -26,7 +24,7 @@ def find_unique_text(content:str,text:str):
 @param {list} edits - 编辑内容列表
 @returns {dict} - 编辑结果
 """
-def edit(self:AgentLoop,target_path:str,edits:list[dict]):
+def edit(self,target_path:str,edits:list[dict]):
     # 检查目标文件是否存在
     if not os.path.exists(target_path) or not os.path.isfile(target_path):
         return {
