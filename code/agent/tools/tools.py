@@ -78,6 +78,7 @@ class Tools:
             )
 
         if not isinstance(result, ToolResult):
+            # 这是工具实现错误，不允许继续猜测或兼容其他返回格式。
             return self._encode_output(
                 ToolResult.failure(
                     "INVALID_TOOL_RESULT",
@@ -94,16 +95,22 @@ class Tools:
 
     @staticmethod
     def _encode_output(result):
-        """将工具业务结果编码为 Responses function_call_output.output。"""
+        """将内部 ToolResult 适配为 Responses function_call_output.output。
+
+        这是工具层唯一可以产生 input_text、input_image 等 Responses
+        协议字段的位置。工具实现只处理 ToolResult 和 ImageAttachment。
+        """
         if not isinstance(result, ToolResult):
             raise TypeError("工具结果必须是 ToolResult")
 
         if result.attachments:
+            # 多模态输出必须使用 content 数组；业务数据仍作为首个文本项。
             content = [{
                 "type": "input_text",
                 "text": Tools._serialize_value(Tools._result_data(result)),
             }]
             for attachment in result.attachments:
+                # ImageAttachment 是内部语义，转换规则集中在此处。
                 content.append({
                     "type": "input_image",
                     "image_url": attachment.url,
@@ -115,6 +122,7 @@ class Tools:
 
     @staticmethod
     def _result_data(result: ToolResult):
+        """将统一结果投影为可 JSON 序列化的工具响应主体。"""
         if result.status == "ok":
             return {"status": result.status, "data": result.data}
         return {
@@ -129,6 +137,7 @@ class Tools:
 
     @staticmethod
     def _serialize_value(value):
+        # 普通函数工具输出必须是字符串；结构化数据使用 JSON 字符串承载。
         if isinstance(value, str):
             return value
         return json.dumps(value, ensure_ascii=False)

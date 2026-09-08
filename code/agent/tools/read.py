@@ -40,6 +40,7 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000) -> ToolRes
                 with open(cur_path, 'rb') as file:
                     image_types = file.read()
                 image_base64 = base64.b64encode(image_types).decode("ascii")
+                # 读取工具只声明图片附件；Responses 的 input_image 转换在 Tools 中完成。
                 return ToolResult.success(
                     data={
                         "type": "image",
