@@ -1,9 +1,8 @@
 import os.path
-import base64
 import mimetypes
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import ImageAttachment, Tool, ToolResult, handle_path
+from tools.types import Attachment, Tool, ToolResult, handle_path
 
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif",
@@ -36,10 +35,8 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000) -> ToolRes
         if is_img(cur_path):
             mime_type, _ = mimetypes.guess_type(cur_path)
             if mime_type is not None:
-                image_types = None;
                 with open(cur_path, 'rb') as file:
-                    image_types = file.read()
-                image_base64 = base64.b64encode(image_types).decode("ascii")
+                    image_bytes = file.read()
                 # 读取工具只声明图片附件；Responses 的 input_image 转换在 Tools 中完成。
                 return ToolResult.success(
                     data={
@@ -48,9 +45,10 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000) -> ToolRes
                         "mime_type": mime_type,
                     },
                     attachments=[
-                        ImageAttachment(
-                            url=f"data:{mime_type};base64,{image_base64}",
-                            mime_type=mime_type,
+                        Attachment(
+                            media_type=mime_type,
+                            source_kind="bytes",
+                            source=image_bytes,
                         )
                     ],
                 )

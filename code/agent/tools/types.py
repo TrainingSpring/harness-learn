@@ -1,4 +1,5 @@
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
@@ -15,11 +16,26 @@ class ToolError:
 
 
 @dataclass
-class ImageAttachment:
-    """工具产生的图片附件，不包含任何模型厂商的协议字段。"""
-    url: str
-    mime_type: str
-    detail: str = "auto"
+class Attachment:
+    """通用媒体附件，不包含模型厂商的协议字段。
+
+    source_kind 决定 source 的类型：bytes 表示本地二进制内容，url
+    表示可直接引用的远程资源地址。Base64 只在协议适配阶段生成。
+    """
+    media_type: str
+    source_kind: Literal["bytes", "url"]
+    source: bytes | str
+    filename: str | None = None
+
+    def __post_init__(self):
+        if not re.fullmatch(r"[^/\s]+/[^/\s]+", self.media_type):
+            raise ValueError("media_type 必须是合法的 MIME 类型")
+        if self.source_kind == "bytes" and not isinstance(self.source, bytes):
+            raise TypeError("bytes 来源必须传入 bytes")
+        if self.source_kind == "url" and not isinstance(self.source, str):
+            raise TypeError("url 来源必须传入字符串")
+        if self.source_kind not in ("bytes", "url"):
+            raise ValueError(f"未知的附件来源类型: {self.source_kind}")
 
 
 @dataclass
@@ -31,7 +47,7 @@ class ToolResult:
     """
     status: Literal["ok", "error"]
     data: Any = None
-    attachments: list[ImageAttachment] = field(default_factory=list)
+    attachments: list[Attachment] = field(default_factory=list)
     error: ToolError | None = None
 
     def __post_init__(self):
@@ -44,14 +60,14 @@ class ToolResult:
             raise ValueError("失败的 ToolResult 必须包含 error")
         if self.status == "error" and self.data is not None:
             raise ValueError("失败的 ToolResult 不能包含 data")
-        if not all(isinstance(item, ImageAttachment) for item in self.attachments):
-            raise TypeError("attachments 必须全部是 ImageAttachment")
+        if not all(isinstance(item, Attachment) for item in self.attachments):
+            raise TypeError("attachments 必须全部是 Attachment")
 
     @classmethod
     def success(
         cls,
         data: Any = None,
-        attachments: list[ImageAttachment] | None = None,
+        attachments: list[Attachment] | None = None,
     ) -> "ToolResult":
         """创建成功结果；附件与业务数据一同描述本次工具调用。"""
         return cls(status="ok", data=data, attachments=list(attachments or []))

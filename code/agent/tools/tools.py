@@ -1,8 +1,9 @@
 import importlib
 import json
+from base64 import b64encode
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Tool, ToolResult
+from tools.types import Attachment, Tool, ToolResult
 
 
 class Tools:
@@ -98,7 +99,7 @@ class Tools:
         """将内部 ToolResult 适配为 Responses function_call_output.output。
 
         这是工具层唯一可以产生 input_text、input_image 等 Responses
-        协议字段的位置。工具实现只处理 ToolResult 和 ImageAttachment。
+        协议字段的位置。工具实现只处理 ToolResult 和 Attachment。
         """
         if not isinstance(result, ToolResult):
             raise TypeError("工具结果必须是 ToolResult")
@@ -110,15 +111,30 @@ class Tools:
                 "text": Tools._serialize_value(Tools._result_data(result)),
             }]
             for attachment in result.attachments:
-                # ImageAttachment 是内部语义，转换规则集中在此处。
-                content.append({
-                    "type": "input_image",
-                    "image_url": attachment.url,
-                    "detail": attachment.detail,
-                })
+                content.append(Tools._encode_attachment(attachment))
             return content
 
         return Tools._serialize_value(Tools._result_data(result))
+
+    @staticmethod
+    def _encode_attachment(attachment: Attachment):
+        """根据 MIME 类型和来源将内部附件转换成 Responses 内容项。"""
+        if attachment.media_type.startswith("image/"):
+            image_url = Tools._attachment_source(attachment)
+            return {
+                "type": "input_image",
+                "image_url": image_url,
+                "detail": "auto",
+            }
+
+        raise ValueError(f"暂不支持的附件类型: {attachment.media_type}")
+
+    @staticmethod
+    def _attachment_source(attachment: Attachment):
+        if attachment.source_kind == "url":
+            return attachment.source
+        encoded = b64encode(attachment.source).decode("ascii")
+        return f"data:{attachment.media_type};base64,{encoded}"
 
     @staticmethod
     def _result_data(result: ToolResult):

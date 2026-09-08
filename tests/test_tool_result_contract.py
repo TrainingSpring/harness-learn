@@ -14,7 +14,7 @@ from tools.bash import bash
 from tools.edit import edit
 from tools.read import read
 from tools.tools import Tools
-from tools.types import ImageAttachment, Tool, ToolResult
+from tools.types import Attachment, Tool, ToolResult
 from tools.write import write
 
 
@@ -86,9 +86,10 @@ class ToolResultContractTests(unittest.TestCase):
                 lambda _ctx: ToolResult.success(
                     data={"path": "/tmp/image.png"},
                     attachments=[
-                        ImageAttachment(
-                            url="data:image/png;base64,abc",
-                            mime_type="image/png",
+                        Attachment(
+                            media_type="image/png",
+                            source_kind="bytes",
+                            source=b"image-bytes",
                         )
                     ],
                 ),
@@ -105,10 +106,33 @@ class ToolResultContractTests(unittest.TestCase):
             result[1],
             {
                 "type": "input_image",
-                "image_url": "data:image/png;base64,abc",
+                "image_url": "data:image/png;base64,aW1hZ2UtYnl0ZXM=",
                 "detail": "auto",
             },
         )
+
+    def test_attachment_can_represent_remote_image_url(self):
+        ctx = ExecutionContext("/tmp", "agent-test")
+        tools = Tools(ctx)
+        tools.register(
+            Tool(
+                {"name": "remote_image"},
+                lambda _ctx: ToolResult.success(
+                    attachments=[
+                        Attachment(
+                            media_type="image/jpeg",
+                            source_kind="url",
+                            source="https://example.com/image.jpg",
+                        )
+                    ],
+                ),
+            )
+        )
+
+        result = tools.eval("remote_image", {})
+
+        self.assertEqual(result[1]["type"], "input_image")
+        self.assertEqual(result[1]["image_url"], "https://example.com/image.jpg")
 
     def test_all_builtin_tools_return_tool_result(self):
         with tempfile.TemporaryDirectory() as workspace:
@@ -158,8 +182,9 @@ class ToolResultContractTests(unittest.TestCase):
 
         self.assertIsInstance(result, ToolResult)
         self.assertEqual(result.data["type"], "image")
-        self.assertEqual(result.attachments[0].mime_type, "image/png")
-        self.assertTrue(result.attachments[0].url.startswith("data:image/png;base64,"))
+        self.assertEqual(result.attachments[0].media_type, "image/png")
+        self.assertEqual(result.attachments[0].source_kind, "bytes")
+        self.assertEqual(result.attachments[0].source, b"image-bytes")
 
     def test_tool_result_enforces_success_and_error_invariants(self):
         with self.assertRaises(ValueError):
