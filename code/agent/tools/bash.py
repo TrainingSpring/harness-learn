@@ -1,8 +1,10 @@
+import json
 import locale
 
 import subprocess
 import os
 
+from runtime.ExecutionContext import ExecutionContext
 from tools.types import Tool
 
 
@@ -11,7 +13,7 @@ from tools.types import Tool
 @param data: bytes
 
 """
-def decode_output(data: bytes | None) -> str:
+def decode_output(data: bytes | None,max_length:int) -> str:
     if not data:
         return ""
 
@@ -28,16 +30,15 @@ def decode_output(data: bytes | None) -> str:
     # 尝试使用不同的编码解码数据
     for encoding in encodings:
         try:
-            return data.decode(encoding)[-20000:]
+            return data.decode(encoding)[-max_length:]
         except (UnicodeDecodeError, LookupError):
             continue
 
     return data.decode("utf-8", errors="replace")
 
-def bash(self,command:str,timeout:int|None = None):
+def bash(ctx:ExecutionContext,command:str,timeout:int|None = None):
 
     if os.name == "nt":
-        # command = ["powershell.exe","-NoProfile","-NonInteractive", "-Command", command]
         command = "powershell.exe"+" -NoProfile"+" -NonInteractive"+ " -Command " +  command
     else:
         command = [
@@ -51,19 +52,25 @@ def bash(self,command:str,timeout:int|None = None):
         timeout=timeout,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=self.workspace
+        cwd=ctx.workspace
     )
     if result.returncode == 0:
         return {
-            "type": "text",
-            "text": decode_output(result.stdout),
-            "status":"ok"
+            "type":"input_text",
+            "text":json.dumps({
+                "type": "text",
+                "text": decode_output(result.stdout,ctx.max_tool_call_length),
+                "status":"ok"
+            })
         }
     else:
         return {
-            "type": "text",
-            "text": decode_output(result.stderr),
-            "status":"error"
+            "type":"input_text",
+            "text":json.dumps({
+                "type": "text",
+                "text": decode_output(result.stderr),
+                "status":"error"
+            })
         }
 
 # agent = AgentLoop()

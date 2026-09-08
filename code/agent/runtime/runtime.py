@@ -2,16 +2,16 @@ import os
 
 from context.context import Context
 from head.llm import LLM, LLMResponseOutputItem
+from runtime.ExecutionContext import ExecutionContext
 from tools.tools import Tools
 
 
 class Runtime:
-    def __init__(self,llm:LLM,tools:Tools,context:Context):
+    def __init__(self,llm:LLM,tools:Tools,context:Context,ctx:ExecutionContext):
         self.llm = llm
         self.tools = tools
         self.context = context
-        self.workspace = os.getcwd()
-
+        self.ctx = ctx  # 运行时上下文（Agent运行时的参数）
         self.sys_message = [
             {
                 "type": "message",
@@ -19,7 +19,7 @@ class Runtime:
                 "content": [
                     {
                         "type": "input_text",
-                        "text": f"当前系统环境：{'windows' if os.name == 'nt' else 'linux'},工作目录{self.workspace}"
+                        "text": f"当前系统环境：{'windows' if os.name == 'nt' else 'linux'},工作目录{ctx.workspace}"
                     }
                 ]
             }
@@ -50,6 +50,6 @@ class Runtime:
                             })
                     if res.is_stop:
                         yield res
-                        break
+                        return res
                 else:
                     yield res

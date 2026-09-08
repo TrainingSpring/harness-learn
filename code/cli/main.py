@@ -119,7 +119,7 @@ def main():
     agent = Agent(LLMConfig(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),["read","write"])
     # agent = read_record(os.path.join(agent.workspace,".training","sid_e8317d01f81f20abcc5cd51c.json"))
 
-    agent.tools.eval("read",{"target_path":"屏幕截图 2026-08-14 221707.png"})
+    # agent.tools.eval("read",{"target_path":"屏幕截图 2026-08-14 221707.png"})
     # agent.compact_context()
     print("Agent CLI 已启动，输入 /help 查看命令。")
 

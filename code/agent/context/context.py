@@ -2,6 +2,7 @@ import json
 import secrets
 
 from head.llm import LLM, LLMUsage, LLMResponseOutputItem
+from runtime.ExecutionContext import ExecutionContext
 
 
 def rough_tokens(text: str) -> int:
@@ -13,7 +14,8 @@ def rough_tokens(text: str) -> int:
 
 
 class Context:
-    def __init__(self,llm:LLM):
+    def __init__(self,llm:LLM,ctx:ExecutionContext):
+        self.ctx = ctx
         """
         上下文类，用于管理对话历史和压缩上下文。
         :param  llm:LLM: 用于压缩上下文的 LLM
@@ -40,6 +42,7 @@ class Context:
         self.screen_size = 128*1024
         self.usage = None
         self.sid = f"s_{secrets.token_hex(10)}"
+        ctx.sid = self.sid
 
     def append_msg(self,msg:LLMResponseOutputItem|dict|str, type:str="message", role:str="user",usage:LLMUsage|None= None):
         """
@@ -66,22 +69,22 @@ class Context:
         ignore_num = 0
         for i in reversed(range(len(msg) - 1)):
             item = msg[i]
-            name = item.get("name")
-            if item.get("type") == "function_call" and ignore_num < self.call_result_num:
+            name = item.name
+            if item.type == "function_call" and ignore_num < self.call_result_num:
                 ignore_num += 1
             if ignore_num > self.call_result_num:
-                if item.get("type") == "function_call":
+                if item.type == "function_call":
                     self.messages[i] = {
                         "role": "assistant",
                         "content": json.dumps({
                             "tool": name,
                             "kind": "history_tool_call",
-                            "bytes_written": len(item.get("arguments")),
+                            "bytes_written": len(item.arguments),
                             "message": f"{name}的历史调参数内容已被移除。",
                         })
                     }
-                elif item.get("type") == "function_call_output":
-                    item["output"] = f"工具调用结果内容已从上下文移除，请重新调用{item.get('name')}"
+                elif item.type == "function_call_output":
+                    item.output = f"工具调用结果内容已从上下文移除，请重新调用{item.name}"
 
     def compact_context(self):
         """
@@ -103,7 +106,7 @@ class Context:
                 msg = msg[:i + 1]
                 break
         ipt = [{"role": "user", "content": json.dumps(msg)}]
-        res = self.llm.call_responses(ipt).get("output_text")
+        res = self.llm.call_responses(ipt).output_text
         self.messages = [{
             "type": "message",
             "role": "developer",
@@ -146,7 +149,7 @@ class Context:
         """
         检测点，进行上下文治理，用于处理上下文过大的问题。
         """
-        rate = usage.get("total_tokens",0) / self.screen_size
+        rate = usage.total_tokens / self.screen_size
         if 0.6 < rate < 0.7:
             self.function_call_manager()
         elif rate >= 0.7:

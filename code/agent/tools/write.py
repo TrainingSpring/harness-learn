@@ -1,5 +1,8 @@
+import json
 import os
-from tools.types import Tool
+
+from runtime.ExecutionContext import ExecutionContext
+from tools.types import Tool, handle_path
 
 """
 @description: 写文件
@@ -8,13 +11,9 @@ from tools.types import Tool
 @param content: 文件内容
 
 """
-def write(self,target_path:str,content:str=""):
-    cur_path = target_path
+def write(ctx:ExecutionContext,target_path:str,content:str=""):
     # 判定是否是相对路径
-    if not os.path.isabs(target_path):
-        if target_path.startswith("/"):
-            target_path = target_path[1:]
-        cur_path = os.path.join(self.workspace, target_path)
+    cur_path = target_path = handle_path(ctx,target_path)
     # 如果目录路径不存在，创建目录
     try:
         parent_dir = os.path.dirname(target_path)
@@ -22,10 +21,13 @@ def write(self,target_path:str,content:str=""):
             os.makedirs(parent_dir, exist_ok=True)
     except Exception as e:
         return {
-            "status":"error",
-            "type":"make_dir",
-            "path":target_path,
-            "error":str(e)
+            "type":"input_text",
+            "text":json.dumps({
+                "status":"error",
+                "type":"make_dir",
+                "path":target_path,
+                "error":str(e)
+            })
         }
 
     # 判定路径是文件路径还是目录路径
@@ -34,24 +36,33 @@ def write(self,target_path:str,content:str=""):
             with open(target_path, 'w', encoding='utf-8') as file:
                 file.write(content)
             return {
-                "status": "ok",
-                "type": "write_file",
-                "path": target_path,
-                "size": len(content)
+                "type":"input_text",
+                "text":json.dumps({
+                    "status": "ok",
+                    "type": "write_file",
+                    "path": target_path,
+                    "size": len(content)
+                })
             }
         except Exception as e:
             return {
-                "status": "error",
-                "type": "write_file",
-                "path": target_path,
-                "error": str(e)
+                "type":"input_text",
+                "text":json.dumps({
+                    "status": "error",
+                    "type": "write_file",
+                    "path": target_path,
+                    "error": str(e)
+                })
             }
     else:
         return {
-            "status":"ok",
-            "type":"make_dir",
-            "path":target_path
-        }
+                "type":"input_text",
+                "text":json.dumps({
+                    "status":"ok",
+                    "type":"make_dir",
+                    "path":target_path
+                })
+            }
 
 
 REGISTER = Tool(

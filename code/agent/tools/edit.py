@@ -1,5 +1,7 @@
 import os.path
-from tools.types import Tool
+
+from runtime.ExecutionContext import ExecutionContext
+from tools.types import Tool, handle_path
 
 
 # 查找唯一文本
@@ -17,25 +19,27 @@ def find_unique_text(content:str,text:str):
         else:
             raise Exception(f"'{text}'文本不唯一。")
 
-"""
-@description: 编辑文件内容
-@param {AgentLoop} self - 代理循环对象
-@param {str} target_path - 目标文件路径
-@param {list} edits - 编辑内容列表
-@returns {dict} - 编辑结果
-"""
-def edit(self,target_path:str,edits:list[dict]):
+
+def edit(ctx:ExecutionContext,target_path:str,edits:list[dict]):
+    """
+     编辑文件内容
+    :param  ctx:ExecutionContext - 执行时环境上下文
+    :param :target_path:str - 文件路径
+    :param :edits:list[dict] - 编辑内容列表
+    :returns :dict - 编辑结果
+    """
+    target_path = handle_path(ctx,target_path)
     # 检查目标文件是否存在
     if not os.path.exists(target_path) or not os.path.isfile(target_path):
         return {
-            "status":"error",
-            "message":"目标文件不存在。"
+            "type":"input_text",
+            "text":"[ ERROR ] 目标文件不存在。"
         }
     # 检查编辑内容是否为空
     if not edits or len(edits) == 0:
         return {
-            "status":"error",
-            "message":"编辑内容为空。"
+            "type":"input_text",
+            "text":"[ERROR] 编辑内容为空。"
         }
     # 读取目标文件内容
     with open(target_path, 'r', encoding='utf-8') as file:
@@ -43,8 +47,8 @@ def edit(self,target_path:str,edits:list[dict]):
     # 检查目标文件内容是否为空
     if not content or len(content) == 0:
         return {
-            "status":"error",
-            "message":"目标文件内容为空。"
+            "type":"input_text",
+            "text":"[ERROR] 目标文件内容为空。"
         }
     # 遍历编辑内容
     for item in edits:
@@ -61,16 +65,16 @@ def edit(self,target_path:str,edits:list[dict]):
                     content = content.replace(old_str, new_str)
             except Exception as e:
                 return {
-                    "status":"error",
-                    "message":str(e)
+                    "type":"input_text",
+                    "text":"[ERROR] "+str(e)
                 }
 
     # 将修改后的内容写回
     with open(target_path, 'w', encoding='utf-8') as file:
         file.write(content)
     return{
-        "status":"success",
-        "message":"编辑成功。",
+        "type":"input_text",
+        "text":"[SUCCESS] 编辑成功。"
     }
 
 

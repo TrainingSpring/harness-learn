@@ -2,7 +2,9 @@ import json
 import os.path
 import base64
 import mimetypes
-from tools.types import Tool
+
+from runtime.ExecutionContext import ExecutionContext
+from tools.types import Tool, handle_path
 
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif",
@@ -25,12 +27,11 @@ def is_img(path):
     "limit": "string",  # 读取的最大字符数
 }
 """
-def read(self,target_path:str,offset=None,limit=None):
-    cur_path = target_path
-    limit = min(limit,20000)
+def read(ctx:ExecutionContext, target_path:str, offset=None, limit=None):
+    cur_path = handle_path(ctx,target_path)
+    limit = min(limit,ctx.max_tool_call_length)
     # 判定是否是相对路径
-    if not os.path.isabs(target_path):
-        cur_path = os.path.join(self.workspace,target_path)
+
     # 判定路径是文件路径还是目录路径
     if os.path.isfile(cur_path):
         if not os.path.exists(cur_path):

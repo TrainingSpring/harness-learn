@@ -47,12 +47,12 @@ class LLMResponseOutputItem:
     def to_LLMResponseOutputItem(item:ResponseOutputItem):
         return LLMResponseOutputItem(
             type=item.type,
-            id=item.id,
-            content=item.content,
-            name=item.name,
-            arguments=item.arguments,
-            call_id=item.call_id,
-            status=item.status,
+            id=getattr(item,"id",None),
+            content=getattr(item,"content",None),
+            name=getattr(item,"name",None),
+            arguments=getattr(item,"arguments",None),
+            call_id=getattr(item,"call_id",None),
+            status=getattr(item,"status",None),
         )
     @staticmethod
     def to_LLMResponseOutputItems(items:list[ResponseOutputItem]):

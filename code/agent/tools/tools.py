@@ -1,6 +1,7 @@
 import importlib
 import json
 
+from runtime.ExecutionContext import ExecutionContext
 from tools.types import Tool
 
 
@@ -8,7 +9,8 @@ class Tools:
     """
     工具集
     """
-    def __init__(self):
+    def __init__(self,ctx:ExecutionContext):
+        self.ctx = ctx
         self.map:dict[str,Tool] = {}
         self.list:list[dict] = []
 
@@ -61,7 +63,7 @@ class Tools:
 
         try:
             # 调用工具方法
-            return tool.function(self,**args)
+            return tool.function(self.ctx,**args)
         except Exception as e:
             return "[Error]: " + str(e)
 
