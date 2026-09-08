@@ -31,25 +31,25 @@ def edit(ctx:ExecutionContext,target_path:str,edits:list[dict]):
     target_path = handle_path(ctx,target_path)
     # 检查目标文件是否存在
     if not os.path.exists(target_path) or not os.path.isfile(target_path):
-        return {
+        return [{
             "type":"input_text",
             "text":"[ ERROR ] 目标文件不存在。"
-        }
+        }]
     # 检查编辑内容是否为空
     if not edits or len(edits) == 0:
-        return {
-            "type":"input_text",
-            "text":"[ERROR] 编辑内容为空。"
-        }
+        return [{
+            "type": "input_text",
+            "text": "[ERROR] 编辑内容为空。"
+        }]
     # 读取目标文件内容
     with open(target_path, 'r', encoding='utf-8') as file:
         content = file.read()
     # 检查目标文件内容是否为空
     if not content or len(content) == 0:
-        return {
-            "type":"input_text",
-            "text":"[ERROR] 目标文件内容为空。"
-        }
+        return [{
+            "type": "input_text",
+            "text": "[ERROR] 目标文件内容为空。"
+        }]
     # 遍历编辑内容
     for item in edits:
         old_str = item.get("old_text") or ""
@@ -58,24 +58,23 @@ def edit(ctx:ExecutionContext,target_path:str,edits:list[dict]):
         # 检查旧文本是否为空,为空的话则不进行替换
         if old_str:
             try:
-                find_unique_text(content, old_str or "")
-                if not is_replace_all:
+                if not is_replace_all and find_unique_text(content, old_str or ""):
                     content = content.replace(old_str, new_str,1)
                 else:
                     content = content.replace(old_str, new_str)
             except Exception as e:
-                return {
-                    "type":"input_text",
-                    "text":"[ERROR] "+str(e)
-                }
+                return [{
+                    "type": "input_text",
+                    "text": "[ERROR] " + str(e)
+                }]
 
     # 将修改后的内容写回
     with open(target_path, 'w', encoding='utf-8') as file:
         file.write(content)
-    return{
+    return [{
         "type":"input_text",
         "text":"[SUCCESS] 编辑成功。"
-    }
+    }]
 
 
 REGISTER = Tool({

@@ -27,7 +27,7 @@ def is_img(path):
     "limit": "string",  # 读取的最大字符数
 }
 """
-def read(ctx:ExecutionContext, target_path:str, offset=None, limit=None):
+def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000):
     cur_path = handle_path(ctx,target_path)
     limit = min(limit,ctx.max_tool_call_length)
     # 判定是否是相对路径
@@ -61,7 +61,7 @@ def read(ctx:ExecutionContext, target_path:str, offset=None, limit=None):
                 }
             ]
         with open(cur_path, 'r', encoding='utf-8') as f:
-            f.seek(offset or 0)
+            f.seek(offset)
             content = f.read(limit)
             return [
                 {
@@ -117,7 +117,7 @@ REGISTER = Tool({
                 },
                 "limit":{
                     "type":"number",
-                    "description":"读取的字符数量"
+                    "description":"读取的字符数量, 默认值为5000"
                 }
             },
             "required":["target_path"],

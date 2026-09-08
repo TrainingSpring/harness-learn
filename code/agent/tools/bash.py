@@ -55,23 +55,23 @@ def bash(ctx:ExecutionContext,command:str,timeout:int|None = None):
         cwd=ctx.workspace
     )
     if result.returncode == 0:
-        return {
+        return [{
             "type":"input_text",
             "text":json.dumps({
                 "type": "text",
                 "text": decode_output(result.stdout,ctx.max_tool_call_length),
                 "status":"ok"
             })
-        }
+        }]
     else:
-        return {
+        return [{
             "type":"input_text",
             "text":json.dumps({
                 "type": "text",
-                "text": decode_output(result.stderr),
+                "text": decode_output(result.stderr,ctx.max_tool_call_length),
                 "status":"error"
             })
-        }
+        }]
 
 # agent = AgentLoop()
 # res = bash(agent,"netstat -ano",10)

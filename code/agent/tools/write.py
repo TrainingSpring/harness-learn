@@ -20,7 +20,7 @@ def write(ctx:ExecutionContext,target_path:str,content:str=""):
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
     except Exception as e:
-        return {
+        return [{
             "type":"input_text",
             "text":json.dumps({
                 "status":"error",
@@ -28,14 +28,14 @@ def write(ctx:ExecutionContext,target_path:str,content:str=""):
                 "path":target_path,
                 "error":str(e)
             })
-        }
+        }]
 
     # 判定路径是文件路径还是目录路径
     if not cur_path.endswith("/"):
         try:
             with open(target_path, 'w', encoding='utf-8') as file:
                 file.write(content)
-            return {
+            return [{
                 "type":"input_text",
                 "text":json.dumps({
                     "status": "ok",
@@ -43,9 +43,9 @@ def write(ctx:ExecutionContext,target_path:str,content:str=""):
                     "path": target_path,
                     "size": len(content)
                 })
-            }
+            }]
         except Exception as e:
-            return {
+            return [{
                 "type":"input_text",
                 "text":json.dumps({
                     "status": "error",
@@ -53,16 +53,16 @@ def write(ctx:ExecutionContext,target_path:str,content:str=""):
                     "path": target_path,
                     "error": str(e)
                 })
-            }
+            }]
     else:
-        return {
+        return [{
                 "type":"input_text",
                 "text":json.dumps({
                     "status":"ok",
                     "type":"make_dir",
                     "path":target_path
                 })
-            }
+            }]
 
 
 REGISTER = Tool(
