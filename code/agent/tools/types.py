@@ -1,6 +1,6 @@
 import os
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from runtime.ExecutionContext import ExecutionContext
 
@@ -9,6 +9,13 @@ from runtime.ExecutionContext import ExecutionContext
 class Tool:
     schema:dict
     function:Callable
+
+
+@dataclass
+class ToolOutput:
+    """工具的业务结果，以及可选的 Responses 多模态内容。"""
+    value: Any = None
+    content: list[dict] | None = None
 
 
 def handle_path(ctx:ExecutionContext,target_path:str):

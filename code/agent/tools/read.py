@@ -1,10 +1,9 @@
-import json
 import os.path
 import base64
 import mimetypes
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Tool, handle_path
+from tools.types import Tool, ToolOutput, handle_path
 
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif",
@@ -44,36 +43,25 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000):
                 with open(cur_path, 'rb') as file:
                     image_types = file.read()
                 image_base64 = base64.b64encode(image_types).decode("ascii")
-                return [
-                    {
-                        "type":"input_text",
-                        "text":f"读取到图片{mime_type or ""}",
-                    },
-                    {
-                        "type":"input_image",
-                        "image_url":f"data:{mime_type};base64,{image_base64}"
-                    }
-                ]
-            return [
-                {
-                    "type":"input_text",
-                    "text":"Error： 图片格式未知!",
-                }
-            ]
+                return ToolOutput(
+                    value={"path": cur_path, "mime_type": mime_type},
+                    content=[
+                        {
+                            "type":"input_image",
+                            "image_url":f"data:{mime_type};base64,{image_base64}"
+                        }
+                    ],
+                )
+            return {"status": "error", "message": "图片格式未知!", "path": cur_path}
         with open(cur_path, 'r', encoding='utf-8') as f:
             f.seek(offset)
             content = f.read(limit)
-            return [
-                {
-                    "type":"input_text",
-                    "text":json.dumps({
-                        "content": content,
-                        "offset":offset,
-                        "limit": limit,
-                        "path": cur_path
-                    })
-                }
-            ]
+            return {
+                "content": content,
+                "offset": offset,
+                "limit": limit,
+                "path": cur_path,
+            }
     elif os.path.isdir(cur_path):
         dir_list = []
         for target in os.listdir(cur_path):
@@ -83,21 +71,11 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000):
                 "name":target,
                 "path":target_path
             })
-        return [
-            {
-                "type":"input_text",
-                "text":f"读取到目录{cur_path}",
-            },
-            {
-                "type":"input_text",
-
-                "text":json.dumps({
-                    "path": cur_path,
-                    "listdir": dir_list
-                })
-            }
-        ]
-    return None
+        return {
+            "path": cur_path,
+            "listdir": dir_list,
+        }
+    return {"status": "not_found", "path": cur_path}
 
 
 REGISTER = Tool({

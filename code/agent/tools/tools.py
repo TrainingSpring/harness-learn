@@ -2,7 +2,7 @@ import importlib
 import json
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Tool
+from tools.types import Tool, ToolOutput
 
 
 class Tools:
@@ -63,9 +63,39 @@ class Tools:
 
         try:
             # 调用工具方法
-            return tool.function(self.ctx,**args)
+            return self._encode_output(tool.function(self.ctx,**args))
         except Exception as e:
             return "[Error]: " + str(e)
+
+    @staticmethod
+    def _encode_output(result):
+        """将工具业务结果编码为 Responses function_call_output.output。"""
+        if isinstance(result, ToolOutput):
+            content = list(result.content or [])
+            if result.value is not None:
+                content.insert(0, {
+                    "type": "input_text",
+                    "text": Tools._serialize_value(result.value),
+                })
+            return content
+        # 兼容尚未迁移的工具：它们当前已经返回 Responses content 数组。
+        if Tools._is_responses_content(result):
+            return result
+        return Tools._serialize_value(result)
+
+    @staticmethod
+    def _serialize_value(value):
+        if isinstance(value, str):
+            return value
+        return json.dumps(value, ensure_ascii=False, default=str)
+
+    @staticmethod
+    def _is_responses_content(value):
+        return (
+            isinstance(value, list)
+            and all(isinstance(item, dict) and "type" in item for item in value)
+            and any(item["type"].startswith("input_") for item in value)
+        )
 
     def register_by_names(self,names:list[str]):
         """
