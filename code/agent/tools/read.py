@@ -3,7 +3,7 @@ import base64
 import mimetypes
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Tool, ToolOutput, handle_path
+from tools.types import ImageAttachment, Tool, ToolResult, handle_path
 
 IMAGE_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif",
@@ -17,16 +17,9 @@ def is_img(path):
 @param target_path: 目标路径 ， 可以是相对路径和绝对路径，也可以是目录路径
 @param offset: 读取偏移量
 @param limit: 读取的最大字符数
-@return {
-    "type": "file",  # 文件类型，可选值有 "text","image" 和 "dir"
-    "path": "string",  # 文件路径
-    "content": "string",  # 文件内容
-    "listdir": "string",  # 文件夹内容列表，当文件类型为 "dir" 时返回
-    "offset": "string",  # 读取偏移量
-    "limit": "string",  # 读取的最大字符数
-}
+@return ToolResult: 读取结果；图片通过 attachments 返回
 """
-def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000):
+def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000) -> ToolResult:
     cur_path = handle_path(ctx,target_path)
     limit = min(limit,ctx.max_tool_call_length)
     # 判定是否是相对路径
@@ -34,7 +27,11 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000):
     # 判定路径是文件路径还是目录路径
     if os.path.isfile(cur_path):
         if not os.path.exists(cur_path):
-            return "File not found"
+            return ToolResult.failure(
+                "PATH_NOT_FOUND",
+                "目标路径不存在",
+                details={"path": cur_path},
+            )
 
         if is_img(cur_path):
             mime_type, _ = mimetypes.guess_type(cur_path)
@@ -43,25 +40,34 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000):
                 with open(cur_path, 'rb') as file:
                     image_types = file.read()
                 image_base64 = base64.b64encode(image_types).decode("ascii")
-                return ToolOutput(
-                    value={"path": cur_path, "mime_type": mime_type},
-                    content=[
-                        {
-                            "type":"input_image",
-                            "image_url":f"data:{mime_type};base64,{image_base64}"
-                        }
+                return ToolResult.success(
+                    data={
+                        "type": "image",
+                        "path": cur_path,
+                        "mime_type": mime_type,
+                    },
+                    attachments=[
+                        ImageAttachment(
+                            url=f"data:{mime_type};base64,{image_base64}",
+                            mime_type=mime_type,
+                        )
                     ],
                 )
-            return {"status": "error", "message": "图片格式未知!", "path": cur_path}
+            return ToolResult.failure(
+                "UNKNOWN_IMAGE_FORMAT",
+                "图片格式未知!",
+                details={"path": cur_path},
+            )
         with open(cur_path, 'r', encoding='utf-8') as f:
             f.seek(offset)
             content = f.read(limit)
-            return {
+            return ToolResult.success({
+                "type": "text",
                 "content": content,
                 "offset": offset,
                 "limit": limit,
                 "path": cur_path,
-            }
+            })
     elif os.path.isdir(cur_path):
         dir_list = []
         for target in os.listdir(cur_path):
@@ -71,11 +77,16 @@ def read(ctx:ExecutionContext, target_path:str, offset=0, limit=5000):
                 "name":target,
                 "path":target_path
             })
-        return {
+        return ToolResult.success({
+            "type": "directory",
             "path": cur_path,
             "listdir": dir_list,
-        }
-    return {"status": "not_found", "path": cur_path}
+        })
+    return ToolResult.failure(
+        "PATH_NOT_FOUND",
+        "目标路径不存在",
+        details={"path": cur_path},
+    )
 
 
 REGISTER = Tool({

@@ -1,17 +1,17 @@
-import json
 import os
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Tool, handle_path
+from tools.types import Tool, ToolResult, handle_path
 
 """
 @description: 写文件
-@param self: AgentLoop
+@param ctx: ExecutionContext
 @param target_path: 文件路径
 @param content: 文件内容
+@return ToolResult: 写入结果
 
 """
-def write(ctx:ExecutionContext,target_path:str,content:str=""):
+def write(ctx:ExecutionContext,target_path:str,content:str="") -> ToolResult:
     # 判定是否是相对路径
     cur_path = target_path = handle_path(ctx,target_path)
     # 如果目录路径不存在，创建目录
@@ -20,49 +20,33 @@ def write(ctx:ExecutionContext,target_path:str,content:str=""):
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
     except Exception as e:
-        return [{
-            "type":"input_text",
-            "text":json.dumps({
-                "status":"error",
-                "type":"make_dir",
-                "path":target_path,
-                "error":str(e)
-            })
-        }]
+        return ToolResult.failure(
+            "CREATE_DIRECTORY_FAILED",
+            str(e),
+            details={"path": target_path},
+        )
 
     # 判定路径是文件路径还是目录路径
     if not cur_path.endswith("/"):
         try:
             with open(target_path, 'w', encoding='utf-8') as file:
                 file.write(content)
-            return [{
-                "type":"input_text",
-                "text":json.dumps({
-                    "status": "ok",
-                    "type": "write_file",
-                    "path": target_path,
-                    "size": len(content)
-                })
-            }]
+            return ToolResult.success({
+                "operation": "write_file",
+                "path": target_path,
+                "size": len(content),
+            })
         except Exception as e:
-            return [{
-                "type":"input_text",
-                "text":json.dumps({
-                    "status": "error",
-                    "type": "write_file",
-                    "path": target_path,
-                    "error": str(e)
-                })
-            }]
+            return ToolResult.failure(
+                "WRITE_FILE_FAILED",
+                str(e),
+                details={"path": target_path},
+            )
     else:
-        return [{
-                "type":"input_text",
-                "text":json.dumps({
-                    "status":"ok",
-                    "type":"make_dir",
-                    "path":target_path
-                })
-            }]
+        return ToolResult.success({
+            "operation": "make_directory",
+            "path": target_path,
+        })
 
 
 REGISTER = Tool(

@@ -1,0 +1,179 @@
+import json
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+
+sys.path.insert(0, str(Path(__file__).parents[1] / "code" / "agent"))
+
+from runtime.ExecutionContext import ExecutionContext
+from tools.bash import bash
+from tools.edit import edit
+from tools.read import read
+from tools.tools import Tools
+from tools.types import ImageAttachment, Tool, ToolResult
+from tools.write import write
+
+
+class ToolResultContractTests(unittest.TestCase):
+    def test_eval_serializes_tool_result_as_json(self):
+        ctx = ExecutionContext("/tmp", "agent-test")
+        tools = Tools(ctx)
+        tools.register(
+            Tool(
+                {"name": "structured"},
+                lambda _ctx: ToolResult.success({"count": 2}),
+            )
+        )
+
+        result = tools.eval("structured", {})
+
+        self.assertEqual(
+            json.loads(result),
+            {"status": "ok", "data": {"count": 2}},
+        )
+
+    def test_eval_rejects_results_that_violate_the_contract(self):
+        ctx = ExecutionContext("/tmp", "agent-test")
+        tools = Tools(ctx)
+        tools.register(Tool({"name": "invalid"}, lambda _ctx: {"count": 2}))
+
+        result = json.loads(tools.eval("invalid", {}))
+
+        self.assertEqual(result["error"]["code"], "INVALID_TOOL_RESULT")
+
+    def test_eval_returns_structured_argument_errors(self):
+        ctx = ExecutionContext("/tmp", "agent-test")
+        tools = Tools(ctx)
+        tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success()))
+
+        result = json.loads(tools.eval("valid", "{"))
+
+        self.assertEqual(result["error"]["code"], "INVALID_ARGUMENTS")
+
+    def test_eval_rejects_non_object_arguments(self):
+        ctx = ExecutionContext("/tmp", "agent-test")
+        tools = Tools(ctx)
+        tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success()))
+
+        result = json.loads(tools.eval("valid", "[]"))
+
+        self.assertEqual(result["error"]["code"], "INVALID_ARGUMENTS")
+
+    def test_eval_rejects_non_serializable_result_data(self):
+        ctx = ExecutionContext("/tmp", "agent-test")
+        tools = Tools(ctx)
+        tools.register(
+            Tool(
+                {"name": "invalid_data"},
+                lambda _ctx: ToolResult.success({"value": object()}),
+            )
+        )
+
+        result = json.loads(tools.eval("invalid_data", {}))
+
+        self.assertEqual(result["error"]["code"], "INVALID_TOOL_RESULT")
+
+    def test_eval_converts_image_attachments_to_responses_content(self):
+        ctx = ExecutionContext("/tmp", "agent-test")
+        tools = Tools(ctx)
+        tools.register(
+            Tool(
+                {"name": "image"},
+                lambda _ctx: ToolResult.success(
+                    data={"path": "/tmp/image.png"},
+                    attachments=[
+                        ImageAttachment(
+                            url="data:image/png;base64,abc",
+                            mime_type="image/png",
+                        )
+                    ],
+                ),
+            )
+        )
+
+        result = tools.eval("image", {})
+
+        self.assertEqual(
+            json.loads(result[0]["text"]),
+            {"status": "ok", "data": {"path": "/tmp/image.png"}},
+        )
+        self.assertEqual(
+            result[1],
+            {
+                "type": "input_image",
+                "image_url": "data:image/png;base64,abc",
+                "detail": "auto",
+            },
+        )
+
+    def test_all_builtin_tools_return_tool_result(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            ctx = ExecutionContext(workspace, "agent-test")
+            source = Path(workspace) / "source.txt"
+            source.write_text("before", encoding="utf-8")
+
+            read_result = read(ctx, "source.txt")
+            write_result = write(ctx, "written.txt", "content")
+            edit_result = edit(
+                ctx,
+                "source.txt",
+                [{"old_text": "before", "new_text": "after"}],
+            )
+
+            completed = subprocess.CompletedProcess(
+                args=["test"],
+                returncode=1,
+                stdout=b"stdout",
+                stderr=b"stderr",
+            )
+            with patch("tools.bash.subprocess.run", return_value=completed):
+                bash_result = bash(ctx, "test")
+
+        for result in (read_result, write_result, edit_result, bash_result):
+            self.assertIsInstance(result, ToolResult)
+
+        self.assertEqual(read_result.data["content"], "before")
+        self.assertEqual(write_result.data["operation"], "write_file")
+        self.assertEqual(edit_result.data["operation"], "edit_file")
+        self.assertEqual(bash_result.status, "ok")
+        self.assertEqual(bash_result.data["exit_code"], 1)
+
+    def test_read_returns_structured_failure_for_missing_path(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            result = read(ExecutionContext(workspace, "agent-test"), "missing.txt")
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(result.error.code, "PATH_NOT_FOUND")
+
+    def test_read_returns_image_attachment_without_responses_fields(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            path = Path(workspace) / "image.png"
+            path.write_bytes(b"image-bytes")
+
+            result = read(ExecutionContext(workspace, "agent-test"), "image.png")
+
+        self.assertIsInstance(result, ToolResult)
+        self.assertEqual(result.data["type"], "image")
+        self.assertEqual(result.attachments[0].mime_type, "image/png")
+        self.assertTrue(result.attachments[0].url.startswith("data:image/png;base64,"))
+
+    def test_tool_result_enforces_success_and_error_invariants(self):
+        with self.assertRaises(ValueError):
+            ToolResult(status="unknown")
+
+        with self.assertRaises(ValueError):
+            ToolResult(status="error")
+
+        with self.assertRaises(ValueError):
+            ToolResult(
+                status="ok",
+                error=ToolResult.failure("FAILED", "failed").error,
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

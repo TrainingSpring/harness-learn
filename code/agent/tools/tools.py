@@ -2,7 +2,7 @@ import importlib
 import json
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Tool, ToolOutput
+from tools.types import Tool, ToolResult
 
 
 class Tools:
@@ -54,48 +54,84 @@ class Tools:
         tool = self.map.get(name)
 
         if not tool:
-            return "[Error]: Tool not found"
+            return self._encode_output(
+                ToolResult.failure("TOOL_NOT_FOUND", f"工具不存在: {name}")
+            )
         try:
             # 解析参数
             args = json.loads(arguments) if isinstance(arguments, str) else arguments
         except Exception as e:
-            return "[Error]: " + str(e)
+            return self._encode_output(
+                ToolResult.failure("INVALID_ARGUMENTS", str(e))
+            )
+        if not isinstance(args, dict):
+            return self._encode_output(
+                ToolResult.failure("INVALID_ARGUMENTS", "工具参数必须是 JSON 对象")
+            )
 
         try:
             # 调用工具方法
-            return self._encode_output(tool.function(self.ctx,**args))
+            result = tool.function(self.ctx,**args)
         except Exception as e:
-            return "[Error]: " + str(e)
+            return self._encode_output(
+                ToolResult.failure("TOOL_EXECUTION_FAILED", str(e))
+            )
+
+        if not isinstance(result, ToolResult):
+            return self._encode_output(
+                ToolResult.failure(
+                    "INVALID_TOOL_RESULT",
+                    f"工具 {name} 必须返回 ToolResult",
+                )
+            )
+
+        try:
+            return self._encode_output(result)
+        except (TypeError, ValueError) as e:
+            return self._encode_output(
+                ToolResult.failure("INVALID_TOOL_RESULT", str(e))
+            )
 
     @staticmethod
     def _encode_output(result):
         """将工具业务结果编码为 Responses function_call_output.output。"""
-        if isinstance(result, ToolOutput):
-            content = list(result.content or [])
-            if result.value is not None:
-                content.insert(0, {
-                    "type": "input_text",
-                    "text": Tools._serialize_value(result.value),
+        if not isinstance(result, ToolResult):
+            raise TypeError("工具结果必须是 ToolResult")
+
+        if result.attachments:
+            content = [{
+                "type": "input_text",
+                "text": Tools._serialize_value(Tools._result_data(result)),
+            }]
+            for attachment in result.attachments:
+                content.append({
+                    "type": "input_image",
+                    "image_url": attachment.url,
+                    "detail": attachment.detail,
                 })
             return content
-        # 兼容尚未迁移的工具：它们当前已经返回 Responses content 数组。
-        if Tools._is_responses_content(result):
-            return result
-        return Tools._serialize_value(result)
+
+        return Tools._serialize_value(Tools._result_data(result))
+
+    @staticmethod
+    def _result_data(result: ToolResult):
+        if result.status == "ok":
+            return {"status": result.status, "data": result.data}
+        return {
+            "status": result.status,
+            "error": {
+                "code": result.error.code,
+                "message": result.error.message,
+                "retryable": result.error.retryable,
+                **({"details": result.error.details} if result.error.details else {}),
+            },
+        }
 
     @staticmethod
     def _serialize_value(value):
         if isinstance(value, str):
             return value
-        return json.dumps(value, ensure_ascii=False, default=str)
-
-    @staticmethod
-    def _is_responses_content(value):
-        return (
-            isinstance(value, list)
-            and all(isinstance(item, dict) and "type" in item for item in value)
-            and any(item["type"].startswith("input_") for item in value)
-        )
+        return json.dumps(value, ensure_ascii=False)
 
     def register_by_names(self,names:list[str]):
         """

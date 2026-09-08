@@ -1,11 +1,10 @@
-import json
 import locale
 
 import subprocess
 import os
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Tool
+from tools.types import Tool, ToolResult
 
 
 """
@@ -36,7 +35,8 @@ def decode_output(data: bytes | None,max_length:int) -> str:
 
     return data.decode("utf-8", errors="replace")
 
-def bash(ctx:ExecutionContext,command:str,timeout:int|None = None):
+def bash(ctx:ExecutionContext,command:str,timeout:int|None = None) -> ToolResult:
+    """执行命令并返回统一的工具结果。"""
 
     if os.name == "nt":
         command = "powershell.exe"+" -NoProfile"+" -NonInteractive"+ " -Command " +  command
@@ -54,24 +54,12 @@ def bash(ctx:ExecutionContext,command:str,timeout:int|None = None):
         stderr=subprocess.PIPE,
         cwd=ctx.workspace
     )
-    if result.returncode == 0:
-        return [{
-            "type":"input_text",
-            "text":json.dumps({
-                "type": "text",
-                "text": decode_output(result.stdout,ctx.max_tool_call_length),
-                "status":"ok"
-            })
-        }]
-    else:
-        return [{
-            "type":"input_text",
-            "text":json.dumps({
-                "type": "text",
-                "text": decode_output(result.stderr,ctx.max_tool_call_length),
-                "status":"error"
-            })
-        }]
+    return ToolResult.success({
+        "command": command,
+        "exit_code": result.returncode,
+        "stdout": decode_output(result.stdout,ctx.max_tool_call_length),
+        "stderr": decode_output(result.stderr,ctx.max_tool_call_length),
+    })
 
 # agent = AgentLoop()
 # res = bash(agent,"netstat -ano",10)
