@@ -4,7 +4,7 @@ import secrets
 from head.llm import LLM
 from head.types import LLMConfig
 from permission.PermissionManager import PermissionManager
-from permission.types import PermissionMode
+from permission.types import PermissionMode, PermissionResponse
 from runtime.runtime import Runtime
 from tools.tools import Tools
 from context.context import Context
@@ -60,3 +60,11 @@ class Agent:
 
     def send(self,message:str):
         return self.runtime.run(message)
+
+    def resolve_permission(self, response: PermissionResponse):
+        """将宿主的权限确认转交给 Runtime，并恢复挂起的 Agent loop。
+
+        Args:
+            response: 用户针对当前 pending 工具调用的确认结果。
+        """
+        return self.runtime.resolve_permission(response)
