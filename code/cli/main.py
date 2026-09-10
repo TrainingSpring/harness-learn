@@ -4,7 +4,9 @@ import sys
 from pathlib import Path
 
 from head.types import LLMConfig
+from permission.types import PermissionDecision, PermissionResponse, PermissionScope
 from runtime.agent import Agent
+from runtime.runtime import PermissionRequiredEvent
 
 # 支持直接执行 `python code/cli/main.py`。
 AGENT_PATH = Path(__file__).resolve().parents[1] / "agent"
@@ -104,12 +106,90 @@ def render_event(event,agent):
     elif event_type == "function_call":
         print(f"\n[tool] {event.name}({event.arguments})")
 
+    elif event_type == "permission_required":
+        render_permission_request(event)
+
     elif event_type == "error":
         print(f"\n[error] {event.message}")
 
     elif event_type == "done" and event.is_stop:
         # write_record(agent)
         print("[finished]")
+
+
+def render_permission_request(event: PermissionRequiredEvent):
+    """向用户展示一次待确认的权限请求。
+
+    Args:
+        event: Runtime 产生的权限请求事件，包含动作、工具和真实资源。
+
+    CLI 展示的是 PermissionRequest.resource，而不是模型传入的相对路径，
+    这样用户确认的是工具实际准备访问的位置。
+    """
+    request = event.request
+    print("\n[permission required]")
+    print(f"工具: {request.tool_name}")
+    print(f"动作: {request.action.value}")
+    print(f"资源: {request.resource or '(命令执行，无单一文件资源)'}")
+
+
+def read_permission_response(event: PermissionRequiredEvent) -> PermissionResponse:
+    """读取用户的权限选择并转换为 Runtime 的稳定响应对象。
+
+    Args:
+        event: 当前待确认权限事件，用于绑定 call_id。
+
+    Returns:
+        只包含 allow/deny、scope 和原 call_id 的 PermissionResponse。
+
+    非法输入会循环询问；没有默认放行分支，避免回车或未知字符意外授予权限。
+    """
+    options = {
+        "1": (PermissionDecision.ALLOW, PermissionScope.ONCE),
+        "2": (PermissionDecision.ALLOW, PermissionScope.SESSION),
+        "3": (PermissionDecision.ALLOW, PermissionScope.AGENT),
+        "4": (PermissionDecision.DENY, PermissionScope.ONCE),
+        "5": (PermissionDecision.DENY, PermissionScope.SESSION),
+        "6": (PermissionDecision.DENY, PermissionScope.AGENT),
+    }
+    print("1. 允许本次  2. 当前会话允许  3. 当前 Agent 允许")
+    print("4. 拒绝本次  5. 当前会话拒绝  6. 当前 Agent 拒绝")
+    while True:
+        choice = input("请选择: ").strip()
+        selected = options.get(choice)
+        if selected is None:
+            print("无效选择，请输入 1-6。")
+            continue
+        decision, scope = selected
+        return PermissionResponse(
+            call_id=event.request.call_id,
+            decision=decision,
+            scope=scope,
+        )
+
+
+def run_agent_events(events, agent):
+    """消费 Agent 事件，并在权限事件处交互后继续消费恢复流。
+
+    Args:
+        events: ``agent.send()`` 或 ``agent.resolve_permission()`` 返回的事件流。
+        agent: 当前 Agent，用于接收用户确认并恢复 Runtime。
+
+    该函数把 CLI 的交互循环与 Runtime 状态机隔离开：Runtime 只产生事件，
+    CLI 只收集输入并转发 PermissionResponse。
+    """
+    current_events = events
+    while True:
+        for event in current_events:
+            if event.type != "permission_required":
+                render_event(event, agent)
+                continue
+            render_permission_request(event)
+            response = read_permission_response(event)
+            current_events = agent.resolve_permission(response)
+            break
+        else:
+            return
 BASE_URL = "http://192.168.31.6:18080"
 API_KEY = "sk-5c206cdd7da2521f5949d6f78f9f40d1320caf8414eb187423c0e23e0619c8a8"
 MODEL = "gpt-5.6-luna"
@@ -157,8 +237,7 @@ def main():
             continue
 
         try:
-            for event in agent.send(user_input):
-                render_event(event,agent)
+            run_agent_events(agent.send(user_input), agent)
         except Exception as e:
             print(f"\n[error] {e}")
 
