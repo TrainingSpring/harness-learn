@@ -1,6 +1,7 @@
 import os.path
 import mimetypes
 
+from permission.PermissionManager import Permission, PermissionAction
 from runtime.ExecutionContext import ExecutionContext
 from tools.types import Attachment, Tool, ToolResult, handle_path
 
@@ -111,4 +112,4 @@ REGISTER = Tool({
             "required":["target_path"],
             "additionalProperties": False
         }
-    },read)
+    },read,Permission(PermissionAction.file_read,"target_path"))

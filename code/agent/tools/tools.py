@@ -41,6 +41,11 @@ class Tools:
 
     def get_tools(self):
         return self.list
+    def get_tool(self,name):
+        try:
+            return self.map[name]
+        except KeyError:
+            raise KeyError(f"工具不存在: {name}")
 
     def eval(self,name:str,arguments:str|dict)->list|str:
         """

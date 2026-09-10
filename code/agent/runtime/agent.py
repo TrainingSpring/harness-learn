@@ -3,6 +3,7 @@ import secrets
 
 from head.llm import LLM
 from head.types import LLMConfig
+from permission.PermissionManager import PermissionManager
 from runtime.runtime import Runtime
 from tools.tools import Tools
 from context.context import Context
@@ -20,12 +21,13 @@ class Agent:
         # 工具
         self.tools = Tools(self.ctx)
         # 注册工具
-
         self.tools.register_by_names(tools)
         # 上下文
         self.context = context if context is not None else Context(LLM(llm_config.base_url,llm_config.api_key,llm_config.model,llm_config.instructions),self.ctx)
+        # 权限管理
+        self.permission = PermissionManager(self.ctx)
         # 运行时（loop）
-        self.runtime = Runtime(self.llm,self.tools,self.context,self.ctx)
+        self.runtime = Runtime(self.llm,self.tools,self.context,self.ctx,self.permission)
 
 
     def send(self,message:str):

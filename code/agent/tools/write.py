@@ -1,5 +1,6 @@
 import os
 
+from permission.PermissionManager import PermissionAction, Permission
 from runtime.ExecutionContext import ExecutionContext
 from tools.types import Tool, ToolResult, handle_path
 
@@ -69,5 +70,4 @@ REGISTER = Tool(
             "required": ["target_path"],
             "additionalProperties": False
         }
-    },write
-)
+    },write,Permission(PermissionAction.file_write,"target_path"))
