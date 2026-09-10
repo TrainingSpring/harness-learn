@@ -2,7 +2,7 @@ import os
 
 from context.context import Context
 from head.llm import LLM, LLMResponseOutputItem
-from permission.PermissionManager import PermissionManager, PermissionType
+from permission.PermissionManager import PermissionManager
 from runtime.ExecutionContext import ExecutionContext
 from tools.tools import Tools
 

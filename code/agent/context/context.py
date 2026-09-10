@@ -41,8 +41,9 @@ class Context:
         self.call_result_num = 5
         self.screen_size = 128*1024
         self.usage = None
-        self.sid = f"s_{secrets.token_hex(10)}"
-        ctx.sid = self.sid
+        # 会话身份在 Agent 创建 ExecutionContext 时已经确定；Context 只
+        # 引用它用于历史记录，不能反向修改不可变的执行上下文。
+        self.sid = ctx.session_id
 
     def append_msg(self,msg:LLMResponseOutputItem|dict|str, type:str="message", role:str="user",usage:LLMUsage|None= None):
         """

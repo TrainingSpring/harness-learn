@@ -10,6 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).parents[1] / "code" / "agent"))
 
 from runtime.ExecutionContext import ExecutionContext
+from permission.types import PermissionAction, PermissionRequirement
 from tools.bash import bash
 from tools.edit import edit
 from tools.read import read
@@ -19,13 +20,21 @@ from tools.write import write
 
 
 class ToolResultContractTests(unittest.TestCase):
+    """验证工具结果与 Responses 输出适配的公共契约。"""
+
+    @staticmethod
+    def _test_permission() -> PermissionRequirement:
+        """为不访问真实资源的测试工具提供必填的权限声明。"""
+        return PermissionRequirement(PermissionAction.FILE_READ, None)
+
     def test_eval_serializes_tool_result_as_json(self):
-        ctx = ExecutionContext("/tmp", "agent-test")
+        ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(
             Tool(
                 {"name": "structured"},
                 lambda _ctx: ToolResult.success({"count": 2}),
+                self._test_permission(),
             )
         )
 
@@ -37,39 +46,40 @@ class ToolResultContractTests(unittest.TestCase):
         )
 
     def test_eval_rejects_results_that_violate_the_contract(self):
-        ctx = ExecutionContext("/tmp", "agent-test")
+        ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
-        tools.register(Tool({"name": "invalid"}, lambda _ctx: {"count": 2}))
+        tools.register(Tool({"name": "invalid"}, lambda _ctx: {"count": 2}, self._test_permission()))
 
         result = json.loads(tools.eval("invalid", {}))
 
         self.assertEqual(result["error"]["code"], "INVALID_TOOL_RESULT")
 
     def test_eval_returns_structured_argument_errors(self):
-        ctx = ExecutionContext("/tmp", "agent-test")
+        ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
-        tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success()))
+        tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success(), self._test_permission()))
 
         result = json.loads(tools.eval("valid", "{"))
 
         self.assertEqual(result["error"]["code"], "INVALID_ARGUMENTS")
 
     def test_eval_rejects_non_object_arguments(self):
-        ctx = ExecutionContext("/tmp", "agent-test")
+        ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
-        tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success()))
+        tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success(), self._test_permission()))
 
         result = json.loads(tools.eval("valid", "[]"))
 
         self.assertEqual(result["error"]["code"], "INVALID_ARGUMENTS")
 
     def test_eval_rejects_non_serializable_result_data(self):
-        ctx = ExecutionContext("/tmp", "agent-test")
+        ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(
             Tool(
                 {"name": "invalid_data"},
                 lambda _ctx: ToolResult.success({"value": object()}),
+                self._test_permission(),
             )
         )
 
@@ -78,7 +88,7 @@ class ToolResultContractTests(unittest.TestCase):
         self.assertEqual(result["error"]["code"], "INVALID_TOOL_RESULT")
 
     def test_eval_converts_image_attachments_to_responses_content(self):
-        ctx = ExecutionContext("/tmp", "agent-test")
+        ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(
             Tool(
@@ -93,6 +103,7 @@ class ToolResultContractTests(unittest.TestCase):
                         )
                     ],
                 ),
+                self._test_permission(),
             )
         )
 
@@ -112,7 +123,7 @@ class ToolResultContractTests(unittest.TestCase):
         )
 
     def test_attachment_can_represent_remote_image_url(self):
-        ctx = ExecutionContext("/tmp", "agent-test")
+        ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(
             Tool(
@@ -126,6 +137,7 @@ class ToolResultContractTests(unittest.TestCase):
                         )
                     ],
                 ),
+                self._test_permission(),
             )
         )
 
@@ -136,7 +148,7 @@ class ToolResultContractTests(unittest.TestCase):
 
     def test_all_builtin_tools_return_tool_result(self):
         with tempfile.TemporaryDirectory() as workspace:
-            ctx = ExecutionContext(workspace, "agent-test")
+            ctx = ExecutionContext(workspace, "agent-test", "session-test")
             source = Path(workspace) / "source.txt"
             source.write_text("before", encoding="utf-8")
 
@@ -168,7 +180,7 @@ class ToolResultContractTests(unittest.TestCase):
 
     def test_read_returns_structured_failure_for_missing_path(self):
         with tempfile.TemporaryDirectory() as workspace:
-            result = read(ExecutionContext(workspace, "agent-test"), "missing.txt")
+            result = read(ExecutionContext(workspace, "agent-test", "session-test"), "missing.txt")
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.error.code, "PATH_NOT_FOUND")
@@ -178,7 +190,7 @@ class ToolResultContractTests(unittest.TestCase):
             path = Path(workspace) / "image.png"
             path.write_bytes(b"image-bytes")
 
-            result = read(ExecutionContext(workspace, "agent-test"), "image.png")
+            result = read(ExecutionContext(workspace, "agent-test", "session-test"), "image.png")
 
         self.assertIsInstance(result, ToolResult)
         self.assertEqual(result.data["type"], "image")

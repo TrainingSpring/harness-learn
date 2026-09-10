@@ -3,7 +3,7 @@ import locale
 import subprocess
 import os
 
-from permission.PermissionManager import Permission, PermissionAction
+from permission.types import PermissionAction, PermissionRequirement
 from runtime.ExecutionContext import ExecutionContext
 from tools.types import Tool, ToolResult
 
@@ -83,4 +83,4 @@ REGISTER = Tool({
             "required":["command"],
             "additionalProperties": False
         }
-    },bash,Permission(PermissionAction.bash_execute,"command"))
+    },bash,PermissionRequirement(PermissionAction.BASH_EXECUTE, None))

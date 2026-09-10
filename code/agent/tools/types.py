@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
-from permission.PermissionManager import Permission
+from permission.types import PermissionRequirement
 from runtime.ExecutionContext import ExecutionContext
 
 
@@ -93,7 +93,7 @@ class Tool:
     """工具定义；function 的唯一返回类型是 ToolResult。"""
     schema:dict
     function:Callable[..., ToolResult]
-    permission:Permission
+    permission: PermissionRequirement
 
 
 def handle_path(ctx:ExecutionContext,target_path:str):
