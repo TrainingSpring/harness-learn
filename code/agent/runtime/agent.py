@@ -4,6 +4,7 @@ import secrets
 from head.llm import LLM
 from head.types import LLMConfig
 from permission.PermissionManager import PermissionManager
+from permission.types import PermissionMode
 from runtime.runtime import Runtime
 from tools.tools import Tools
 from context.context import Context
@@ -18,6 +19,7 @@ class Agent:
         tools: list[str],
         context: Context | None = None,
         agent_key: str = "default",
+        permission_mode: PermissionMode = PermissionMode.BUILD,
         workspace: str | None = None,
     ):
         """创建具有稳定 Agent 身份和新会话身份的 Agent。
@@ -27,6 +29,7 @@ class Agent:
             tools: 需要注册的工具模块名称。
             context: 可选的既有对话上下文。
             agent_key: 逻辑 Agent 的稳定标识，用于 AGENT 范围权限规则。
+            permission_mode: 没有命中明确规则时使用的默认权限模式。
             workspace: 工具处理相对路径的目录；为空时使用当前目录。
         """
         self.agent_key = agent_key
@@ -47,7 +50,10 @@ class Agent:
         # 上下文
         self.context = context if context is not None else Context(LLM(llm_config.base_url,llm_config.api_key,llm_config.model,llm_config.instructions),self.ctx)
         # 权限管理
-        self.permission = PermissionManager(self.ctx)
+        self.permission = PermissionManager(
+            mode=permission_mode,
+            workspace=self.workspace,
+        )
         # 运行时（loop）
         self.runtime = Runtime(self.llm,self.tools,self.context,self.ctx,self.permission)
 

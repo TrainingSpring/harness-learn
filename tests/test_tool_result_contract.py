@@ -27,7 +27,7 @@ class ToolResultContractTests(unittest.TestCase):
         """为不访问真实资源的测试工具提供必填的权限声明。"""
         return PermissionRequirement(PermissionAction.FILE_READ, None)
 
-    def test_eval_serializes_tool_result_as_json(self):
+    def test_execute_serializes_tool_result_as_json(self):
         ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(
@@ -38,41 +38,45 @@ class ToolResultContractTests(unittest.TestCase):
             )
         )
 
-        result = tools.eval("structured", {})
+        call = tools.prepare_call("structured", {}, "call-structured")
+        result = tools.encode_result(tools.execute(call))
 
         self.assertEqual(
             json.loads(result),
             {"status": "ok", "data": {"count": 2}},
         )
 
-    def test_eval_rejects_results_that_violate_the_contract(self):
+    def test_execute_rejects_results_that_violate_the_contract(self):
         ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(Tool({"name": "invalid"}, lambda _ctx: {"count": 2}, self._test_permission()))
 
-        result = json.loads(tools.eval("invalid", {}))
+        call = tools.prepare_call("invalid", {}, "call-invalid")
+        result = json.loads(tools.encode_result(tools.execute(call)))
 
         self.assertEqual(result["error"]["code"], "INVALID_TOOL_RESULT")
 
-    def test_eval_returns_structured_argument_errors(self):
+    def test_prepare_call_returns_structured_argument_errors(self):
         ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success(), self._test_permission()))
 
-        result = json.loads(tools.eval("valid", "{"))
+        with self.assertRaises(Exception) as raised:
+            tools.prepare_call("valid", "{", "call-invalid-json")
 
-        self.assertEqual(result["error"]["code"], "INVALID_ARGUMENTS")
+        self.assertEqual(raised.exception.error.code, "INVALID_ARGUMENTS")
 
-    def test_eval_rejects_non_object_arguments(self):
+    def test_prepare_call_rejects_non_object_arguments(self):
         ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(Tool({"name": "valid"}, lambda _ctx: ToolResult.success(), self._test_permission()))
 
-        result = json.loads(tools.eval("valid", "[]"))
+        with self.assertRaises(Exception) as raised:
+            tools.prepare_call("valid", "[]", "call-list")
 
-        self.assertEqual(result["error"]["code"], "INVALID_ARGUMENTS")
+        self.assertEqual(raised.exception.error.code, "INVALID_ARGUMENTS")
 
-    def test_eval_rejects_non_serializable_result_data(self):
+    def test_encode_result_rejects_non_serializable_result_data(self):
         ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(
@@ -83,11 +87,12 @@ class ToolResultContractTests(unittest.TestCase):
             )
         )
 
-        result = json.loads(tools.eval("invalid_data", {}))
+        call = tools.prepare_call("invalid_data", {}, "call-invalid-data")
+        with self.assertRaises(TypeError):
+            tools.encode_result(tools.execute(call))
 
-        self.assertEqual(result["error"]["code"], "INVALID_TOOL_RESULT")
 
-    def test_eval_converts_image_attachments_to_responses_content(self):
+    def test_encode_result_converts_image_attachments_to_responses_content(self):
         ctx = ExecutionContext("/tmp", "agent-test", "session-test")
         tools = Tools(ctx)
         tools.register(
@@ -107,7 +112,8 @@ class ToolResultContractTests(unittest.TestCase):
             )
         )
 
-        result = tools.eval("image", {})
+        call = tools.prepare_call("image", {}, "call-image")
+        result = tools.encode_result(tools.execute(call))
 
         self.assertEqual(
             json.loads(result[0]["text"]),
@@ -141,7 +147,8 @@ class ToolResultContractTests(unittest.TestCase):
             )
         )
 
-        result = tools.eval("remote_image", {})
+        call = tools.prepare_call("remote_image", {}, "call-remote-image")
+        result = tools.encode_result(tools.execute(call))
 
         self.assertEqual(result[1]["type"], "input_image")
         self.assertEqual(result[1]["image_url"], "https://example.com/image.jpg")

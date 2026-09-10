@@ -1,15 +1,22 @@
 import importlib
 import json
+import os
 from base64 import b64encode
 
 from runtime.ExecutionContext import ExecutionContext
-from tools.types import Attachment, Tool, ToolResult
+from permission.types import PermissionRequest
+from tools.types import (
+    Attachment,
+    PreparedToolCall,
+    Tool,
+    ToolCallPreparationError,
+    ToolError,
+    ToolResult,
+)
 
 
 class Tools:
-    """
-    工具集
-    """
+    """管理工具注册、调用准备、执行和 Responses 结果编码。"""
     def __init__(self,ctx:ExecutionContext):
         self.ctx = ctx
         self.map:dict[str,Tool] = {}
@@ -47,60 +54,139 @@ class Tools:
         except KeyError:
             raise KeyError(f"工具不存在: {name}")
 
-    def eval(self,name:str,arguments:str|dict)->list|str:
+    def prepare_call(
+        self,
+        name: str,
+        arguments: str | dict | None,
+        call_id: str,
+    ) -> PreparedToolCall:
+        """解析一次模型工具调用，并生成待检查的权限请求。
+
+        Args:
+            name: 模型请求调用的工具名称。
+            arguments: JSON 字符串或参数字典；None 表示空对象。
+            call_id: 模型 function_call 的唯一标识。
+
+        Returns:
+            已解析的 PreparedToolCall，供 Runtime 先检查权限再执行。
+
+        Raises:
+            ToolCallPreparationError: 工具不存在、参数非法或资源参数缺失。
+
+        参数在此处只解析一次。这样权限判断和真正执行共享同一份参数，
+        不会因为重复 JSON 解析导致两条路径的行为不一致。
         """
-        调用工具
-        :param name : str : 工具名称
-        :param arguments : str|dict : 工具参数
-        :return : list|str : 工具返回结果
-        """
-        # 获取工具
-        if arguments is None:
-            arguments = {}
         tool = self.map.get(name)
+        if tool is None:
+            raise ToolCallPreparationError(
+                ToolError("TOOL_NOT_FOUND", f"工具不存在: {name}")
+            )
 
-        if not tool:
-            return self._encode_output(
-                ToolResult.failure("TOOL_NOT_FOUND", f"工具不存在: {name}")
-            )
         try:
-            # 解析参数
-            args = json.loads(arguments) if isinstance(arguments, str) else arguments
-        except Exception as e:
-            return self._encode_output(
-                ToolResult.failure("INVALID_ARGUMENTS", str(e))
+            args = {} if arguments is None else (
+                json.loads(arguments) if isinstance(arguments, str) else arguments
             )
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ToolCallPreparationError(
+                ToolError("INVALID_ARGUMENTS", str(error))
+            ) from error
+
         if not isinstance(args, dict):
-            return self._encode_output(
-                ToolResult.failure("INVALID_ARGUMENTS", "工具参数必须是 JSON 对象")
+            raise ToolCallPreparationError(
+                ToolError("INVALID_ARGUMENTS", "工具参数必须是 JSON 对象")
             )
 
         try:
-            # 调用工具方法
-            result = tool.function(self.ctx,**args)
-        except Exception as e:
-            return self._encode_output(
-                ToolResult.failure("TOOL_EXECUTION_FAILED", str(e))
+            request = self.build_permission_request(tool, name, args, call_id)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ToolCallPreparationError(
+                ToolError("INVALID_ARGUMENTS", str(error))
+            ) from error
+
+        return PreparedToolCall(call_id, name, tool, args, request)
+
+    def build_permission_request(
+        self,
+        tool: Tool,
+        tool_name: str,
+        arguments: dict,
+        call_id: str,
+    ) -> PermissionRequest:
+        """根据工具权限声明和已解析参数构造真实权限请求。
+
+        Args:
+            tool: 已注册工具定义。
+            tool_name: 工具名称，供用户确认界面和诊断使用。
+            arguments: 已验证为对象的工具参数。
+            call_id: 当前模型工具调用标识。
+
+        Returns:
+            带规范化资源与执行身份的 PermissionRequest。
+        """
+        resource = None
+        resource_from = tool.permission.resource_from
+        if resource_from is not None:
+            raw_resource = arguments[resource_from]
+            if not isinstance(raw_resource, str) or not raw_resource:
+                raise TypeError(f"权限资源参数 {resource_from} 必须是非空字符串")
+            resource = os.path.normpath(
+                os.path.abspath(self._resolve_path(raw_resource))
             )
+
+        return PermissionRequest(
+            action=tool.permission.action,
+            resource=resource,
+            tool_name=tool_name,
+            call_id=call_id,
+            session_id=self.ctx.session_id,
+            agent_key=self.ctx.agent_key,
+        )
+
+    def execute(self, call: PreparedToolCall) -> ToolResult:
+        """执行已经完成权限预检的工具调用。
+
+        Args:
+            call: 已准备的工具调用；权限决定由 Runtime 在此之前完成。
+
+        Returns:
+            工具返回的 ToolResult，或由执行异常转换出的失败结果。
+        """
+        try:
+            result = call.tool.function(self.ctx, **call.arguments)
+        except Exception as error:
+            return ToolResult.failure("TOOL_EXECUTION_FAILED", str(error))
 
         if not isinstance(result, ToolResult):
-            # 这是工具实现错误，不允许继续猜测或兼容其他返回格式。
-            return self._encode_output(
-                ToolResult.failure(
-                    "INVALID_TOOL_RESULT",
-                    f"工具 {name} 必须返回 ToolResult",
-                )
+            return ToolResult.failure(
+                "INVALID_TOOL_RESULT",
+                f"工具 {call.tool_name} 必须返回 ToolResult",
             )
+        return result
 
-        try:
-            return self._encode_output(result)
-        except (TypeError, ValueError) as e:
-            return self._encode_output(
-                ToolResult.failure("INVALID_TOOL_RESULT", str(e))
-            )
+    def default_grant_resource(self, request: PermissionRequest) -> str | None:
+        """计算用户确认后默认写入的授权资源范围。
+
+        Args:
+            request: 当前真实权限请求。
+
+        Returns:
+            文件请求返回目标父目录，bash 等无资源动作返回 None。
+
+        这里仅决定授权范围，不负责判断是否安全；安全判断始终由
+        PermissionManager 完成。
+        """
+        if request.resource is None:
+            return None
+        return os.path.dirname(request.resource)
+
+    def _resolve_path(self, target_path: str) -> str:
+        """将工具路径参数解析为基于当前 workspace 的路径。"""
+        if os.path.isabs(target_path):
+            return target_path
+        return os.path.join(self.ctx.workspace, target_path)
 
     @staticmethod
-    def _encode_output(result):
+    def encode_result(result):
         """将内部 ToolResult 适配为 Responses function_call_output.output。
 
         这是工具层唯一可以产生 input_text、input_image 等 Responses

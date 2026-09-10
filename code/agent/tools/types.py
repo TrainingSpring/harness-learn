@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
-from permission.types import PermissionRequirement
+from permission.types import PermissionRequest, PermissionRequirement
 from runtime.ExecutionContext import ExecutionContext
 
 
@@ -14,6 +14,19 @@ class ToolError:
     message: str
     retryable: bool = False
     details: dict[str, Any] | None = None
+
+
+class ToolCallPreparationError(Exception):
+    """工具调用准备失败时携带稳定 ToolError 的内部异常。
+
+    解析参数和构造权限请求发生在工具执行前，尚未有 ToolResult 可返回；
+    Runtime 捕获此异常后会将其中的 ToolError 转换为 ToolResult.failure。
+    """
+
+    def __init__(self, error: ToolError):
+        """保存供 Runtime 转换的结构化错误。"""
+        super().__init__(error.message)
+        self.error = error
 
 
 @dataclass
@@ -90,10 +103,36 @@ class ToolResult:
 
 @dataclass
 class Tool:
-    """工具定义；function 的唯一返回类型是 ToolResult。"""
-    schema:dict
-    function:Callable[..., ToolResult]
+    """工具定义及其执行契约。
+
+    Attributes:
+        schema: 传给模型的工具 JSON Schema。
+        function: 实际执行函数，签名为 ``function(ctx, **arguments)``，且
+            必须返回 ToolResult。
+        permission: 工具静态声明的权限需求；它不是用户已授予的规则。
+    """
+    schema: dict
+    function: Callable[..., ToolResult]
     permission: PermissionRequirement
+
+
+@dataclass(frozen=True)
+class PreparedToolCall:
+    """经过解析、查找和权限请求构造后的待执行工具调用。
+
+    Attributes:
+        call_id: 模型 function_call 的标识。
+        tool_name: 已注册工具名称。
+        tool: 已解析出的 Tool 定义。
+        arguments: 只解析一次后的 JSON 对象参数。
+        permission_request: 根据工具声明和参数生成的实际权限请求。
+    """
+
+    call_id: str
+    tool_name: str
+    tool: Tool
+    arguments: dict[str, Any]
+    permission_request: PermissionRequest
 
 
 def handle_path(ctx:ExecutionContext,target_path:str):
