@@ -8,6 +8,7 @@ from runtime.prompt_builder import PromptBuilder
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
+from storage.repositories.permission_rule import PermissionRuleRepository
 from tools.catalog import ToolCatalog
 
 
@@ -93,6 +94,7 @@ class AgentFactory:
             permission_mode=permission_mode,
             workspace=str(self.database.workspace),
             session_id=session_id,
+            permission_rule_repository=PermissionRuleRepository(self.database),
         )
         # participant_id 是会话级身份，当前 Agent 先保留它供 ContextService 接入。
         agent.participant_id = participant_id

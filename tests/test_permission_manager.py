@@ -26,6 +26,7 @@ class PermissionManagerTests(unittest.TestCase):
         self.manager = PermissionManager(
             mode=PermissionMode.BUILD,
             workspace="/workspace",
+            agent_id="agent_1V3ASAXQ2A",
             hard_safety_policy=HardSafetyPolicy(),
             protected_resource_policy=ProtectedResourcePolicy(["/system"]),
         )
@@ -173,6 +174,7 @@ class PermissionManagerTests(unittest.TestCase):
         manager = PermissionManager(
             mode=PermissionMode.YOLO,
             workspace="/workspace",
+            agent_id="agent_1V3ASAXQ2A",
             hard_safety_policy=HardSafetyPolicy(),
             protected_resource_policy=ProtectedResourcePolicy(["/system"]),
         )
@@ -190,6 +192,7 @@ class PermissionManagerTests(unittest.TestCase):
         manager = PermissionManager(
             mode=PermissionMode.YOLO,
             workspace="/workspace",
+            agent_id="agent_1V3ASAXQ2A",
             hard_safety_policy=HardSafetyPolicy(),
             protected_resource_policy=ProtectedResourcePolicy(["/system"]),
         )

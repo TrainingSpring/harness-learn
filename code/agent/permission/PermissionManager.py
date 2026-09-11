@@ -1,6 +1,7 @@
 """内存权限规则的写入、匹配与最终决策入口。"""
 
 import os
+from typing import Protocol
 
 from permission.policies import (
     HardSafetyPolicy,
@@ -16,12 +17,22 @@ from permission.types import (
 )
 
 
+class PermissionRuleStore(Protocol):
+    """PermissionManager 所需的最小规则仓储接口。"""
+
+    def list_for_agent(self, agent_id: str) -> list[PermissionRule]:
+        """读取指定 Agent 的持久化规则。"""
+
+    def save(self, rule: PermissionRule) -> PermissionRule:
+        """保存一条持久化规则。"""
+
+
 class PermissionManager:
     """根据安全策略、显式规则和模式为一次调用作出权限决定。
 
     Attributes:
         _mode: 未命中硬策略和规则时采用的默认权限模式。
-        _rules: 当前进程内的授权规则；首版不会持久化到磁盘。
+        _rules: 当前权限管理器的有效授权规则；Agent 级规则来自仓储。
         _hard_safety_policy: 不可被 yolo 或用户规则覆盖的绝对拒绝策略。
         _protected_resource_policy: 命中后仍可由用户确认、但不能自动放行的
             受保护资源策略。
@@ -38,23 +49,35 @@ class PermissionManager:
         self,
         mode: PermissionMode,
         workspace: str,
+        agent_id: str,
+        rule_repository: PermissionRuleStore | None = None,
         hard_safety_policy: HardSafetyPolicy | None = None,
         protected_resource_policy: ProtectedResourcePolicy | None = None,
     ) -> None:
-        """创建使用内存规则表的权限管理器。
+        """创建权限管理器并加载当前 Agent 的持久化规则。
 
         Args:
             mode: 当前 Agent 的默认权限模式。
             workspace: 用于模式策略判断项目内外资源的绝对工作目录。
+            agent_id: 当前逻辑 Agent 的稳定身份，用于加载和写入 AGENT 规则。
+            rule_repository: 可选的 Agent 规则仓储；不传时仅使用内存规则，
+                便于未接入状态数据库的纯运行时场景。
             hard_safety_policy: 可选的绝对拒绝策略；未传入时使用默认策略。
             protected_resource_policy: 可选的受保护资源策略；未传入时使用
                 默认系统目录策略。
 
-        Manager 不持有 ExecutionContext。实际调用的 call/session/agent 身份
-        都在 PermissionRequest 中提供，因此这里可以作为纯领域对象测试。
+        Manager 不持有 ExecutionContext。实际调用的 call/session 身份仍在
+        PermissionRequest 中提供；agent_id 只用于选择持久化规则所属 Agent。
         """
-        self._mode = mode # 权限模式
-        self._rules: list[PermissionRule] = [] # 规则列表
+        if not agent_id:
+            raise ValueError("agent_id 不能为空")
+        self._mode = mode  # 权限模式
+        self._agent_id = agent_id  # 当前稳定 Agent 身份
+        self._rule_repository = rule_repository  # Agent 规则持久化仓储
+        self._rules: list[PermissionRule] = []  # 当前有效规则列表
+        if self._rule_repository is not None:
+            # 只在构造时加载当前 Agent 的规则，避免不同 Agent 共享授权。
+            self._rules.extend(self._rule_repository.list_for_agent(agent_id))
         self._hard_safety_policy = ( # 绝对拒绝策略
             hard_safety_policy
             if hard_safety_policy is not None
@@ -180,6 +203,9 @@ class PermissionManager:
             scope=scope,
             **identity_kwargs,
         )
+        if scope is PermissionScope.AGENT and self._rule_repository is not None:
+            # 先落库，成功后才更新内存；否则数据库失败会造成“假授权”。
+            rule = self._rule_repository.save(rule)
         self._replace_rule(rule)
         return rule
 
@@ -348,6 +374,4 @@ class PermissionManager:
             return os.path.commonpath([path, root]) == root
         except ValueError:
             return False
-
-
 

@@ -9,6 +9,7 @@ from tools.tools import Tools
 from context.context import Context
 from runtime.ExecutionContext import ExecutionContext
 from storage.ids import generate_id
+from storage.repositories.permission_rule import PermissionRuleRepository
 
 class Agent:
     """组装 LLM、工具、上下文和权限管理器的逻辑 Agent。"""
@@ -22,6 +23,7 @@ class Agent:
         permission_mode: PermissionMode = PermissionMode.BUILD,
         workspace: str | None = None,
         session_id: str | None = None,
+        permission_rule_repository: PermissionRuleRepository | None = None,
     ):
         """创建具有稳定 Agent 身份和新会话身份的 Agent。
 
@@ -33,6 +35,8 @@ class Agent:
             permission_mode: 没有命中明确规则时使用的默认权限模式。
             workspace: 工具处理相对路径的目录；为空时使用当前目录。
             session_id: 可选的既有会话 ID；为空时生成新的 session_ 前缀 ID。
+            permission_rule_repository: 可选的 Agent 权限规则仓储；传入后
+                PermissionManager 会加载并持久化 AGENT 规则。
         """
         self.agent_id = agent_id
         self.session_id = session_id if session_id is not None else generate_id("session")
@@ -55,6 +59,8 @@ class Agent:
         self.permission = PermissionManager(
             mode=permission_mode,
             workspace=self.workspace,
+            agent_id=self.agent_id,
+            rule_repository=permission_rule_repository,
         )
         # 运行时（loop）
         self.runtime = Runtime(self.llm,self.tools,self.context,self.ctx,self.permission)
