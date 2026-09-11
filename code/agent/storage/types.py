@@ -138,8 +138,14 @@ class SessionParticipant:
         validate_id("participant", self.id)
         validate_id("session", self.session_id)
         validate_id("agent", self.agent_id)
-        if self.role not in {"PRIMARY", "MEMBER"}:
+        if self.role not in {"PRIMARY", "PARTICIPANT"}:
             raise ValueError(f"未知的参与者角色: {self.role}")
+        if self.join_reason is not None and self.join_reason not in {
+            "USER_SELECTED",
+            "DELEGATED",
+            "AUTO_JOINED",
+        }:
+            raise ValueError(f"未知的参与原因: {self.join_reason}")
 
 
 @dataclass
