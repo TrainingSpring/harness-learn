@@ -13,8 +13,12 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 from runtime.agent_factory import AgentFactory  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402
+from storage.repositories.context_item import ContextItemRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
-from storage.types import AgentProfile, LLMProfile  # noqa: E402
+from storage.repositories.session import SessionRepository  # noqa: E402
+from storage.repositories.session_participant import SessionParticipantRepository  # noqa: E402
+from storage.types import AgentProfile, LLMProfile, SessionParticipant  # noqa: E402
+from runtime.context_service import ContextService  # noqa: E402
 
 
 class AgentFactoryTests(unittest.TestCase):
@@ -73,6 +77,37 @@ class AgentFactoryTests(unittest.TestCase):
         """不存在的 Agent 配置不能创建默认 Agent。"""
         with self.assertRaises(ValueError):
             AgentFactory(self.database).load("agent_8LRT3N5QYB")
+
+    def test_load_restores_participant_context_when_session_is_provided(self):
+        """Factory 应恢复指定参与者可见的历史，并接入 Runtime 持久化服务。"""
+        session = SessionRepository(self.database).create("DIRECT")
+        SessionParticipantRepository(self.database).add(
+            SessionParticipant(
+                id="participant_8T2LQ6MZP1",
+                session_id=session.id,
+                agent_id="agent_1V3ASAXQ2A",
+                role="PRIMARY",
+                join_reason="USER_SELECTED",
+            )
+        )
+        service = ContextService(ContextItemRepository(self.database), session.id)
+        service.append_user_message("历史消息")
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-value"}):
+            with patch("runtime.agent.LLM"):
+                agent = AgentFactory(self.database).load(
+                    "agent_1V3ASAXQ2A",
+                    session_id=session.id,
+                    participant_id="participant_8T2LQ6MZP1",
+                )
+
+        self.assertEqual(agent.participant_id, "participant_8T2LQ6MZP1")
+        self.assertIsNotNone(agent.runtime.context_service)
+        self.assertEqual(agent.context.messages[0]["role"], "user")
+        self.assertEqual(
+            agent.context.messages[0]["content"][0]["text"],
+            "历史消息",
+        )
 
 
 if __name__ == "__main__":

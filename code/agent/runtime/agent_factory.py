@@ -4,11 +4,14 @@ from head.credential_resolver import CredentialResolver
 from head.types import LLMConfig
 from permission.types import PermissionMode
 from runtime.agent import Agent
+from runtime.context_service import ContextService
 from runtime.prompt_builder import PromptBuilder
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.repositories.permission_rule import PermissionRuleRepository
+from storage.repositories.context_item import ContextItemRepository
+from storage.repositories.session_participant import SessionParticipantRepository
 from tools.catalog import ToolCatalog
 
 
@@ -87,6 +90,25 @@ class AgentFactory:
             instructions=instructions,
         )
 
+        context_service = None
+        if participant_id is not None:
+            if session_id is None:
+                raise ValueError("participant_id 必须与 session_id 一起提供")
+            participant = SessionParticipantRepository(self.database).get(
+                participant_id
+            )
+            if (
+                participant is None
+                or participant.session_id != session_id
+                or participant.agent_id != agent_id
+                or participant.left_at is not None
+            ):
+                raise ValueError("participant_id 不属于当前 Agent 的活跃会话参与者")
+            context_service = ContextService(
+                ContextItemRepository(self.database),
+                session_id,
+            )
+
         agent = Agent(
             llm_config=llm_config,
             tools=profile.tools,
@@ -95,9 +117,9 @@ class AgentFactory:
             workspace=str(self.database.workspace),
             session_id=session_id,
             permission_rule_repository=PermissionRuleRepository(self.database),
+            participant_id=participant_id,
+            context_service=context_service,
         )
-        # participant_id 是会话级身份，当前 Agent 先保留它供 ContextService 接入。
-        agent.participant_id = participant_id
         agent.agent_id = profile.id
         agent.profile = profile
         return agent
