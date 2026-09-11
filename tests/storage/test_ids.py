@@ -25,6 +25,7 @@ class PersistentIdTests(unittest.TestCase):
         self.assertTrue(generate_id("llm").startswith("llm_"))
         self.assertTrue(generate_id("session").startswith("session_"))
         self.assertTrue(generate_id("participant").startswith("participant_"))
+        self.assertTrue(generate_id("permission_rule").startswith("permission_rule_"))
 
     def test_unknown_prefix_is_rejected(self):
         """未知实体类型不能生成没有约束的 ID。"""
