@@ -1,5 +1,4 @@
 import os
-import secrets
 
 from head.llm import LLM
 from head.types import LLMConfig
@@ -9,6 +8,7 @@ from runtime.runtime import Runtime
 from tools.tools import Tools
 from context.context import Context
 from runtime.ExecutionContext import ExecutionContext
+from storage.ids import generate_id
 
 class Agent:
     """组装 LLM、工具、上下文和权限管理器的逻辑 Agent。"""
@@ -21,6 +21,7 @@ class Agent:
         agent_key: str = "default",
         permission_mode: PermissionMode = PermissionMode.BUILD,
         workspace: str | None = None,
+        session_id: str | None = None,
     ):
         """创建具有稳定 Agent 身份和新会话身份的 Agent。
 
@@ -31,9 +32,10 @@ class Agent:
             agent_key: 逻辑 Agent 的稳定标识，用于 AGENT 范围权限规则。
             permission_mode: 没有命中明确规则时使用的默认权限模式。
             workspace: 工具处理相对路径的目录；为空时使用当前目录。
+            session_id: 可选的既有会话 ID；为空时生成新的 session_ 前缀 ID。
         """
         self.agent_key = agent_key
-        self.session_id = f"session_{secrets.token_hex(10)}"
+        self.session_id = session_id if session_id is not None else generate_id("session")
         # workspace 只是工具路径解析依据，安全边界会在 harness 层实现。
         self.workspace = workspace if workspace is not None else os.getcwd()
         self.ctx = ExecutionContext(
