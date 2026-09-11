@@ -168,8 +168,8 @@ class ContextItem:
         """校验上下文类型、目标语义和会话内引用。"""
         validate_id("item", self.id)
         validate_id("session", self.session_id)
-        if self.sequence_no < 1:
-            raise ValueError("sequence_no 必须从 1 开始")
+        if self.sequence_no < 0:
+            raise ValueError("sequence_no 不能是负数")
         if self.kind not in {
             "USER_MESSAGE",
             "AGENT_MESSAGE",
