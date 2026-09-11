@@ -17,6 +17,7 @@ from permission.types import (
     PermissionScope,
 )
 from runtime.ExecutionContext import ExecutionContext
+from runtime.context_service import ContextService
 from tools.tools import Tools
 from tools.types import PreparedToolCall, ToolCallPreparationError, ToolResult
 
@@ -84,6 +85,8 @@ class Runtime:
         context: Context,
         ctx: ExecutionContext,
         permission: PermissionManager,
+        context_service: ContextService | None = None,
+        participant_id: str | None = None,
     ) -> None:
         """创建运行时协调器。
 
@@ -93,12 +96,20 @@ class Runtime:
             context: 当前会话的模型上下文。
             ctx: 工具共享的执行环境和身份信息。
             permission: 当前 Agent 的权限管理器。
+            context_service: 可选的业务上下文持久化服务；为空时只维护内存
+                Context，保留纯运行时测试和旧入口的行为。
+            participant_id: 当前 Agent 在会话中的参与者身份；启用
+                context_service 时必须提供，用于记录 Agent 作者。
         """
+        if context_service is not None and not participant_id:
+            raise ValueError("启用 context_service 时必须提供 participant_id")
         self.llm = llm
         self.tools = tools
         self.context = context
         self.permission = permission
         self.ctx = ctx
+        self.context_service = context_service
+        self.participant_id = participant_id
         self._state = RuntimeState.IDLE
         self._pending_permission: PendingToolCall | None = None
         self._tool_queue: deque[PreparedToolCall] = deque()
@@ -145,6 +156,8 @@ class Runtime:
         """
         if self._state is not RuntimeState.IDLE:
             raise ValueError(f"Runtime 当前状态为 {self._state.value}，不能开始新消息")
+        if self.context_service is not None:
+            self.context_service.append_user_message(message)
         self.context.append_msg(message)
         self._state = RuntimeState.RUNNING
         yield from self._run_llm_loop()
@@ -183,11 +196,23 @@ class Runtime:
         usage = response.usage
         for item in response.data or []:
             if item.type == "message":
+                if self.context_service is not None:
+                    self.context_service.append_agent_message(
+                        self.participant_id,
+                        self._message_text(item),
+                    )
                 self.context.append_msg(item, usage=usage)
                 continue
             if item.type != "function_call":
                 continue
 
+            if self.context_service is not None:
+                self.context_service.append_function_call(
+                    self.participant_id,
+                    call_id=item.call_id,
+                    name=item.name,
+                    arguments=item.arguments,
+                )
             self.context.append_msg(item)
             try:
                 call = self.tools.prepare_call(
@@ -294,13 +319,38 @@ class Runtime:
 
     def _append_tool_result(self, call_id: str, result: ToolResult) -> None:
         """将 ToolResult 统一编码后追加为 function_call_output。"""
+        encoded_output = self.tools.encode_result(result)
+        if self.context_service is not None:
+            self.context_service.append_function_call_output(
+                self.participant_id,
+                call_id=call_id,
+                output=encoded_output,
+            )
         self.context.append_msg(
             {
                 "type": "function_call_output",
                 "call_id": call_id,
-                "output": self.tools.encode_result(result),
+                "output": encoded_output,
             }
         )
+
+    @staticmethod
+    def _message_text(item: LLMResponseOutputItem) -> str:
+        """从 LLM 消息输出提取纯文本，供业务上下文持久化。"""
+        content = item.content
+        if isinstance(content, str):
+            return content
+        if not isinstance(content, list):
+            return ""
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, dict):
+                text = part.get("text")
+            else:
+                text = getattr(part, "text", None)
+            if isinstance(text, str):
+                parts.append(text)
+        return "".join(parts)
 
     @staticmethod
     def _command_for(call: PreparedToolCall) -> str | None:
