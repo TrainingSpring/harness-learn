@@ -1,9 +1,9 @@
-import importlib
 import json
 import os
 from base64 import b64encode
 
 from runtime.ExecutionContext import ExecutionContext
+from tools.catalog import ToolCatalog
 from permission.types import PermissionRequest
 from tools.types import (
     Attachment,
@@ -255,16 +255,7 @@ class Tools:
         :param names : list[str] : 工具名称列表
         :return : list[dict] : 工具集
         """
-        res = []
+        catalog = ToolCatalog()
         for name in names:
-            module_name = "tools."+name
-            module = importlib.import_module(module_name)
-            tool = getattr(module,"REGISTER",None)
-            if not isinstance(tool, Tool):
-                raise TypeError(f"{name}.REGISTER 不是有效的 Tool")
-            if tool.schema.get("name") != name:
-                raise ValueError(
-                    f"工具名称不一致: 配置名={name}, schema名称={tool.schema.get('name')}"
-                )
-            self.register(tool)
+            self.register(catalog.get(name))
         return self
