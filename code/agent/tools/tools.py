@@ -139,7 +139,7 @@ class Tools:
             tool_name=tool_name,
             call_id=call_id,
             session_id=self.ctx.session_id,
-            agent_key=self.ctx.agent_key,
+            agent_id=self.ctx.agent_id,
         )
 
     def execute(self, call: PreparedToolCall) -> ToolResult:

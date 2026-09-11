@@ -18,7 +18,7 @@ class Agent:
         llm_config: LLMConfig,
         tools: list[str],
         context: Context | None = None,
-        agent_key: str = "default",
+        agent_id: str = "agent_default",
         permission_mode: PermissionMode = PermissionMode.BUILD,
         workspace: str | None = None,
         session_id: str | None = None,
@@ -29,18 +29,18 @@ class Agent:
             llm_config: LLM 连接与模型配置。
             tools: 需要注册的工具模块名称。
             context: 可选的既有对话上下文。
-            agent_key: 逻辑 Agent 的稳定标识，用于 AGENT 范围权限规则。
+            agent_id: 逻辑 Agent 的稳定标识，用于 AGENT 范围权限规则。
             permission_mode: 没有命中明确规则时使用的默认权限模式。
             workspace: 工具处理相对路径的目录；为空时使用当前目录。
             session_id: 可选的既有会话 ID；为空时生成新的 session_ 前缀 ID。
         """
-        self.agent_key = agent_key
+        self.agent_id = agent_id
         self.session_id = session_id if session_id is not None else generate_id("session")
         # workspace 只是工具路径解析依据，安全边界会在 harness 层实现。
         self.workspace = workspace if workspace is not None else os.getcwd()
         self.ctx = ExecutionContext(
             workspace=self.workspace,
-            agent_key=self.agent_key,
+            agent_id=self.agent_id,
             session_id=self.session_id,
         )
         # LLM

@@ -32,7 +32,7 @@ class CliPermissionTests(unittest.TestCase):
             tool_name="write",
             call_id="call_001",
             session_id="session_001",
-            agent_key="code_editor",
+            agent_id="agent_1V3ASAXQ2A",
         )
         self.event = PermissionRequiredEvent(
             type="permission_required",

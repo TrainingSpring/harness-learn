@@ -37,7 +37,7 @@ class PermissionManagerTests(unittest.TestCase):
         resource: str | None = "/workspace/src/app.py",
         call_id: str = "call_001",
         session_id: str = "session_001",
-        agent_key: str = "code_editor",
+        agent_id: str = "agent_1V3ASAXQ2A",
     ) -> PermissionRequest:
         """创建具有可替换身份字段的真实请求。"""
         return PermissionRequest(
@@ -46,7 +46,7 @@ class PermissionManagerTests(unittest.TestCase):
             tool_name="write",
             call_id=call_id,
             session_id=session_id,
-            agent_key=agent_key,
+            agent_id=agent_id,
         )
 
     def test_build_mode_falls_back_to_ask_for_unruled_write(self):
@@ -110,7 +110,7 @@ class PermissionManagerTests(unittest.TestCase):
             PermissionDecision.ALLOW,
         )
         self.assertEqual(
-            self.manager.check(self._request(agent_key="other_agent")),
+            self.manager.check(self._request(agent_id="agent_9U3M7BKP2C")),
             PermissionDecision.ASK,
         )
 

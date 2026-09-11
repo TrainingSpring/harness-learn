@@ -43,7 +43,7 @@ class PermissionPolicyTests(unittest.TestCase):
             tool_name="test_tool",
             call_id="call_001",
             session_id="session_001",
-            agent_key="code_editor",
+            agent_id="agent_1V3ASAXQ2A",
         )
 
     def test_hard_safety_denies_writing_critical_system_files(self):

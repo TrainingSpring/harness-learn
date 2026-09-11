@@ -89,7 +89,7 @@ class AgentFactory:
         agent = Agent(
             llm_config=llm_config,
             tools=profile.tools,
-            agent_key=profile.id,
+            agent_id=profile.id,
             permission_mode=permission_mode,
             workspace=str(self.database.workspace),
             session_id=session_id,

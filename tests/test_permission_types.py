@@ -29,7 +29,7 @@ class PermissionTypeTests(unittest.TestCase):
             tool_name="write",
             call_id="call_001",
             session_id="session_001",
-            agent_key="code_editor",
+            agent_id="agent_1V3ASAXQ2A",
         )
 
     def test_once_rule_binds_only_the_current_call(self):
@@ -44,7 +44,7 @@ class PermissionTypeTests(unittest.TestCase):
 
         self.assertEqual(rule.call_id, "call_001")
         self.assertIsNone(rule.session_id)
-        self.assertIsNone(rule.agent_key)
+        self.assertIsNone(rule.agent_id)
 
     def test_rule_rejects_ask_as_a_persisted_decision(self):
         """ASK 是暂态结果，不能被保存为允许/拒绝规则。"""
@@ -86,7 +86,7 @@ class PermissionTypeTests(unittest.TestCase):
             tool_name="bash",
             call_id="call_002",
             session_id="session_001",
-            agent_key="code_editor",
+            agent_id="agent_1V3ASAXQ2A",
         )
 
         self.assertIsNone(request.resource)
@@ -95,12 +95,12 @@ class PermissionTypeTests(unittest.TestCase):
         """Agent 长期身份与当前会话身份必须是不同字段。"""
         ctx = ExecutionContext(
             workspace="/workspace",
-            agent_key="code_editor",
+            agent_id="agent_1V3ASAXQ2A",
             session_id="session_001",
         )
 
         self.assertEqual(ctx.workspace, "/workspace")
-        self.assertEqual(ctx.agent_key, "code_editor")
+        self.assertEqual(ctx.agent_id, "agent_1V3ASAXQ2A")
         self.assertEqual(ctx.session_id, "session_001")
         self.assertEqual(ctx.max_tool_call_length, 20_000)
 

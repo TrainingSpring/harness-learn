@@ -64,7 +64,7 @@ class AgentFactoryTests(unittest.TestCase):
 
         self.assertEqual(agent.session_id, "session_4N9C1R7WBA")
         self.assertEqual(agent.workspace, str(Path(self.temp_dir.name).resolve()))
-        self.assertEqual(agent.ctx.agent_key, "agent_1V3ASAXQ2A")
+        self.assertEqual(agent.ctx.agent_id, "agent_1V3ASAXQ2A")
         self.assertIn("read", agent.tools.map)
         self.assertIn("write", agent.tools.map)
         self.assertEqual(llm_class.call_count, 2)

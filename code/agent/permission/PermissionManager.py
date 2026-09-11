@@ -53,19 +53,19 @@ class PermissionManager:
         Manager 不持有 ExecutionContext。实际调用的 call/session/agent 身份
         都在 PermissionRequest 中提供，因此这里可以作为纯领域对象测试。
         """
-        self._mode = mode
-        self._rules: list[PermissionRule] = []
-        self._hard_safety_policy = (
+        self._mode = mode # 权限模式
+        self._rules: list[PermissionRule] = [] # 规则列表
+        self._hard_safety_policy = ( # 绝对拒绝策略
             hard_safety_policy
             if hard_safety_policy is not None
             else HardSafetyPolicy()
         )
-        self._protected_resource_policy = (
+        self._protected_resource_policy = ( # 受保护资源策略
             protected_resource_policy
             if protected_resource_policy is not None
             else ProtectedResourcePolicy()
         )
-        self._mode_policy = ModePolicy(workspace)
+        self._mode_policy = ModePolicy(workspace) # 模式策略
 
     def check(
         self,
@@ -201,7 +201,7 @@ class PermissionManager:
             return {"call_id": request.call_id}
         if scope is PermissionScope.SESSION:
             return {"session_id": request.session_id}
-        return {"agent_key": request.agent_key}
+        return {"agent_id": request.agent_id}
 
     @staticmethod
     def _validate_rule_resource(
@@ -278,7 +278,7 @@ class PermissionManager:
             return rule.call_id == request.call_id
         if rule.scope is PermissionScope.SESSION:
             return rule.session_id == request.session_id
-        return rule.agent_key == request.agent_key
+        return rule.agent_id == request.agent_id
 
     @staticmethod
     def _resource_matches(
@@ -332,7 +332,7 @@ class PermissionManager:
             return left.call_id == right.call_id
         if left.scope is PermissionScope.SESSION:
             return left.session_id == right.session_id
-        return left.agent_key == right.agent_key
+        return left.agent_id == right.agent_id
 
     @staticmethod
     def _normalise_absolute_path(path: str) -> str:
@@ -348,7 +348,6 @@ class PermissionManager:
             return os.path.commonpath([path, root]) == root
         except ValueError:
             return False
-
 
 
 
