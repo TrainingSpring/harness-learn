@@ -1,4 +1,4 @@
-"""LLM 和工具配置的只读查询路由。"""
+"""LLM 创建及工具、LLM 配置查询路由。"""
 
 from fastapi import APIRouter, Depends, Query, status
 
