@@ -28,9 +28,14 @@ def _sse(event: ServerEvent) -> str:
 
 async def _event_stream(events):
     """逐事件让出控制权，使取消请求能在模型 token 间得到处理。"""
-    for event in events:
-        yield _sse(event)
-        await asyncio.sleep(0)
+    try:
+        for event in events:
+            yield _sse(event)
+            await asyncio.sleep(0)
+    finally:
+        close = getattr(events, "close", None)
+        if close is not None:
+            close()
 
 
 def _stream_response(events) -> StreamingResponse:
@@ -91,4 +96,3 @@ async def cancel_run(
     except RunNotFoundError as error:
         raise ApiError(404, "RUN_NOT_FOUND", "Run 不存在") from error
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-

@@ -13,6 +13,7 @@ from .dependencies import ApplicationServices
 from .errors import install_error_handlers
 from .services.chat_service import ChatService
 from .services.run_registry import RunRegistry
+from .static import SpaStaticFiles
 
 install_agent_source_path()
 
@@ -74,6 +75,9 @@ def create_app(settings: WebServerSettings) -> FastAPI:
     )
     install_error_handlers(app)
     app.include_router(api_router)
+    if settings.frontend_dist is not None:
+        # 必须最后挂载根路径，否则会截获前面定义的 /api 路由。
+        app.mount("/", SpaStaticFiles(settings.frontend_dist), name="frontend")
     return app
 
 
