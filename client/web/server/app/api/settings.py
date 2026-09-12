@@ -38,10 +38,10 @@ async def list_llm_profiles(
     )
 
 
-@router.get("/tools")
+@router.get("/tools", response_model=ListResponse[ToolSummary])
 async def list_tools(
     services: ApplicationServices = Depends(get_services),
-) -> dict[str, list[ToolSummary]]:
+) -> ListResponse[ToolSummary]:
     """返回受信任工具的可展示元数据，不暴露 Python 对象。"""
     items = []
     for metadata in services.tool_catalog.list_available():
@@ -55,4 +55,8 @@ async def list_tools(
                 permission_action=getattr(action, "value", str(action or "")),
             )
         )
-    return {"items": items}
+    return ListResponse(
+        items=items,
+        # 工具目录当前是本地受信列表，不提供动态分页。但仍使用统一外壳，让前端不需要为特殊接口写分支。
+        pagination=Pagination(limit=len(items), offset=0, has_more=False),
+    )
