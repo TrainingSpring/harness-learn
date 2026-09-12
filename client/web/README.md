@@ -18,6 +18,19 @@ cd client/web/server
 ../../../.venv/bin/python -m app.cli --workspace ../../..
 ```
 
+也可使用启动脚本：
+
+```bash
+cd client/web/server
+./start.sh
+```
+
+指定其他 workspace 或端口：
+
+```bash
+./start.sh --workspace /path/to/workspace --port 9000
+```
+
 另开终端启动前端：
 
 ```bash
