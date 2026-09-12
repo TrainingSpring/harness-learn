@@ -121,6 +121,48 @@ class Session:
             raise ValueError(f"未知的会话状态: {self.status}")
 
 
+@dataclass(frozen=True)
+class DirectSessionSummary:
+    """供客户端读取的固定 1v1 会话聚合摘要。
+
+    Attributes:
+        session: DIRECT 会话的基础数据。
+        agent_id: 会话中唯一 Agent 的稳定 ID。
+        agent_name: 会话中唯一 Agent 的用户可读名称。
+        last_message: 最后一条用户或 Agent 消息的文本；无消息时为 None。
+        last_sequence_no: 最后一条可展示消息的会话序号；无消息时为 None。
+
+    该类型是只读查询结果，不参与 Session 或 ContextItem 的写入流程。
+    """
+
+    session: Session
+    agent_id: str
+    agent_name: str
+    last_message: str | None
+    last_sequence_no: int | None
+
+    def __post_init__(self) -> None:
+        """校验 1v1 聚合中的会话、Agent 和最后消息字段。"""
+        if not isinstance(self.session, Session):
+            raise ValueError("session 必须是 Session")
+        if self.session.conversation_mode != "DIRECT":
+            raise ValueError("DirectSessionSummary 只能包含 DIRECT 会话")
+        validate_id("agent", self.agent_id)
+        _validate_non_empty(self.agent_name, "agent_name")
+        if self.last_message is None:
+            if self.last_sequence_no is not None:
+                raise ValueError("无最后消息时不能存在 last_sequence_no")
+            return
+        if not isinstance(self.last_message, str):
+            raise ValueError("last_message 必须是字符串或 None")
+        if (
+            not isinstance(self.last_sequence_no, int)
+            or isinstance(self.last_sequence_no, bool)
+            or self.last_sequence_no <= 0
+        ):
+            raise ValueError("last_sequence_no 必须是正整数")
+
+
 @dataclass
 class SessionAgent:
     """表示固定会话与一个逻辑 Agent 之间的成员关系。
