@@ -38,7 +38,7 @@ class ContextService:
         text: str,
         *,
         visibility: str = "PUBLIC",
-        target_participant_id: str | None = None,
+        target_agent_id: str | None = None,
     ) -> ContextItem:
         """追加一条本地用户消息。"""
         self._require_text(text)
@@ -46,30 +46,30 @@ class ContextService:
             kind="USER_MESSAGE",
             payload={"text": text},
             visibility=visibility,
-            target_participant_id=target_participant_id,
+            target_agent_id=target_agent_id,
         )
 
     def append_agent_message(
         self,
-        author_participant_id: str,
+        author_agent_id: str,
         text: str,
         *,
         visibility: str = "PUBLIC",
-        target_participant_id: str | None = None,
+        target_agent_id: str | None = None,
     ) -> ContextItem:
-        """追加一条 Agent 消息，可选地定向发送给另一个参与者。"""
+        """追加一条 Agent 消息，可选地定向发送给另一个会话 Agent。"""
         self._require_text(text)
         return self._append(
             kind="AGENT_MESSAGE",
             payload={"text": text},
-            author_participant_id=author_participant_id,
+            author_agent_id=author_agent_id,
             visibility=visibility,
-            target_participant_id=target_participant_id,
+            target_agent_id=target_agent_id,
         )
 
     def append_function_call(
         self,
-        author_participant_id: str,
+        author_agent_id: str,
         *,
         call_id: str,
         name: str,
@@ -87,14 +87,14 @@ class ContextService:
         return self._append(
             kind="FUNCTION_CALL",
             payload={"name": name, "arguments": arguments},
-            author_participant_id=author_participant_id,
+            author_agent_id=author_agent_id,
             visibility="PUBLIC",
             call_id=call_id,
         )
 
     def append_function_call_output(
         self,
-        author_participant_id: str,
+        author_agent_id: str,
         *,
         call_id: str,
         output: Any,
@@ -106,15 +106,15 @@ class ContextService:
         return self._append(
             kind="FUNCTION_CALL_OUTPUT",
             payload={"output": output},
-            author_participant_id=author_participant_id,
+            author_agent_id=author_agent_id,
             visibility="PUBLIC",
             call_id=call_id,
             caused_by_item_id=caused_by_item_id,
         )
 
-    def load_visible(self, participant_id: str) -> list[ContextItem]:
-        """读取指定参与者可见的会话时间线。"""
-        return self.repository.list_visible(self.session_id, participant_id)
+    def load_visible(self, agent_id: str) -> list[ContextItem]:
+        """读取指定会话 Agent 可见的时间线。"""
+        return self.repository.list_visible(self.session_id, agent_id)
 
     @staticmethod
     def to_responses_input(items: list[ContextItem]) -> list[dict[str, Any]]:
@@ -162,8 +162,8 @@ class ContextService:
         kind: str,
         payload: dict[str, Any],
         visibility: str,
-        author_participant_id: str | None = None,
-        target_participant_id: str | None = None,
+        author_agent_id: str | None = None,
+        target_agent_id: str | None = None,
         call_id: str | None = None,
         caused_by_item_id: str | None = None,
     ) -> ContextItem:
@@ -174,8 +174,8 @@ class ContextService:
                 session_id=self.session_id,
                 sequence_no=0,
                 kind=kind,
-                author_participant_id=author_participant_id,
-                target_participant_id=target_participant_id,
+                author_agent_id=author_agent_id,
+                target_agent_id=target_agent_id,
                 visibility=visibility,
                 payload=payload,
                 call_id=call_id,

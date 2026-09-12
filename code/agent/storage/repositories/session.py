@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from ..database import StateDatabase
 from ..errors import StorageConflictError, StorageFormatError
 from ..ids import generate_id, validate_id
-from ..types import Session
+from ..types import Session, SessionAgent
 
 
 class SessionRepository:
@@ -16,8 +16,8 @@ class SessionRepository:
     Attributes:
         database: 已初始化的 workspace 状态数据库。
 
-    会话不直接绑定 Agent；Agent 参与关系由 SessionParticipantRepository 管理，
-    因此同一个 Session 可以支持 DIRECT、GROUP 和 OPEN 三种协作形态。
+    会话不直接绑定 Agent；固定成员关系由 SessionAgentRepository 管理。
+    当前只支持 DIRECT 和 GROUP 两种产品形态。
     """
 
     def __init__(self, database: StateDatabase) -> None:
@@ -32,42 +32,78 @@ class SessionRepository:
         """创建一个 ACTIVE 会话。
 
         Args:
-            mode: 会话模式，必须是 DIRECT、GROUP 或 OPEN。
+            mode: 会话模式，必须是 DIRECT 或 GROUP。
             title: 可选的用户可读标题。
 
         Returns:
             已写入数据库、带稳定 session_ ID 和时间戳的 Session。
         """
-        now = _utc_now()
-        session = Session(
-            id=generate_id("session"),
-            title=title,
-            conversation_mode=mode,
-            status="ACTIVE",
-            created_at=now,
-            updated_at=now,
-        )
+        session = self._new_session(mode, title)
         try:
             with self.database.transaction() as connection:
-                connection.execute(
-                    """
-                    INSERT INTO sessions (
-                        id, title, conversation_mode, status,
-                        created_at, updated_at, closed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        session.id,
-                        session.title,
-                        session.conversation_mode,
-                        session.status,
-                        session.created_at,
-                        session.updated_at,
-                        session.closed_at,
-                    ),
-                )
+                self._insert_session(connection, session)
         except sqlite3.IntegrityError as error:
             raise StorageConflictError(f"Session 创建冲突: {session.id}") from error
+        return session
+
+    def create_with_agents(
+        self,
+        mode: str,
+        agent_roles: list[tuple[str, str]],
+        title: str | None = None,
+    ) -> Session:
+        """在一个事务内创建 Session 及其全部固定 Agent 成员。
+
+        Args:
+            mode: 当前支持的 DIRECT 或 GROUP 模式。
+            agent_roles: ``(agent_id, role)`` 列表，由 SessionService 根据模式
+                构造；仓储会再次通过 SessionAgent 校验字段。
+            title: 可选的用户可读标题。
+
+        Returns:
+            已持久化的 ACTIVE Session。
+
+        Raises:
+            ValueError: 成员列表为空或成员字段不合法。
+            StorageConflictError: Session、Agent 外键或成员唯一约束冲突。
+
+        Session 和成员必须共同成功或共同回滚，避免留下无法加载的空会话。
+        """
+        if not agent_roles:
+            raise ValueError("会话必须至少包含一个 Agent")
+        session = self._new_session(mode, title)
+        members = [
+            SessionAgent(
+                session_id=session.id,
+                agent_id=agent_id,
+                role=role,
+                created_at=session.created_at,
+            )
+            for agent_id, role in agent_roles
+        ]
+        try:
+            with self.database.transaction() as connection:
+                self._insert_session(connection, session)
+                connection.executemany(
+                    """
+                    INSERT INTO session_agents (
+                        session_id, agent_id, role, created_at
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    [
+                        (
+                            member.session_id,
+                            member.agent_id,
+                            member.role,
+                            member.created_at,
+                        )
+                        for member in members
+                    ],
+                )
+        except sqlite3.IntegrityError as error:
+            raise StorageConflictError(
+                f"Session 固定成员创建冲突: {session.id}"
+            ) from error
         return session
 
     def get(self, session_id: str) -> Session | None:
@@ -130,6 +166,40 @@ class SessionRepository:
             raise ValueError("limit 必须是正整数")
         if not isinstance(offset, int) or offset < 0:
             raise ValueError("offset 必须是非负整数")
+
+    @staticmethod
+    def _new_session(mode: str, title: str | None) -> Session:
+        """构造带统一时间戳的新 Session 领域对象。"""
+        now = _utc_now()
+        return Session(
+            id=generate_id("session"),
+            title=title,
+            conversation_mode=mode,
+            status="ACTIVE",
+            created_at=now,
+            updated_at=now,
+        )
+
+    @staticmethod
+    def _insert_session(connection: sqlite3.Connection, session: Session) -> None:
+        """在调用方事务中插入 Session，供单表和聚合创建共同使用。"""
+        connection.execute(
+            """
+            INSERT INTO sessions (
+                id, title, conversation_mode, status,
+                created_at, updated_at, closed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                session.id,
+                session.title,
+                session.conversation_mode,
+                session.status,
+                session.created_at,
+                session.updated_at,
+                session.closed_at,
+            ),
+        )
 
     @staticmethod
     def _from_row(row: sqlite3.Row) -> Session:

@@ -80,7 +80,7 @@ class ContextItemRepository:
                     """
                     INSERT INTO context_items (
                         id, session_id, sequence_no, kind,
-                        author_participant_id, target_participant_id,
+                        author_agent_id, target_agent_id,
                         visibility, call_id, caused_by_item_id,
                         payload_json, created_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -90,8 +90,8 @@ class ContextItemRepository:
                         stored.session_id,
                         stored.sequence_no,
                         stored.kind,
-                        stored.author_participant_id,
-                        stored.target_participant_id,
+                        stored.author_agent_id,
+                        stored.target_agent_id,
                         stored.visibility,
                         stored.call_id,
                         stored.caused_by_item_id,
@@ -123,32 +123,32 @@ class ContextItemRepository:
     def list_visible(
         self,
         session_id: str,
-        participant_id: str,
+        agent_id: str,
     ) -> list[ContextItem]:
-        """读取一个参与者可见的上下文投影。
+        """读取一个 Agent 可见的上下文投影。
 
         Args:
             session_id: 要读取的会话 ID。
-            participant_id: 当前接收 Agent 的参与者 ID。
+            agent_id: 当前接收 Agent 的稳定 ID。
 
         Returns:
-            PUBLIC 项、发给该参与者的 TARGETED 项，以及该参与者自己产生的
+            PUBLIC 项、发给该 Agent 的 TARGETED 项，以及该 Agent 自己产生的
             PRIVATE 项，均按时间线顺序返回。
         """
         validate_id("session", session_id)
-        validate_id("participant", participant_id)
+        validate_id("agent", agent_id)
         rows = self.database.connection.execute(
             """
             SELECT * FROM context_items
             WHERE session_id = ?
               AND (
                   visibility = 'PUBLIC'
-                  OR (visibility = 'TARGETED' AND target_participant_id = ?)
-                  OR (visibility = 'PRIVATE' AND author_participant_id = ?)
+                  OR (visibility = 'TARGETED' AND target_agent_id = ?)
+                  OR (visibility = 'PRIVATE' AND author_agent_id = ?)
               )
             ORDER BY sequence_no ASC
             """,
-            (session_id, participant_id, participant_id),
+            (session_id, agent_id, agent_id),
         ).fetchall()
         return [self._from_row(row) for row in rows]
 
@@ -185,30 +185,30 @@ class ContextItemRepository:
         if session_exists is None:
             raise ValueError("上下文项所属 Session 不存在")
 
-        if item.author_participant_id is not None:
+        if item.author_agent_id is not None:
             author = connection.execute(
                 """
-                SELECT 1 FROM session_participants
-                WHERE id = ? AND session_id = ?
+                SELECT 1 FROM session_agents
+                WHERE agent_id = ? AND session_id = ?
                 """,
-                (item.author_participant_id, item.session_id),
+                (item.author_agent_id, item.session_id),
             ).fetchone()
             if author is None:
                 raise ValueError("上下文项作者不属于当前 Session")
-        if item.kind in self._AUTHOR_REQUIRED_KINDS and item.author_participant_id is None:
-            raise ValueError(f"{item.kind} 必须指定作者参与者")
+        if item.kind in self._AUTHOR_REQUIRED_KINDS and item.author_agent_id is None:
+            raise ValueError(f"{item.kind} 必须指定作者 Agent")
 
         if item.visibility == "TARGETED":
             target = connection.execute(
                 """
-                SELECT 1 FROM session_participants
-                WHERE id = ? AND session_id = ? AND left_at IS NULL
+                SELECT 1 FROM session_agents
+                WHERE agent_id = ? AND session_id = ?
                 """,
-                (item.target_participant_id, item.session_id),
+                (item.target_agent_id, item.session_id),
             ).fetchone()
             if target is None:
-                raise ValueError("TARGETED 上下文的目标必须是当前活跃参与者")
-        elif item.visibility in {"PUBLIC", "PRIVATE"} and item.target_participant_id is not None:
+                raise ValueError("TARGETED 上下文的目标必须是当前 Session 的 Agent")
+        elif item.visibility in {"PUBLIC", "PRIVATE"} and item.target_agent_id is not None:
             raise ValueError(f"{item.visibility} 上下文不能指定目标")
 
         if item.kind == "FUNCTION_CALL":
@@ -279,8 +279,8 @@ class ContextItemRepository:
                 session_id=row["session_id"],
                 sequence_no=row["sequence_no"],
                 kind=row["kind"],
-                author_participant_id=row["author_participant_id"],
-                target_participant_id=row["target_participant_id"],
+                author_agent_id=row["author_agent_id"],
+                target_agent_id=row["target_agent_id"],
                 visibility=row["visibility"],
                 payload=payload,
                 call_id=row["call_id"],

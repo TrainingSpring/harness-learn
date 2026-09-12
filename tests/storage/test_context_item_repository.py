@@ -14,7 +14,6 @@ from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E
 from storage.repositories.context_item import ContextItemRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
 from storage.repositories.session import SessionRepository  # noqa: E402
-from storage.repositories.session_participant import SessionParticipantRepository  # noqa: E402
 from storage.types import AgentProfile, ContextItem, LLMProfile  # noqa: E402
 
 
@@ -22,7 +21,7 @@ class ContextItemRepositoryTests(unittest.TestCase):
     """验证上下文追加、序号、可见性和调用配对约束。"""
 
     def setUp(self):
-        """创建一个带两个 Agent 参与者的 GROUP 会话。"""
+        """创建一个带两个固定 Agent 成员的 GROUP 会话。"""
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = StateDatabase(self.temp_dir.name)
         self.database.initialize()
@@ -54,21 +53,13 @@ class ContextItemRepositoryTests(unittest.TestCase):
                     permission_mode="BUILD",
                 )
             )
-        self.session = SessionRepository(self.database).create("GROUP", "协作")
-        participant_repository = SessionParticipantRepository(self.database)
-        participant_repository.add(
-            self._participant(
-                "participant_8T2LQ6MZP1",
-                "agent_1V3ASAXQ2A",
-                "PRIMARY",
-            )
-        )
-        participant_repository.add(
-            self._participant(
-                "participant_9U3M7BKP2C",
-                "agent_9U3M7BKP2C",
-                "PARTICIPANT",
-            )
+        self.session = SessionRepository(self.database).create_with_agents(
+            "GROUP",
+            [
+                ("agent_1V3ASAXQ2A", "MEMBER"),
+                ("agent_9U3M7BKP2C", "MEMBER"),
+            ],
+            "协作",
         )
         self.repository = ContextItemRepository(self.database)
 
@@ -76,18 +67,6 @@ class ContextItemRepositoryTests(unittest.TestCase):
         """关闭数据库并清理临时目录。"""
         self.database.close()
         self.temp_dir.cleanup()
-
-    def _participant(self, participant_id, agent_id, role):
-        """创建当前会话中的参与者。"""
-        from storage.types import SessionParticipant
-
-        return SessionParticipant(
-            id=participant_id,
-            session_id=self.session.id,
-            agent_id=agent_id,
-            role=role,
-            join_reason="USER_SELECTED",
-        )
 
     def _item(
         self,
@@ -107,8 +86,8 @@ class ContextItemRepositoryTests(unittest.TestCase):
             session_id=self.session.id,
             sequence_no=0,
             kind=kind,
-            author_participant_id=author,
-            target_participant_id=target,
+            author_agent_id=author,
+            target_agent_id=target,
             visibility=visibility,
             payload=payload or {"text": "消息"},
             call_id=call_id,
@@ -124,7 +103,7 @@ class ContextItemRepositoryTests(unittest.TestCase):
             self._item(
                 "item_4G8YL0B3WD",
                 "AGENT_MESSAGE",
-                author="participant_8T2LQ6MZP1",
+                author="agent_1V3ASAXQ2A",
             )
         )
 
@@ -136,7 +115,7 @@ class ContextItemRepositoryTests(unittest.TestCase):
         )
 
     def test_list_visible_filters_public_targeted_and_private_items(self):
-        """按参与者读取时只返回该参与者可见的上下文。"""
+        """按 Agent 读取时只返回该 Agent 可见的上下文。"""
         public = self.repository.append(
             self._item("item_3F7XK9A2VC", "USER_MESSAGE")
         )
@@ -144,8 +123,8 @@ class ContextItemRepositoryTests(unittest.TestCase):
             self._item(
                 "item_4G8YL0B3WD",
                 "AGENT_MESSAGE",
-                author="participant_8T2LQ6MZP1",
-                target="participant_9U3M7BKP2C",
+                author="agent_1V3ASAXQ2A",
+                target="agent_9U3M7BKP2C",
                 visibility="TARGETED",
             )
         )
@@ -153,18 +132,18 @@ class ContextItemRepositoryTests(unittest.TestCase):
             self._item(
                 "item_5H1ZM7C4XE",
                 "AGENT_MESSAGE",
-                author="participant_8T2LQ6MZP1",
+                author="agent_1V3ASAXQ2A",
                 visibility="PRIVATE",
             )
         )
 
         visible_to_worker = self.repository.list_visible(
             self.session.id,
-            "participant_9U3M7BKP2C",
+            "agent_9U3M7BKP2C",
         )
         visible_to_author = self.repository.list_visible(
             self.session.id,
-            "participant_8T2LQ6MZP1",
+            "agent_1V3ASAXQ2A",
         )
 
         self.assertEqual(
@@ -174,18 +153,15 @@ class ContextItemRepositoryTests(unittest.TestCase):
             [item.id for item in visible_to_author], [public.id, private.id]
         )
 
-    def test_targeted_item_requires_an_active_target(self):
-        """定向消息不能发送给不存在或已经离开的参与者。"""
-        participant_repository = SessionParticipantRepository(self.database)
-        participant_repository.leave("participant_9U3M7BKP2C")
-
+    def test_targeted_item_requires_a_session_agent(self):
+        """定向消息不能发送给不属于当前会话的 Agent。"""
         with self.assertRaises(ValueError):
             self.repository.append(
                 self._item(
                     "item_3F7XK9A2VC",
                     "AGENT_MESSAGE",
-                    author="participant_8T2LQ6MZP1",
-                    target="participant_9U3M7BKP2C",
+                    author="agent_1V3ASAXQ2A",
+                    target="agent_8LRT3N5QYB",
                     visibility="TARGETED",
                 )
             )
@@ -203,7 +179,7 @@ class ContextItemRepositoryTests(unittest.TestCase):
             self._item(
                 "item_3F7XK9A2VC",
                 "FUNCTION_CALL",
-                author="participant_8T2LQ6MZP1",
+                author="agent_1V3ASAXQ2A",
                 payload={"name": "read"},
                 call_id="call_001",
             )
@@ -212,7 +188,7 @@ class ContextItemRepositoryTests(unittest.TestCase):
             self._item(
                 "item_4G8YL0B3WD",
                 "FUNCTION_CALL_OUTPUT",
-                author="participant_8T2LQ6MZP1",
+                author="agent_1V3ASAXQ2A",
                 payload={"output": "ok"},
                 call_id="call_001",
                 caused_by=function_call.id,
@@ -224,7 +200,7 @@ class ContextItemRepositoryTests(unittest.TestCase):
                 self._item(
                     "item_5H1ZM7C4XE",
                     "FUNCTION_CALL_OUTPUT",
-                    author="participant_8T2LQ6MZP1",
+                    author="agent_1V3ASAXQ2A",
                     payload={"output": "duplicate"},
                     call_id="call_001",
                 )
@@ -242,7 +218,7 @@ class ContextItemRepositoryTests(unittest.TestCase):
                 self._item(
                     "item_3F7XK9A2VC",
                     "FUNCTION_CALL_OUTPUT",
-                    author="participant_8T2LQ6MZP1",
+                    author="agent_1V3ASAXQ2A",
                     call_id="call_missing",
                 )
             )
@@ -253,8 +229,8 @@ class ContextItemRepositoryTests(unittest.TestCase):
         self.database.connection.execute(
             """
             INSERT INTO context_items (
-                id, session_id, sequence_no, kind, author_participant_id,
-                target_participant_id, visibility, call_id, caused_by_item_id,
+                id, session_id, sequence_no, kind, author_agent_id,
+                target_agent_id, visibility, call_id, caused_by_item_id,
                 payload_json, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,

@@ -20,12 +20,11 @@ class Agent:
         llm_config: LLMConfig,
         tools: list[str],
         context: Context | None = None,
-        agent_id: str = "agent_default",
+        agent_id: str = "",
         permission_mode: PermissionMode = PermissionMode.BUILD,
         workspace: str | None = None,
         session_id: str | None = None,
         permission_rule_repository: PermissionRuleRepository | None = None,
-        participant_id: str | None = None,
         context_service: ContextService | None = None,
     ):
         """创建具有稳定 Agent 身份和新会话身份的 Agent。
@@ -40,12 +39,10 @@ class Agent:
             session_id: 可选的既有会话 ID；为空时生成新的 session_ 前缀 ID。
             permission_rule_repository: 可选的 Agent 权限规则仓储；传入后
                 PermissionManager 会加载并持久化 AGENT 规则。
-            participant_id: 当前 Agent 在会话中的参与者 ID。
             context_service: 可选的持久化上下文服务；传入后会恢复可见历史，
                 并让 Runtime 继续记录新的业务事件。
         """
-        self.agent_id = agent_id
-        self.participant_id = participant_id
+        self.agent_id = agent_id if agent_id else generate_id("agent")
         self.session_id = session_id if session_id is not None else generate_id("session")
         # workspace 只是工具路径解析依据，安全边界会在 harness 层实现。
         self.workspace = workspace if workspace is not None else os.getcwd()
@@ -63,10 +60,8 @@ class Agent:
         # 上下文
         self.context = context if context is not None else Context(LLM(llm_config.base_url,llm_config.api_key,llm_config.model,llm_config.instructions),self.ctx)
         if context is None and context_service is not None:
-            if participant_id is None:
-                raise ValueError("启用 context_service 时必须提供 participant_id")
             self.context.messages = ContextService.to_responses_input(
-                context_service.load_visible(participant_id)
+                context_service.load_visible(self.agent_id)
             )
         # 权限管理
         self.permission = PermissionManager(
@@ -83,7 +78,6 @@ class Agent:
             self.ctx,
             self.permission,
             context_service=context_service,
-            participant_id=participant_id,
         )
 
 

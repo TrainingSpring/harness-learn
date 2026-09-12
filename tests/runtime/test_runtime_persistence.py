@@ -50,9 +50,9 @@ class RecordingContextService:
         """记录用户消息。"""
         self.events.append(("user", text))
 
-    def append_agent_message(self, author_participant_id, text):
+    def append_agent_message(self, author_agent_id, text):
         """记录 Agent 消息及其作者。"""
-        self.events.append(("agent", author_participant_id, text))
+        self.events.append(("agent", author_agent_id, text))
 
 
 class RuntimePersistenceTests(unittest.TestCase):
@@ -79,7 +79,6 @@ class RuntimePersistenceTests(unittest.TestCase):
                 protected_resource_policy=ProtectedResourcePolicy(["/system"]),
             ),
             context_service=context_service,
-            participant_id="participant_8T2LQ6MZP1",
         )
 
         list(runtime.run("请完成任务"))
@@ -88,7 +87,7 @@ class RuntimePersistenceTests(unittest.TestCase):
             context_service.events,
             [
                 ("user", "请完成任务"),
-                ("agent", "participant_8T2LQ6MZP1", "已完成"),
+                ("agent", "agent_1V3ASAXQ2A", "已完成"),
             ],
         )
         self.assertEqual(runtime.context.messages[0]["content"], "请完成任务")

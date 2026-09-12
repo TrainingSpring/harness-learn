@@ -28,18 +28,22 @@ class SessionRepositoryTests(unittest.TestCase):
         self.database.close()
         self.temp_dir.cleanup()
 
-    def test_create_and_get_supports_all_conversation_modes(self):
-        """DIRECT、GROUP、OPEN 都应创建为可恢复的 ACTIVE 会话。"""
+    def test_create_and_get_supports_current_conversation_modes(self):
+        """DIRECT 和 GROUP 都应创建为可恢复的 ACTIVE 会话。"""
         sessions = [
             self.repository.create("DIRECT", "一对一"),
             self.repository.create("GROUP", "群聊"),
-            self.repository.create("OPEN", "自由对话"),
         ]
 
-        self.assertEqual([item.conversation_mode for item in sessions], ["DIRECT", "GROUP", "OPEN"])
+        self.assertEqual([item.conversation_mode for item in sessions], ["DIRECT", "GROUP"])
         self.assertTrue(all(item.id.startswith("session_") for item in sessions))
         self.assertTrue(all(item.status == "ACTIVE" for item in sessions))
         self.assertEqual(self.repository.get(sessions[0].id).title, "一对一")
+
+    def test_create_rejects_deferred_open_mode(self):
+        """Agent 自由交流尚未实现，OPEN 不能进入当前数据模型。"""
+        with self.assertRaises(ValueError):
+            self.repository.create("OPEN", "自由对话")
 
     def test_update_status_sets_closed_at_when_session_is_closed(self):
         """关闭会话时记录 closed_at，并保留其他会话字段。"""

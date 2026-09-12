@@ -12,7 +12,6 @@ _SUPPORTED_PREFIXES = frozenset(
         "agent",
         "llm",
         "session",
-        "participant",
         "item",
         "delegation",
         "permission_rule",

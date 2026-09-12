@@ -24,7 +24,6 @@ class PersistentIdTests(unittest.TestCase):
         """不同实体类型的 ID 前缀必须可区分。"""
         self.assertTrue(generate_id("llm").startswith("llm_"))
         self.assertTrue(generate_id("session").startswith("session_"))
-        self.assertTrue(generate_id("participant").startswith("participant_"))
         self.assertTrue(generate_id("permission_rule").startswith("permission_rule_"))
 
     def test_unknown_prefix_is_rejected(self):

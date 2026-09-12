@@ -57,9 +57,10 @@ class StateDatabaseTests(unittest.TestCase):
             self.assertIn("agent_profiles", tables)
             self.assertIn("permission_agent_rules", tables)
             self.assertIn("sessions", tables)
-            self.assertIn("session_participants", tables)
+            self.assertIn("session_agents", tables)
             self.assertIn("context_items", tables)
             self.assertIn("agent_delegations", tables)
+            self.assertNotIn("session_participants", tables)
             self.assertNotIn("agent_tool_configs", tables)
             self.assertNotIn("context_item_targets", tables)
             self.assertEqual(
@@ -107,7 +108,7 @@ class StateDatabaseTests(unittest.TestCase):
                 ("schema_version",),
             ).fetchone()[0]
 
-            self.assertEqual(version, "1")
+            self.assertEqual(version, "2")
             database.close()
 
     def test_database_rejects_a_newer_schema_version(self):

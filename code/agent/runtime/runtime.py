@@ -73,7 +73,8 @@ class Runtime:
         tools: 负责工具准备、执行和结果编码的工具集。
         context: 保存发送给模型的 Responses input items。
         permission: 对已构造的 PermissionRequest 作出权限决定的管理器。
-        ctx: 本次 Agent 会话的不可变执行环境。
+        ctx: 本次 Agent 会话的不可变执行环境，包含作者 agent_id。
+        context_service: 可选的业务上下文持久化服务。
         state: 对外可观察的运行状态；WAITING_PERMISSION 表示必须调用
             resolve_permission() 才能继续。
     """
@@ -86,7 +87,6 @@ class Runtime:
         ctx: ExecutionContext,
         permission: PermissionManager,
         context_service: ContextService | None = None,
-        participant_id: str | None = None,
     ) -> None:
         """创建运行时协调器。
 
@@ -97,19 +97,14 @@ class Runtime:
             ctx: 工具共享的执行环境和身份信息。
             permission: 当前 Agent 的权限管理器。
             context_service: 可选的业务上下文持久化服务；为空时只维护内存
-                Context，保留纯运行时测试和旧入口的行为。
-            participant_id: 当前 Agent 在会话中的参与者身份；启用
-                context_service 时必须提供，用于记录 Agent 作者。
+                Context，传入时使用 ``ctx.agent_id`` 记录 Agent 作者。
         """
-        if context_service is not None and not participant_id:
-            raise ValueError("启用 context_service 时必须提供 participant_id")
         self.llm = llm
         self.tools = tools
         self.context = context
         self.permission = permission
         self.ctx = ctx
         self.context_service = context_service
-        self.participant_id = participant_id
         self._state = RuntimeState.IDLE
         self._pending_permission: PendingToolCall | None = None
         self._tool_queue: deque[PreparedToolCall] = deque()
@@ -198,7 +193,7 @@ class Runtime:
             if item.type == "message":
                 if self.context_service is not None:
                     self.context_service.append_agent_message(
-                        self.participant_id,
+                        self.ctx.agent_id,
                         self._message_text(item),
                     )
                 self.context.append_msg(item, usage=usage)
@@ -208,7 +203,7 @@ class Runtime:
 
             if self.context_service is not None:
                 self.context_service.append_function_call(
-                    self.participant_id,
+                    self.ctx.agent_id,
                     call_id=item.call_id,
                     name=item.name,
                     arguments=item.arguments,
@@ -322,7 +317,7 @@ class Runtime:
         encoded_output = self.tools.encode_result(result)
         if self.context_service is not None:
             self.context_service.append_function_call_output(
-                self.participant_id,
+                self.ctx.agent_id,
                 call_id=call_id,
                 output=encoded_output,
             )

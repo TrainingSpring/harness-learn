@@ -11,7 +11,7 @@ from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.repositories.permission_rule import PermissionRuleRepository
 from storage.repositories.context_item import ContextItemRepository
-from storage.repositories.session_participant import SessionParticipantRepository
+from storage.repositories.session_agent import SessionAgentRepository
 from tools.catalog import ToolCatalog
 
 
@@ -48,14 +48,12 @@ class AgentFactory:
         self,
         agent_id: str,
         session_id: str | None = None,
-        participant_id: str | None = None,
     ) -> Agent:
         """根据 Agent ID 创建运行时 Agent。
 
         Args:
             agent_id: AgentProfile 的稳定 ID。
             session_id: 可选的现有会话 ID；不传时由 Agent 创建新会话 ID。
-            participant_id: 可选的会话参与者 ID，供后续上下文投影使用。
 
         Returns:
             已加载 LLM、工具、Context 和权限管理器的 Agent。
@@ -91,19 +89,10 @@ class AgentFactory:
         )
 
         context_service = None
-        if participant_id is not None:
-            if session_id is None:
-                raise ValueError("participant_id 必须与 session_id 一起提供")
-            participant = SessionParticipantRepository(self.database).get(
-                participant_id
-            )
-            if (
-                participant is None
-                or participant.session_id != session_id
-                or participant.agent_id != agent_id
-                or participant.left_at is not None
-            ):
-                raise ValueError("participant_id 不属于当前 Agent 的活跃会话参与者")
+        if session_id is not None:
+            # agent_id 同时承担会话内作者身份，Factory 只需验证联合成员关系。
+            if not SessionAgentRepository(self.database).exists(session_id, agent_id):
+                raise ValueError("当前 Agent 不属于指定 Session")
             context_service = ContextService(
                 ContextItemRepository(self.database),
                 session_id,
@@ -117,7 +106,6 @@ class AgentFactory:
             workspace=str(self.database.workspace),
             session_id=session_id,
             permission_rule_repository=PermissionRuleRepository(self.database),
-            participant_id=participant_id,
             context_service=context_service,
         )
         agent.agent_id = profile.id

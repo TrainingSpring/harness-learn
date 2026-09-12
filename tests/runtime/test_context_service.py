@@ -14,15 +14,14 @@ from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E
 from storage.repositories.context_item import ContextItemRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
 from storage.repositories.session import SessionRepository  # noqa: E402
-from storage.repositories.session_participant import SessionParticipantRepository  # noqa: E402
-from storage.types import AgentProfile, LLMProfile, SessionParticipant  # noqa: E402
+from storage.types import AgentProfile, LLMProfile  # noqa: E402
 
 
 class ContextServiceTests(unittest.TestCase):
     """验证 ContextService 不暴露 SQL，并能生成模型输入投影。"""
 
     def setUp(self):
-        """创建一个带两个参与者的协作会话。"""
+        """创建一个带两个固定 Agent 成员的协作会话。"""
         self.temp_dir = tempfile.TemporaryDirectory()
         self.database = StateDatabase(self.temp_dir.name)
         self.database.initialize()
@@ -53,25 +52,12 @@ class ContextServiceTests(unittest.TestCase):
                     permission_mode="BUILD",
                 )
             )
-        self.session = SessionRepository(self.database).create("GROUP")
-        participants = SessionParticipantRepository(self.database)
-        participants.add(
-            SessionParticipant(
-                id="participant_8T2LQ6MZP1",
-                session_id=self.session.id,
-                agent_id="agent_1V3ASAXQ2A",
-                role="PRIMARY",
-                join_reason="USER_SELECTED",
-            )
-        )
-        participants.add(
-            SessionParticipant(
-                id="participant_9U3M7BKP2C",
-                session_id=self.session.id,
-                agent_id="agent_9U3M7BKP2C",
-                role="PARTICIPANT",
-                join_reason="USER_SELECTED",
-            )
+        self.session = SessionRepository(self.database).create_with_agents(
+            "GROUP",
+            [
+                ("agent_1V3ASAXQ2A", "MEMBER"),
+                ("agent_9U3M7BKP2C", "MEMBER"),
+            ],
         )
         self.service = ContextService(
             ContextItemRepository(self.database),
@@ -84,20 +70,20 @@ class ContextServiceTests(unittest.TestCase):
         self.temp_dir.cleanup()
 
     def test_append_events_and_load_visible_items(self):
-        """服务层方法应写入业务事件并按参与者返回可见项。"""
+        """服务层方法应写入业务事件并按 Agent 返回可见项。"""
         user_item = self.service.append_user_message("请检查代码")
         agent_item = self.service.append_agent_message(
-            "participant_8T2LQ6MZP1",
+            "agent_1V3ASAXQ2A",
             "我开始检查。",
         )
         targeted_item = self.service.append_agent_message(
-            "participant_8T2LQ6MZP1",
+            "agent_1V3ASAXQ2A",
             "只给测试 Agent 的提示",
             visibility="TARGETED",
-            target_participant_id="participant_9U3M7BKP2C",
+            target_agent_id="agent_9U3M7BKP2C",
         )
 
-        visible = self.service.load_visible("participant_9U3M7BKP2C")
+        visible = self.service.load_visible("agent_9U3M7BKP2C")
 
         self.assertEqual(
             [item.id for item in visible],
@@ -107,20 +93,20 @@ class ContextServiceTests(unittest.TestCase):
     def test_function_call_and_output_are_projected_to_responses_items(self):
         """工具事件应被转换成 Responses 所需的 function call 结构。"""
         call = self.service.append_function_call(
-            "participant_8T2LQ6MZP1",
+            "agent_1V3ASAXQ2A",
             call_id="call_001",
             name="read",
             arguments='{"target_path":"README.md"}',
         )
         output = self.service.append_function_call_output(
-            "participant_8T2LQ6MZP1",
+            "agent_1V3ASAXQ2A",
             call_id="call_001",
             output="读取成功",
             caused_by_item_id=call.id,
         )
 
         projected = self.service.to_responses_input(
-            self.service.load_visible("participant_8T2LQ6MZP1")
+            self.service.load_visible("agent_1V3ASAXQ2A")
         )
 
         self.assertEqual(projected[0]["type"], "function_call")
@@ -133,7 +119,7 @@ class ContextServiceTests(unittest.TestCase):
     def test_service_does_not_store_vendor_protocol_fields_in_payload(self):
         """数据库中的事件 payload 使用业务字段，Responses 字段只在投影时生成。"""
         item = self.service.append_agent_message(
-            "participant_8T2LQ6MZP1",
+            "agent_1V3ASAXQ2A",
             "完成",
         )
 
