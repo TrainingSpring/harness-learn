@@ -114,6 +114,17 @@ class ContextItemRepositoryTests(unittest.TestCase):
             [second.id],
         )
 
+    def test_append_updates_session_activity_time_in_same_write(self):
+        """追加时间线后 Session 的更新时间应与最新 ContextItem 一致。"""
+        stored = self.repository.append(
+            self._item("item_3F7XK9A2VC", "USER_MESSAGE")
+        )
+
+        refreshed = SessionRepository(self.database).get(self.session.id)
+
+        self.assertIsNotNone(refreshed)
+        self.assertEqual(refreshed.updated_at, stored.created_at)
+
     def test_list_visible_filters_public_targeted_and_private_items(self):
         """按 Agent 读取时只返回该 Agent 可见的上下文。"""
         public = self.repository.append(

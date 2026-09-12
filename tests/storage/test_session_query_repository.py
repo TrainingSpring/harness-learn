@@ -126,7 +126,12 @@ class SessionQueryRepositoryTests(unittest.TestCase):
         summaries = self.repository.list_direct_summaries(limit=20, offset=0)
 
         self.assertEqual(len(summaries), 1)
-        self.assertEqual(summaries[0].session, session)
+        self.assertEqual(summaries[0].session.id, session.id)
+        self.assertEqual(summaries[0].session.title, session.title)
+        self.assertGreaterEqual(
+            summaries[0].session.updated_at,
+            session.updated_at,
+        )
         self.assertEqual(summaries[0].agent_id, "agent_1V3ASAXQ2A")
         self.assertEqual(summaries[0].agent_name, "代码专家")
         self.assertEqual(summaries[0].last_message, "文件内容如下")

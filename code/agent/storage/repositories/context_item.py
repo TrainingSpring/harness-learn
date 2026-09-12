@@ -99,6 +99,19 @@ class ContextItemRepository:
                         stored.created_at,
                     ),
                 )
+                # 会话历史按 updated_at 排序；与 ContextItem 同一事务更新，避免
+                # 消息已经可见但会话仍停留在旧位置。导入旧时间线时不回拨时间。
+                connection.execute(
+                    """
+                    UPDATE sessions
+                    SET updated_at = CASE
+                        WHEN updated_at < ? THEN ?
+                        ELSE updated_at
+                    END
+                    WHERE id = ?
+                    """,
+                    (created_at, created_at, item.session_id),
+                )
         except sqlite3.IntegrityError as error:
             raise StorageConflictError(
                 f"上下文项追加冲突: {item.session_id}/{item.id}"
