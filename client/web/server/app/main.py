@@ -20,6 +20,8 @@ from runtime.session_service import SessionService
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
+from storage.repositories.context_item import ContextItemRepository
+from storage.repositories.session_query import SessionQueryRepository
 from tools.catalog import ToolCatalog
 
 
@@ -43,6 +45,8 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             session_service=SessionService(database),
             llm_profiles=LLMProfileRepository(database),
             tool_catalog=catalog,
+            session_queries=SessionQueryRepository(database),
+            context_items=ContextItemRepository(database),
         )
         try:
             yield
@@ -65,4 +69,3 @@ def default_app() -> FastAPI:
 
 
 app = default_app()
-

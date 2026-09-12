@@ -13,6 +13,8 @@ from runtime.agent_factory import AgentFactory
 from runtime.session_service import SessionService
 from storage.database import StateDatabase
 from storage.repositories.llm_profile import LLMProfileRepository
+from storage.repositories.context_item import ContextItemRepository
+from storage.repositories.session_query import SessionQueryRepository
 from tools.catalog import ToolCatalog
 
 
@@ -27,6 +29,8 @@ class ApplicationServices:
         session_service: 遵守固定成员约束的会话创建服务。
         llm_profiles: LLM 配置只读接口使用的仓储。
         tool_catalog: 受信任工具元数据目录。
+        session_queries: 面向客户端的 DIRECT 会话聚合查询仓储。
+        context_items: 会话时间线查询仓储。
     """
 
     database: StateDatabase
@@ -35,6 +39,8 @@ class ApplicationServices:
     session_service: SessionService
     llm_profiles: LLMProfileRepository
     tool_catalog: ToolCatalog
+    session_queries: SessionQueryRepository
+    context_items: ContextItemRepository
 
 
 async def get_services(request: Request) -> ApplicationServices:
