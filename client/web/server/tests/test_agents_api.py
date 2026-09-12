@@ -109,3 +109,86 @@ def test_create_agent_rejects_unknown_tool(client) -> None:
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_TOOL"
+
+
+def test_generate_agent_profile_suggestion_returns_validated_fields(client, monkeypatch) -> None:
+    """AI 草案接口返回可直接回填表单的四个角色字段。"""
+    assistant = client.app.state.services.agent_profile_assistant
+    monkeypatch.setattr(
+        assistant,
+        "suggest",
+        lambda description, llm_profile_id: {
+            "name": "文档助手",
+            "description": description,
+            "personality": "清晰、耐心",
+            "expertise": ["Documentation", "Technical Writing"],
+        },
+    )
+
+    response = client.post(
+        "/api/agents/profile-suggestion",
+        json={
+            "description": "帮助团队整理技术文档和 API 说明",
+            "llmProfileId": "llm_TESTLLM001",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "name": "文档助手",
+        "description": "帮助团队整理技术文档和 API 说明",
+        "personality": "清晰、耐心",
+        "expertise": ["Documentation", "Technical Writing"],
+    }
+
+
+def test_generate_agent_profile_suggestion_rejects_empty_description(client) -> None:
+    """没有描述时不能请求 AI 生成角色草案。"""
+    response = client.post(
+        "/api/agents/profile-suggestion",
+        json={"description": "", "llmProfileId": "llm_TESTLLM001"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_generate_agent_profile_suggestion_hides_model_failure(client, monkeypatch) -> None:
+    """模型调用失败时只返回稳定错误，不泄露凭据或底层异常。"""
+    assistant = client.app.state.services.agent_profile_assistant
+
+    def fail(_description, _llm_profile_id):
+        raise RuntimeError("SECRET_TEST_KEY leaked from provider")
+
+    monkeypatch.setattr(assistant, "suggest", fail)
+    response = client.post(
+        "/api/agents/profile-suggestion",
+        json={
+            "description": "帮助团队整理技术文档",
+            "llmProfileId": "llm_TESTLLM001",
+        },
+    )
+
+    assert response.status_code == 502
+    assert response.json() == {
+        "error": {
+            "code": "AGENT_SUGGESTION_FAILED",
+            "message": "角色信息生成失败",
+            "details": None,
+        }
+    }
+    assert "SECRET_TEST_KEY" not in response.text
+
+
+def test_generate_agent_profile_suggestion_rejects_unknown_llm(client) -> None:
+    """草案生成必须引用存在的 LLM 配置。"""
+    response = client.post(
+        "/api/agents/profile-suggestion",
+        json={
+            "description": "帮助团队整理技术文档",
+            "llmProfileId": "llm_UNKNOWN000",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "LLM_PROFILE_NOT_FOUND"

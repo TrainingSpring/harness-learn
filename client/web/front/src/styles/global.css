@@ -206,7 +206,12 @@ code, pre { font-family: var(--font-mono); }
 .dialog-heading h2 { margin: 3px 0 0; font-size: 17px; }
 .form-stack { display: grid; gap: 14px; }
 .form-field { display: grid; gap: 6px; }
-.form-field > span, .form-fieldset legend { color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+.form-field > span, .form-field__label-row > label, .form-fieldset legend { color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+.form-field__label-row { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+.ai-assist-button { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; color: var(--accent); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent); border-radius: 50%; }
+.ai-assist-button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
+.ai-assist-button:disabled { color: var(--text-muted); background: var(--bg-subtle); border-color: var(--border); opacity: .55; cursor: not-allowed; }
+.ai-assist-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .form-field input, .form-field textarea, .form-field select { width: 100%; padding: 8px 10px; background: var(--bg-subtle); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); outline: 0; }
 .form-field textarea { resize: vertical; }
 .form-field input:focus, .form-field textarea:focus, .form-field select:focus { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }

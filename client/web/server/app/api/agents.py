@@ -9,8 +9,15 @@ from storage.types import AgentProfile
 
 from ..dependencies import ApplicationServices, get_agent_directory, get_services
 from ..errors import ApiError
-from ..schemas.agent import AgentDetail, AgentSummary, CreateAgentRequest
+from ..schemas.agent import (
+    AgentDetail,
+    AgentProfileSuggestion,
+    AgentProfileSuggestionRequest,
+    AgentSummary,
+    CreateAgentRequest,
+)
 from ..schemas.common import ListResponse, Pagination
+from ..services.agent_profile_assistant import LLMProfileNotFoundError
 
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -36,6 +43,25 @@ def _detail(profile: AgentProfile) -> AgentDetail:
         llm_profile_id=profile.llm_profile_id,
         permission_mode=profile.permission_mode,
     )
+
+
+@router.post("/profile-suggestion", response_model=AgentProfileSuggestion)
+async def generate_agent_profile_suggestion(
+    request: AgentProfileSuggestionRequest,
+    services: ApplicationServices = Depends(get_services),
+) -> AgentProfileSuggestion:
+    """使用用户选择的 LLM 根据描述生成角色表单草案。"""
+    try:
+        suggestion = services.agent_profile_assistant.suggest(
+            request.description,
+            request.llm_profile_id,
+        )
+    except LLMProfileNotFoundError as error:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在") from error
+    except Exception as error:
+        # 凭据解析、网络错误和模型输出错误都不能把底层细节暴露给浏览器。
+        raise ApiError(502, "AGENT_SUGGESTION_FAILED", "角色信息生成失败") from error
+    return AgentProfileSuggestion.model_validate(suggestion)
 
 
 @router.get("", response_model=ListResponse[AgentSummary])

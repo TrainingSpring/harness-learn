@@ -19,6 +19,7 @@ from storage.repositories.session_query import SessionQueryRepository
 from tools.catalog import ToolCatalog
 
 from .services.chat_service import ChatService
+from .services.agent_profile_assistant import AgentProfileAssistant
 from .services.run_registry import RunRegistry
 
 
@@ -33,6 +34,7 @@ class ApplicationServices:
         session_service: 遵守固定成员约束的会话创建服务。
         agent_profiles: AgentProfile 写入和读取仓储。
         llm_profiles: LLM 配置只读接口使用的仓储。
+        agent_profile_assistant: 使用指定 LLM 生成角色草案的服务。
         tool_catalog: 受信任工具元数据目录。
         session_queries: 面向客户端的 DIRECT 会话聚合查询仓储。
         context_items: 会话时间线查询仓储。
@@ -46,6 +48,7 @@ class ApplicationServices:
     session_service: SessionService
     agent_profiles: AgentProfileRepository
     llm_profiles: LLMProfileRepository
+    agent_profile_assistant: AgentProfileAssistant
     tool_catalog: ToolCatalog
     session_queries: SessionQueryRepository
     context_items: ContextItemRepository

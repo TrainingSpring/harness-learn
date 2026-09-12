@@ -6,9 +6,11 @@ test("可以从角色页面新增角色并刷新列表", async ({ page }) => {
   await page.goto("/agents");
 
   await page.getByRole("button", { name: "新增角色" }).click();
-  await page.getByLabel("名称").fill("文档助手");
   await page.getByLabel("描述").fill("负责整理文档");
   await page.getByLabel("LLM 配置").selectOption("llm_LOCAL01");
+  await page.getByRole("button", { name: "AI 生成角色信息" }).click();
+  await expect(page.getByLabel("名称")).toHaveValue("文档助手");
+  await expect(page.getByLabel("性格")).toHaveValue("清晰、耐心");
   await page.getByLabel("read").check();
   await page.getByRole("button", { name: "创建角色" }).click();
 

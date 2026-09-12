@@ -16,6 +16,7 @@ from .api.router import api_router
 from .config import WebServerSettings
 from .dependencies import ApplicationServices
 from .errors import install_error_handlers
+from .services.agent_profile_assistant import AgentProfileAssistant
 from .services.chat_service import ChatService
 from .services.run_registry import RunRegistry
 from .static import SpaStaticFiles
@@ -47,6 +48,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
         agent_factory = AgentFactory(database, tool_catalog=catalog)
         session_queries = SessionQueryRepository(database)
         context_items = ContextItemRepository(database)
+        llm_profiles = LLMProfileRepository(database)
         run_registry = RunRegistry()
         app.state.services = ApplicationServices(
             database=database,
@@ -54,7 +56,8 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             agent_factory=agent_factory,
             session_service=SessionService(database),
             agent_profiles=AgentProfileRepository(database),
-            llm_profiles=LLMProfileRepository(database),
+            llm_profiles=llm_profiles,
+            agent_profile_assistant=AgentProfileAssistant(llm_profiles),
             tool_catalog=catalog,
             session_queries=session_queries,
             context_items=context_items,

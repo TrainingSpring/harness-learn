@@ -44,6 +44,20 @@ export interface CreateAgentRequest {
   isEnabled: boolean;
 }
 
+/** 请求 AI 根据原始描述生成角色表单草案。 */
+export interface AgentProfileSuggestionRequest {
+  description: string;
+  llmProfileId: string;
+}
+
+/** 服务端验证后允许回填到角色表单的 AI 生成字段。 */
+export interface AgentProfileSuggestion {
+  name: string;
+  description: string;
+  personality: string;
+  expertise: string[];
+}
+
 export interface AgentDetail extends AgentSummary {
   llmProfileId: string;
   permissionMode: "PLAN" | "BUILD" | "YOLO" | string;

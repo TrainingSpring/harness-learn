@@ -91,6 +91,15 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
       agents = [...agents, createdAgent];
       return json(route, createdAgent, 201);
     }
+    if (path === "/api/agents/profile-suggestion" && method === "POST") {
+      const requestBody = request.postDataJSON() as { description: string; llmProfileId: string };
+      return json(route, {
+        name: "文档助手",
+        description: requestBody.description,
+        personality: "清晰、耐心",
+        expertise: ["Documentation", "Technical Writing"],
+      });
+    }
     if (path === `/api/agents/${agent.id}`) return json(route, { ...agent, llmProfileId: "llm_LOCAL01", permissionMode: "BUILD" });
     if (path === "/api/sessions" && method === "GET") return json(route, list(hasSession ? [session] : []));
     if (path === "/api/sessions" && method === "POST") { hasSession = true; return json(route, session, 201); }

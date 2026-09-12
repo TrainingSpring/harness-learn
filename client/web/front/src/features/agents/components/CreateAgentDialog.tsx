@@ -1,8 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, X } from "lucide-react";
+import { LoaderCircle, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "../../../components/Button";
 import { useModalFocus } from "../../../hooks/useModalFocus";
-import type { CreateAgentRequest, LLMProfileSummary, ToolSummary } from "../../../api/types";
+import type {
+  AgentProfileSuggestion,
+  AgentProfileSuggestionRequest,
+  CreateAgentRequest,
+  LLMProfileSummary,
+  ToolSummary,
+} from "../../../api/types";
 
 interface CreateAgentDialogProps {
   isOpen: boolean;
@@ -10,8 +16,10 @@ interface CreateAgentDialogProps {
   error: string | null;
   llmProfiles: LLMProfileSummary[];
   tools: ToolSummary[];
+  isSuggesting: boolean;
   onClose: () => void;
   onSubmit: (request: CreateAgentRequest) => void;
+  onSuggest: (request: AgentProfileSuggestionRequest) => Promise<AgentProfileSuggestion>;
 }
 
 /** 角色创建弹窗；负责收集表单值，不直接访问 API 或数据库。 */
@@ -21,8 +29,10 @@ export function CreateAgentDialog({
   error,
   llmProfiles,
   tools,
+  isSuggesting,
   onClose,
   onSubmit,
+  onSuggest,
 }: CreateAgentDialogProps) {
   const dialogRef = useModalFocus<HTMLDivElement>(isOpen);
   const [name, setName] = useState("");
@@ -34,6 +44,7 @@ export function CreateAgentDialog({
   const [permissionMode, setPermissionMode] = useState("BUILD");
   const [isEnabled, setIsEnabled] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -46,6 +57,7 @@ export function CreateAgentDialog({
     setPermissionMode("BUILD");
     setIsEnabled(true);
     setFormError(null);
+    setSuggestionError(null);
   }, [isOpen]);
 
   useEffect(() => {
@@ -84,6 +96,29 @@ export function CreateAgentDialog({
     });
   };
 
+  const handleSuggest = async () => {
+    if (!description.trim() || !llmProfileId || isSuggesting) return;
+    setSuggestionError(null);
+    try {
+      const suggestion = await onSuggest({
+        description: description.trim(),
+        llmProfileId,
+      });
+      setName(suggestion.name);
+      setDescription(suggestion.description);
+      setPersonality(suggestion.personality);
+      setExpertise(suggestion.expertise.join(", "));
+    } catch (suggestionFailure) {
+      setSuggestionError(
+        suggestionFailure instanceof Error
+          ? suggestionFailure.message
+          : "角色信息生成失败",
+      );
+    }
+  };
+
+  const canSuggest = Boolean(description.trim() && llmProfileId) && !isSuggesting;
+
   return (
     <div className="dialog-backdrop">
       <div
@@ -100,7 +135,22 @@ export function CreateAgentDialog({
         </div>
         <form className="form-stack" onSubmit={handleSubmit}>
           <label className="form-field"><span>名称</span><input value={name} onChange={(event) => setName(event.target.value)} required autoFocus /></label>
-          <label className="form-field"><span>描述</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} /></label>
+          <div className="form-field">
+            <div className="form-field__label-row">
+              <label htmlFor="agent-description">描述</label>
+              <button
+                type="button"
+                className="ai-assist-button"
+                aria-label="AI 生成角色信息"
+                title={canSuggest ? "使用所选 LLM 生成角色信息" : "请先填写描述并选择 LLM 配置"}
+                disabled={!canSuggest}
+                onClick={() => { void handleSuggest(); }}
+              >
+                {isSuggesting ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
+              </button>
+            </div>
+            <textarea id="agent-description" value={description} onChange={(event) => setDescription(event.target.value)} rows={2} />
+          </div>
           <label className="form-field"><span>性格</span><input value={personality} onChange={(event) => setPersonality(event.target.value)} /></label>
           <label className="form-field"><span>擅长领域</span><input value={expertise} onChange={(event) => setExpertise(event.target.value)} placeholder="多个领域用逗号分隔" /></label>
           <label className="form-field"><span>LLM 配置</span>
@@ -117,7 +167,7 @@ export function CreateAgentDialog({
             <select value={permissionMode} onChange={(event) => setPermissionMode(event.target.value)}><option value="PLAN">PLAN · 只读规划</option><option value="BUILD">BUILD · 按权限执行</option><option value="YOLO">YOLO · 宽松执行</option></select>
           </label>
           <label className="checkbox-option"><input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /><span>启用此角色</span></label>
-          {(formError || error) && <p className="inline-error" role="alert">{formError || error}</p>}
+          {(suggestionError || formError || error) && <p className="inline-error" role="alert">{suggestionError || formError || error}</p>}
           <div className="dialog-actions"><Button type="button" onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={isSubmitting} icon={<Plus size={16} />}>{isSubmitting ? "创建中…" : "创建角色"}</Button></div>
         </form>
       </div>
