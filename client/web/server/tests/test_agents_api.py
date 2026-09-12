@@ -51,3 +51,61 @@ def test_get_unknown_agent_returns_stable_not_found(client) -> None:
             "details": None,
         }
     }
+
+
+def test_create_agent_generates_id_and_persists_configuration(client) -> None:
+    """创建角色时由服务端生成稳定 ID，并返回完整的角色详情。"""
+    response = client.post(
+        "/api/agents",
+        json={
+            "name": "文档助手",
+            "description": "负责整理技术文档",
+            "personality": "清晰、耐心",
+            "expertise": ["Documentation"],
+            "llmProfileId": "llm_TESTLLM001",
+            "tools": ["read"],
+            "permissionMode": "PLAN",
+            "isEnabled": True,
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["id"].startswith("agent_")
+    assert len(payload["id"]) == len("agent_XXXXXXXXXX")
+    assert payload["name"] == "文档助手"
+    assert payload["llmProfileId"] == "llm_TESTLLM001"
+    assert payload["permissionMode"] == "PLAN"
+    assert client.get(f"/api/agents/{payload['id']}").json() == payload
+
+
+def test_create_agent_rejects_unknown_llm_profile(client) -> None:
+    """角色不能引用不存在的 LLM 配置。"""
+    response = client.post(
+        "/api/agents",
+        json={
+            "name": "无效角色",
+            "llmProfileId": "llm_UNKNOWN000",
+            "tools": [],
+            "permissionMode": "PLAN",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "LLM_PROFILE_NOT_FOUND"
+
+
+def test_create_agent_rejects_unknown_tool(client) -> None:
+    """角色只能配置工具目录中已注册的工具。"""
+    response = client.post(
+        "/api/agents",
+        json={
+            "name": "无效工具角色",
+            "llmProfileId": "llm_TESTLLM001",
+            "tools": ["not-a-tool"],
+            "permissionMode": "PLAN",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_TOOL"

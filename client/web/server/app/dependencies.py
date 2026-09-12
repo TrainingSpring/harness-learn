@@ -12,6 +12,7 @@ from runtime.agent_directory import AgentDirectory
 from runtime.agent_factory import AgentFactory
 from runtime.session_service import SessionService
 from storage.database import StateDatabase
+from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session_query import SessionQueryRepository
@@ -30,6 +31,7 @@ class ApplicationServices:
         agent_directory: 可供 UI 查询的 Agent 目录。
         agent_factory: 从持久化配置创建运行时 Agent 的工厂。
         session_service: 遵守固定成员约束的会话创建服务。
+        agent_profiles: AgentProfile 写入和读取仓储。
         llm_profiles: LLM 配置只读接口使用的仓储。
         tool_catalog: 受信任工具元数据目录。
         session_queries: 面向客户端的 DIRECT 会话聚合查询仓储。
@@ -42,6 +44,7 @@ class ApplicationServices:
     agent_directory: AgentDirectory
     agent_factory: AgentFactory
     session_service: SessionService
+    agent_profiles: AgentProfileRepository
     llm_profiles: LLMProfileRepository
     tool_catalog: ToolCatalog
     session_queries: SessionQueryRepository

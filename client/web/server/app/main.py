@@ -53,6 +53,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             agent_directory=AgentDirectory(AgentProfileRepository(database)),
             agent_factory=agent_factory,
             session_service=SessionService(database),
+            agent_profiles=AgentProfileRepository(database),
             llm_profiles=LLMProfileRepository(database),
             tool_catalog=catalog,
             session_queries=session_queries,

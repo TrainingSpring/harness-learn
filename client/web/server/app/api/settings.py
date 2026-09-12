@@ -1,13 +1,31 @@
 """LLM 和工具配置的只读查询路由。"""
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
+
+from storage.errors import StorageConflictError
+from storage.ids import generate_id
+from storage.types import LLMProfile
 
 from ..dependencies import ApplicationServices, get_services
+from ..errors import ApiError
 from ..schemas.common import ListResponse, Pagination
-from ..schemas.settings import LLMProfileSummary, ToolSummary
+from ..schemas.settings import CreateLLMProfileRequest, LLMProfileSummary, ToolSummary
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+def _llm_summary(profile: LLMProfile) -> LLMProfileSummary:
+    """将内部 LLM 配置转换为不含 credential_ref 的摘要。"""
+    return LLMProfileSummary(
+        id=profile.id,
+        name=profile.name,
+        provider=profile.provider,
+        base_url=profile.base_url,
+        model=profile.model,
+        has_credential=bool(profile.credential_ref),
+        options=profile.options,
+    )
 
 
 @router.get("/llm-profiles", response_model=ListResponse[LLMProfileSummary])
@@ -20,22 +38,42 @@ async def list_llm_profiles(
     profiles = services.llm_profiles.list_all(limit + 1, offset)
     has_more = len(profiles) > limit
     items = [
-        LLMProfileSummary(
-            id=profile.id,
-            name=profile.name,
-            provider=profile.provider,
-            base_url=profile.base_url,
-            model=profile.model,
-            # credential_ref 是配置引用而非密钥，但也不属于浏览器所需字段。
-            has_credential=bool(profile.credential_ref),
-            options=profile.options,
-        )
+        _llm_summary(profile)
         for profile in profiles[:limit]
     ]
     return ListResponse(
         items=items,
         pagination=Pagination(limit=limit, offset=offset, has_more=has_more),
     )
+
+
+@router.post(
+    "/llm-profiles",
+    response_model=LLMProfileSummary,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_llm_profile(
+    request: CreateLLMProfileRequest,
+    services: ApplicationServices = Depends(get_services),
+) -> LLMProfileSummary:
+    """创建一套可供角色引用的 LLM 配置。
+
+    请求中的 credential_ref 仅作为凭据定位引用持久化，响应始终返回脱敏摘要。
+    """
+    profile = LLMProfile(
+        id=generate_id("llm"),
+        name=request.name,
+        provider=request.provider,
+        base_url=request.base_url,
+        model=request.model,
+        credential_ref=request.credential_ref,
+        options=request.options,
+    )
+    try:
+        saved = services.llm_profiles.save(profile)
+    except StorageConflictError as error:
+        raise ApiError(409, "LLM_PROFILE_CONFLICT", "LLM 配置名称已存在") from error
+    return _llm_summary(saved)
 
 
 @router.get("/tools", response_model=ListResponse[ToolSummary])
