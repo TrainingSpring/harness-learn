@@ -32,6 +32,18 @@ export interface AgentSummary extends AgentReference {
   isEnabled: boolean;
 }
 
+/** 创建角色时提交给 Web API 的配置。ID 由服务端生成。 */
+export interface CreateAgentRequest {
+  name: string;
+  description: string;
+  personality: string;
+  expertise: string[];
+  llmProfileId: string;
+  tools: string[];
+  permissionMode: string;
+  isEnabled: boolean;
+}
+
 export interface AgentDetail extends AgentSummary {
   llmProfileId: string;
   permissionMode: "PLAN" | "BUILD" | "YOLO" | string;
@@ -90,6 +102,16 @@ export interface LLMProfileSummary {
   baseUrl: string | null;
   model: string;
   hasCredential: boolean;
+  options: Record<string, unknown>;
+}
+
+/** 创建 LLM 配置时提交的连接参数；credentialRef 是引用而不是密钥。 */
+export interface CreateLLMProfileRequest {
+  name: string;
+  provider: string;
+  baseUrl: string | null;
+  model: string;
+  credentialRef: string;
   options: Record<string, unknown>;
 }
 
