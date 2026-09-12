@@ -10,6 +10,16 @@ const agent = {
   isEnabled: true,
 };
 
+const llmProfile = {
+  id: "llm_LOCAL01",
+  name: "本地 GPT",
+  provider: "openai",
+  baseUrl: "https://api.openai.com/v1",
+  model: "gpt-5",
+  hasCredential: true,
+  options: {},
+};
+
 const session = {
   id: "session_DIRECT01",
   title: "检查权限模块",
@@ -29,6 +39,8 @@ const event = (type: string, data: unknown) => `data: ${JSON.stringify({ type, r
 /** 为 E2E 安装与公开 camelCase 契约一致的本地假 API。 */
 export async function installMockApi(page: Page, options: { hasSession?: boolean; permission?: boolean } = {}) {
   let hasSession = options.hasSession ?? false;
+  let agents = [agent];
+  let llmProfiles = [llmProfile];
   const messages: Array<Record<string, unknown>> = [];
   const contextItem = (
     id: string,
@@ -53,7 +65,32 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
     const path = new URL(request.url()).pathname;
     const method = request.method();
 
-    if (path === "/api/agents" && method === "GET") return json(route, list([agent]));
+    if (path === "/api/agents" && method === "GET") return json(route, list(agents));
+    if (path === "/api/agents" && method === "POST") {
+      const requestBody = request.postDataJSON() as {
+        name: string;
+        description: string;
+        personality: string;
+        expertise: string[];
+        llmProfileId: string;
+        tools: string[];
+        permissionMode: string;
+        isEnabled: boolean;
+      };
+      const createdAgent = {
+        id: "agent_CREATED01",
+        name: requestBody.name,
+        description: requestBody.description,
+        personality: requestBody.personality,
+        expertise: requestBody.expertise,
+        tools: requestBody.tools,
+        isEnabled: requestBody.isEnabled,
+        llmProfileId: requestBody.llmProfileId,
+        permissionMode: requestBody.permissionMode,
+      };
+      agents = [...agents, createdAgent];
+      return json(route, createdAgent, 201);
+    }
     if (path === `/api/agents/${agent.id}`) return json(route, { ...agent, llmProfileId: "llm_LOCAL01", permissionMode: "BUILD" });
     if (path === "/api/sessions" && method === "GET") return json(route, list(hasSession ? [session] : []));
     if (path === "/api/sessions" && method === "POST") { hasSession = true; return json(route, session, 201); }
@@ -88,7 +125,27 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
       return route.fulfill({ status: 200, contentType: "text/event-stream", body });
     }
     if (path === "/api/runs/run_DIRECT01/cancel" && method === "POST") return route.fulfill({ status: 204 });
-    if (path === "/api/settings/llm-profiles") return json(route, list([{ id: "llm_LOCAL01", name: "本地 GPT", provider: "openai", baseUrl: "https://api.openai.com/v1", model: "gpt-5", hasCredential: true, options: {} }]));
+    if (path === "/api/settings/llm-profiles" && method === "GET") return json(route, list(llmProfiles));
+    if (path === "/api/settings/llm-profiles" && method === "POST") {
+      const requestBody = request.postDataJSON() as {
+        name: string;
+        provider: string;
+        baseUrl: string | null;
+        model: string;
+        options: Record<string, unknown>;
+      };
+      const createdProfile = {
+        id: "llm_CREATED01",
+        name: requestBody.name,
+        provider: requestBody.provider,
+        baseUrl: requestBody.baseUrl,
+        model: requestBody.model,
+        hasCredential: true,
+        options: requestBody.options,
+      };
+      llmProfiles = [...llmProfiles, createdProfile];
+      return json(route, createdProfile, 201);
+    }
     if (path === "/api/settings/tools") return json(route, list([{ name: "read", description: "读取工作区文件", inputSchema: { type: "object", properties: { targetPath: { type: "string" } } }, permissionAction: "filesystem.read" }]));
     return json(route, { error: { code: "NOT_FOUND", message: path, details: null } }, 404);
   });
