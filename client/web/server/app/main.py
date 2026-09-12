@@ -6,16 +6,19 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from .api.router import api_router
 from .bootstrap import install_agent_source_path
+
+# API 模块会直接导入当前尚未独立打包的 runtime/storage，因此 bootstrap
+# 必须发生在路由导入之前，不能依赖 pytest 或调用方预先修改 sys.path。
+install_agent_source_path()
+
+from .api.router import api_router
 from .config import WebServerSettings
 from .dependencies import ApplicationServices
 from .errors import install_error_handlers
 from .services.chat_service import ChatService
 from .services.run_registry import RunRegistry
 from .static import SpaStaticFiles
-
-install_agent_source_path()
 
 from runtime.agent_directory import AgentDirectory
 from runtime.agent_factory import AgentFactory
