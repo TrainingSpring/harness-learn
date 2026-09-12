@@ -2,12 +2,13 @@
 
 from fastapi import APIRouter
 
-from . import agents, sessions, settings
+from . import agents, runs, sessions, settings
 
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(agents.router)
 api_router.include_router(sessions.router)
+api_router.include_router(runs.router)
 api_router.include_router(settings.router)
 
 

@@ -17,6 +17,9 @@ from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session_query import SessionQueryRepository
 from tools.catalog import ToolCatalog
 
+from .services.chat_service import ChatService
+from .services.run_registry import RunRegistry
+
 
 @dataclass
 class ApplicationServices:
@@ -31,6 +34,8 @@ class ApplicationServices:
         tool_catalog: 受信任工具元数据目录。
         session_queries: 面向客户端的 DIRECT 会话聚合查询仓储。
         context_items: 会话时间线查询仓储。
+        run_registry: 进程内活动 Runtime 注册表。
+        chat_service: Runtime 到 SSE 的应用服务。
     """
 
     database: StateDatabase
@@ -41,6 +46,8 @@ class ApplicationServices:
     tool_catalog: ToolCatalog
     session_queries: SessionQueryRepository
     context_items: ContextItemRepository
+    run_registry: RunRegistry
+    chat_service: ChatService
 
 
 async def get_services(request: Request) -> ApplicationServices:

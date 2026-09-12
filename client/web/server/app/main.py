@@ -11,6 +11,8 @@ from .bootstrap import install_agent_source_path
 from .config import WebServerSettings
 from .dependencies import ApplicationServices
 from .errors import install_error_handlers
+from .services.chat_service import ChatService
+from .services.run_registry import RunRegistry
 
 install_agent_source_path()
 
@@ -38,19 +40,31 @@ def create_app(settings: WebServerSettings) -> FastAPI:
         database = StateDatabase(str(settings.workspace))
         database.initialize()
         catalog = ToolCatalog()
+        agent_factory = AgentFactory(database, tool_catalog=catalog)
+        session_queries = SessionQueryRepository(database)
+        context_items = ContextItemRepository(database)
+        run_registry = RunRegistry()
         app.state.services = ApplicationServices(
             database=database,
             agent_directory=AgentDirectory(AgentProfileRepository(database)),
-            agent_factory=AgentFactory(database, tool_catalog=catalog),
+            agent_factory=agent_factory,
             session_service=SessionService(database),
             llm_profiles=LLMProfileRepository(database),
             tool_catalog=catalog,
-            session_queries=SessionQueryRepository(database),
-            context_items=ContextItemRepository(database),
+            session_queries=session_queries,
+            context_items=context_items,
+            run_registry=run_registry,
+            chat_service=ChatService(
+                agent_factory,
+                session_queries,
+                context_items,
+                run_registry,
+            ),
         )
         try:
             yield
         finally:
+            run_registry.clear()
             database.close()
 
     app = FastAPI(
