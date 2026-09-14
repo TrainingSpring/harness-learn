@@ -155,6 +155,18 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
       llmProfiles = [...llmProfiles, createdProfile];
       return json(route, createdProfile, 201);
     }
+    const llmProfileMatch = path.match(/^\/api\/settings\/llm-profiles\/(llm_[A-Z0-9]+)$/);
+    if (llmProfileMatch && method === "PATCH") {
+      const requestBody = request.postDataJSON() as Omit<typeof llmProfile, "id" | "hasCredential">;
+      const profileId = llmProfileMatch[1];
+      llmProfiles = llmProfiles.map((profile) => profile.id === profileId ? { ...profile, ...requestBody } : profile);
+      return json(route, llmProfiles.find((profile) => profile.id === profileId));
+    }
+    if (llmProfileMatch && method === "DELETE") {
+      const profileId = llmProfileMatch[1];
+      llmProfiles = llmProfiles.filter((profile) => profile.id !== profileId);
+      return route.fulfill({ status: 204 });
+    }
     if (path === "/api/settings/tools") return json(route, list([{ name: "read", description: "读取工作区文件", inputSchema: { type: "object", properties: { targetPath: { type: "string" } } }, permissionAction: "filesystem.read" }]));
     return json(route, { error: { code: "NOT_FOUND", message: path, details: null } }, 404);
   });

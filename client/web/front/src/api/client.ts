@@ -50,4 +50,21 @@ export const apiClient = {
       }),
     );
   },
+
+  async patch<TRequest, TResponse>(path: string, body: TRequest, signal?: AbortSignal): Promise<TResponse> {
+    return parseResponse<TResponse>(
+      await fetch(path, {
+        method: "PATCH",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      }),
+    );
+  },
+
+  async delete(path: string, signal?: AbortSignal): Promise<void> {
+    return parseResponse<void>(
+      await fetch(path, { method: "DELETE", headers: { Accept: "application/json" }, signal }),
+    );
+  },
 };

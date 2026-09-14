@@ -1,19 +1,37 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Plus, X } from "lucide-react";
+import { Pencil, Plus, X } from "lucide-react";
 import { Button } from "../../../components/Button";
 import { useModalFocus } from "../../../hooks/useModalFocus";
-import type { CreateLLMProfileRequest } from "../../../api/types";
+import type {
+  CreateLLMProfileRequest,
+  LLMProfileSummary,
+  UpdateLLMProfileRequest,
+} from "../../../api/types";
 
-interface CreateLlmDialogProps {
+interface SharedLlmDialogProps {
   isOpen: boolean;
   isSubmitting: boolean;
   error: string | null;
   onClose: () => void;
+}
+
+interface CreateLlmDialogProps extends SharedLlmDialogProps {
+  mode: "create";
   onSubmit: (request: CreateLLMProfileRequest) => void;
 }
 
-/** LLM 配置创建弹窗；只提交 credentialRef，不处理真实凭据值。 */
-export function CreateLlmDialog({ isOpen, isSubmitting, error, onClose, onSubmit }: CreateLlmDialogProps) {
+interface EditLlmDialogProps extends SharedLlmDialogProps {
+  mode: "edit";
+  profile: LLMProfileSummary;
+  onSubmit: (request: UpdateLLMProfileRequest) => void;
+}
+
+type LlmDialogProps = CreateLlmDialogProps | EditLlmDialogProps;
+
+/** LLM 配置新增和编辑弹窗；编辑时绝不读取或回显已保存的凭据引用。 */
+export function CreateLlmDialog(props: LlmDialogProps) {
+  const { isOpen, isSubmitting, error, onClose, mode } = props;
+  const editProfile = mode === "edit" ? props.profile : null;
   const dialogRef = useModalFocus<HTMLDivElement>(isOpen);
   const [name, setName] = useState("");
   const [provider, setProvider] = useState("");
@@ -25,14 +43,14 @@ export function CreateLlmDialog({ isOpen, isSubmitting, error, onClose, onSubmit
 
   useEffect(() => {
     if (!isOpen) return;
-    setName("");
-    setProvider("");
-    setBaseUrl("");
-    setModel("");
+    setName(editProfile?.name ?? "");
+    setProvider(editProfile?.provider ?? "");
+    setBaseUrl(editProfile?.baseUrl ?? "");
+    setModel(editProfile?.model ?? "");
     setCredentialRef("");
-    setOptions("");
+    setOptions(editProfile ? JSON.stringify(editProfile.options, null, 2) : "");
     setFormError(null);
-  }, [isOpen]);
+  }, [isOpen, mode, editProfile?.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -59,33 +77,40 @@ export function CreateLlmDialog({ isOpen, isSubmitting, error, onClose, onSubmit
         return;
       }
     }
-    onSubmit({
+    const commonFields = {
       name: name.trim(),
       provider: provider.trim(),
       baseUrl: baseUrl.trim() || null,
       model: model.trim(),
-      credentialRef: credentialRef.trim(),
       options: parsedOptions,
-    });
+    };
+    if (mode === "edit") {
+      props.onSubmit({
+        ...commonFields,
+        ...(credentialRef.trim() ? { credentialRef: credentialRef.trim() } : {}),
+      });
+      return;
+    }
+    props.onSubmit({ ...commonFields, credentialRef: credentialRef.trim() });
   };
 
   return (
     <div className="dialog-backdrop">
-      <div ref={dialogRef} className="permission-dialog create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-llm-title" tabIndex={-1}>
+      <div ref={dialogRef} className="permission-dialog create-dialog" role="dialog" aria-modal="true" aria-labelledby="llm-dialog-title" tabIndex={-1}>
         <div className="dialog-heading">
-          <div><p className="eyebrow">模型连接</p><h2 id="create-llm-title">新增 LLM 配置</h2></div>
+          <div><p className="eyebrow">模型连接</p><h2 id="llm-dialog-title">{mode === "edit" ? "编辑 LLM 配置" : "新增 LLM 配置"}</h2></div>
           <Button variant="ghost" aria-label="关闭" icon={<X size={17} />} onClick={onClose} />
         </div>
-        <p className="form-notice">请填写凭据引用，例如 <code>env:OPENAI_API_KEY</code>，不要填写真实 API Key。</p>
+        <p className="form-notice">{mode === "edit" ? "凭据引用不会显示；留空将保留当前引用。" : <>请填写凭据引用，例如 <code>env:OPENAI_API_KEY</code>，不要填写真实 API Key。</>}</p>
         <form className="form-stack" onSubmit={handleSubmit}>
           <label className="form-field"><span>配置名称</span><input value={name} onChange={(event) => setName(event.target.value)} required autoFocus /></label>
           <label className="form-field"><span>服务商</span><input value={provider} onChange={(event) => setProvider(event.target.value)} placeholder="openai" required /></label>
           <label className="form-field"><span>Base URL</span><input type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" /></label>
           <label className="form-field"><span>模型</span><input value={model} onChange={(event) => setModel(event.target.value)} placeholder="gpt-5" required /></label>
-          <label className="form-field"><span>凭据引用</span><input value={credentialRef} onChange={(event) => setCredentialRef(event.target.value)} placeholder="env:OPENAI_API_KEY" required /></label>
+          <label className="form-field"><span>凭据引用</span><input value={credentialRef} onChange={(event) => setCredentialRef(event.target.value)} placeholder={mode === "edit" ? "留空以保留当前凭据" : "env:OPENAI_API_KEY"} required={mode === "create"} /></label>
           <label className="form-field"><span>额外参数 JSON</span><textarea value={options} onChange={(event) => setOptions(event.target.value)} placeholder='{"temperature": 0.2}' rows={3} /></label>
           {(formError || error) && <p className="inline-error" role="alert">{formError || error}</p>}
-          <div className="dialog-actions"><Button type="button" onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={isSubmitting} icon={<Plus size={16} />}>{isSubmitting ? "创建中…" : "创建配置"}</Button></div>
+          <div className="dialog-actions"><Button type="button" onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={isSubmitting} icon={mode === "edit" ? <Pencil size={16} /> : <Plus size={16} />}>{isSubmitting ? "保存中…" : mode === "edit" ? "保存修改" : "创建配置"}</Button></div>
         </form>
       </div>
     </div>

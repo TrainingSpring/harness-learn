@@ -129,6 +129,16 @@ export interface CreateLLMProfileRequest {
   options: Record<string, unknown>;
 }
 
+/** 编辑 LLM 配置时提交的连接参数；省略 credentialRef 表示保留原凭据引用。 */
+export interface UpdateLLMProfileRequest {
+  name: string;
+  provider: string;
+  baseUrl: string | null;
+  model: string;
+  credentialRef?: string;
+  options: Record<string, unknown>;
+}
+
 export interface ToolSummary {
   name: string;
   description: string;

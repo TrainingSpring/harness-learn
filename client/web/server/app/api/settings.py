@@ -9,7 +9,12 @@ from storage.types import LLMProfile
 from ..dependencies import ApplicationServices, get_services
 from ..errors import ApiError
 from ..schemas.common import ListResponse, Pagination
-from ..schemas.settings import CreateLLMProfileRequest, LLMProfileSummary, ToolSummary
+from ..schemas.settings import (
+    CreateLLMProfileRequest,
+    LLMProfileSummary,
+    ToolSummary,
+    UpdateLLMProfileRequest,
+)
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -74,6 +79,60 @@ async def create_llm_profile(
     except StorageConflictError as error:
         raise ApiError(409, "LLM_PROFILE_CONFLICT", "LLM 配置名称已存在") from error
     return _llm_summary(saved)
+
+
+@router.patch(
+    "/llm-profiles/{profile_id}",
+    response_model=LLMProfileSummary,
+)
+async def update_llm_profile(
+    profile_id: str,
+    request: UpdateLLMProfileRequest,
+    services: ApplicationServices = Depends(get_services),
+) -> LLMProfileSummary:
+    """更新一套 LLM 配置并返回脱敏摘要。
+
+    编辑接口不会从浏览器回显凭据引用。请求未提供 credential_ref 时，
+    先读取并保留数据库中的原引用，避免一次普通编辑意外清空凭据。
+    """
+    try:
+        current = services.llm_profiles.get(profile_id)
+    except ValueError as error:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在") from error
+    if current is None:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在")
+
+    profile = LLMProfile(
+        id=current.id,
+        name=request.name,
+        provider=request.provider,
+        base_url=request.base_url,
+        model=request.model,
+        credential_ref=request.credential_ref or current.credential_ref,
+        options=request.options,
+        created_at=current.created_at,
+    )
+    try:
+        saved = services.llm_profiles.save(profile)
+    except StorageConflictError as error:
+        raise ApiError(409, "LLM_PROFILE_CONFLICT", "LLM 配置名称已存在") from error
+    return _llm_summary(saved)
+
+
+@router.delete("/llm-profiles/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_llm_profile(
+    profile_id: str,
+    services: ApplicationServices = Depends(get_services),
+) -> None:
+    """删除未被 Agent 引用的 LLM 配置。"""
+    try:
+        deleted = services.llm_profiles.delete(profile_id)
+    except ValueError as error:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在") from error
+    except StorageConflictError as error:
+        raise ApiError(409, "LLM_PROFILE_IN_USE", "LLM 配置仍被角色使用，不能删除") from error
+    if not deleted:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在")
 
 
 @router.get("/tools", response_model=ListResponse[ToolSummary])

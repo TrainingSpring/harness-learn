@@ -161,6 +161,7 @@ code, pre { font-family: var(--font-mono); }
 .segmented button.is-selected { color: var(--text); background: var(--bg-surface); box-shadow: 0 1px 4px rgb(0 0 0 / 10%); }
 .data-table { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .data-table__row { display: grid; grid-template-columns: 1fr 1.25fr 1.6fr 80px; gap: 14px; align-items: center; min-height: 54px; padding: 9px 12px; border-top: 1px solid var(--border); }
+.data-table--llms .data-table__row { grid-template-columns: 1fr 1.25fr 1.6fr 80px 76px; }
 .data-table__row:first-child { border-top: 0; }
 .data-table__head { min-height: 36px; color: var(--text-muted); background: var(--bg-subtle); font-size: 11px; font-weight: 650; }
 .data-table__row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -169,6 +170,9 @@ code, pre { font-family: var(--font-mono); }
 .status { width: fit-content; padding: 2px 6px; border-radius: 999px; font-size: 11px; }
 .status--ok { color: var(--accent); background: var(--accent-soft); }
 .status--muted { color: var(--text-muted); background: var(--bg-subtle); }
+.table-actions { display: flex; align-items: center; justify-content: flex-end; gap: 1px; }
+.table-actions .icon-button { width: 30px; height: 30px; }
+.icon-button--danger:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); }
 .tool-list { border-top: 1px solid var(--border); }
 .tool-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; padding: 16px 2px; border-bottom: 1px solid var(--border); }
 .tool-row h3 { margin: 0 0 3px; font-size: 13px; }
@@ -202,6 +206,10 @@ code, pre { font-family: var(--font-mono); }
 .scope-selector input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
 .permission-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .create-dialog { width: min(100%, 620px); }
+.delete-dialog { width: min(100%, 460px); }
+.delete-dialog__title { display: flex; align-items: flex-start; gap: 10px; }
+.delete-dialog__icon { display: grid; place-items: center; width: 34px; height: 34px; color: var(--danger); background: var(--danger-soft); border-radius: var(--radius-sm); }
+.delete-dialog > p { margin: 0; color: var(--text-secondary); }
 .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .dialog-heading h2 { margin: 3px 0 0; font-size: 17px; }
 .form-stack { display: grid; gap: 14px; }
@@ -273,6 +281,7 @@ code, pre { font-family: var(--font-mono); }
   .data-table__row { grid-template-columns: 1fr auto; gap: 5px 12px; margin-bottom: 8px; padding: 12px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
   .data-table__row > code { grid-column: 1 / -1; white-space: normal; overflow-wrap: anywhere; }
   .data-table__row .status { grid-column: 2; grid-row: 1; }
+  .data-table--llms .data-table__row .table-actions { grid-column: 1 / -1; justify-content: flex-start; margin-top: 3px; }
   .tool-row { grid-template-columns: 1fr; gap: 10px; }
   .tool-row__meta { justify-items: start; }
   .dialog-backdrop { align-items: end; padding: 0; }
