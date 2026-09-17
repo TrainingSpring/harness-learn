@@ -87,6 +87,41 @@ class SessionRepositoryTests(unittest.TestCase):
             self.repository.update_status("session_4N9C1R7WBA", "CLOSED")
         )
 
+    def test_current_context_can_be_saved_and_overwritten(self):
+        """当前上下文是 Session 级可覆盖状态。"""
+        session = self.repository.create("DIRECT")
+        first = [{"type": "message", "role": "user", "content": "第一轮"}]
+        second = [
+            {"type": "message", "role": "developer", "content": "压缩摘要"},
+            {"type": "message", "role": "user", "content": "第二轮"},
+        ]
+
+        self.repository.save_current_context(session.id, first)
+        self.repository.save_current_context(session.id, second)
+
+        self.assertEqual(self.repository.load_current_context(session.id), second)
+
+    def test_current_context_rejects_invalid_database_json(self):
+        """数据库中的当前上下文格式损坏时不能静默恢复。"""
+        session = self.repository.create("DIRECT")
+        self.database.connection.execute(
+            "UPDATE sessions SET current_context_json = ? WHERE id = ?",
+            ('{"not": "an array"}', session.id),
+        )
+        self.database.connection.commit()
+
+        from storage.errors import StorageFormatError
+
+        with self.assertRaises(StorageFormatError):
+            self.repository.load_current_context(session.id)
+
+    def test_current_context_rejects_non_serializable_messages(self):
+        """保存前应拒绝不能 JSON 序列化的消息结构。"""
+        session = self.repository.create("DIRECT")
+
+        with self.assertRaises(ValueError):
+            self.repository.save_current_context(session.id, [{"value": object()}])
+
 
 if __name__ == "__main__":
     unittest.main()

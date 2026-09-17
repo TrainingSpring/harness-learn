@@ -9,12 +9,20 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
 from runtime.context_service import ContextService  # noqa: E402
+from context.context import Context  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402
 from storage.repositories.context_item import ContextItemRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
 from storage.repositories.session import SessionRepository  # noqa: E402
 from storage.types import AgentProfile, LLMProfile  # noqa: E402
+
+
+class FakeContextLLM:
+    """满足 Context 初始化所需接口的最小 LLM 替身。"""
+
+    def __init__(self):
+        self.system_prompt = ""
 
 
 class ContextServiceTests(unittest.TestCase):
@@ -126,6 +134,46 @@ class ContextServiceTests(unittest.TestCase):
         self.assertEqual(item.payload, {"text": "完成"})
         self.assertNotIn("type", item.payload)
         self.assertNotIn("role", item.payload)
+
+    def test_service_can_save_and_load_current_context(self):
+        """ContextService 应暴露 Session 当前 Context 的持久化边界。"""
+        messages = [
+            {"type": "message", "role": "developer", "content": "摘要"},
+        ]
+
+        self.service.save_current_context(messages)
+
+        self.assertEqual(self.service.load_current_context(), messages)
+
+    def test_service_restores_saved_current_context_before_raw_events(self):
+        """恢复时应优先使用已经治理过的 Session 当前上下文。"""
+        self.service.append_user_message("原始事件")
+        saved = [{"type": "message", "role": "developer", "content": "压缩摘要"}]
+        self.service.save_current_context(saved)
+        context = Context(FakeContextLLM(), session_id=self.session.id)
+
+        self.service.restore_context(context, "agent_1V3ASAXQ2A")
+
+        self.assertEqual(context.export(), saved)
+
+    def test_service_builds_initial_context_from_raw_events_when_current_is_empty(self):
+        """新旧 Session 没有当前快照时，应从原始业务事件构建输入。"""
+        self.service.append_user_message("从原始事件恢复")
+        context = Context(FakeContextLLM(), session_id=self.session.id)
+
+        self.service.restore_context(context, "agent_1V3ASAXQ2A")
+
+        self.assertEqual(context.messages[0]["role"], "user")
+        self.assertEqual(context.messages[0]["content"][0]["text"], "从原始事件恢复")
+
+    def test_service_saves_context_snapshot(self):
+        """服务应能保存 Context 导出的独立快照。"""
+        context = Context(FakeContextLLM(), session_id=self.session.id)
+        context.append_user_message("当前上下文")
+
+        self.service.save_context(context)
+
+        self.assertEqual(self.service.load_current_context(), context.export())
 
 
 if __name__ == "__main__":

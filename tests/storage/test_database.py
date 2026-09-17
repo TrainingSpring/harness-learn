@@ -108,7 +108,7 @@ class StateDatabaseTests(unittest.TestCase):
                 ("schema_version",),
             ).fetchone()[0]
 
-            self.assertEqual(version, "2")
+            self.assertEqual(version, "3")
             database.close()
 
     def test_database_rejects_a_newer_schema_version(self):

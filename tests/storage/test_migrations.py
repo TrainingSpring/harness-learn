@@ -119,6 +119,78 @@ class MigrationTests(unittest.TestCase):
         self.assertIsNone(old_table)
         self.assertEqual(foreign_key_errors, [])
 
+    def test_current_context_column_is_added_by_migration(self):
+        """当前上下文字段应由显式迁移加入，并默认为空数组。"""
+        connection = sqlite3.connect(":memory:")
+
+        migrate(connection)
+
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(sessions)")
+        }
+        value = connection.execute(
+            """
+            INSERT INTO sessions (
+                id, title, conversation_mode, status,
+                created_at, updated_at, closed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            RETURNING current_context_json
+            """,
+            (
+                "session_4N9C1R7WBA",
+                None,
+                "DIRECT",
+                "ACTIVE",
+                "created",
+                "updated",
+                None,
+            ),
+        ).fetchone()[0]
+
+        self.assertIn("current_context_json", columns)
+        self.assertEqual(value, "[]")
+
+    def test_version_two_database_is_upgraded_with_empty_current_context(self):
+        """已有 v2 数据升级后应保留会话并增加空的当前上下文。"""
+        connection = sqlite3.connect(":memory:")
+        connection.execute(
+            "CREATE TABLE schema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '2')"
+        )
+        connection.execute(
+            """
+            CREATE TABLE sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                conversation_mode TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                closed_at TEXT
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO sessions VALUES (
+                'session_4N9C1R7WBA', '旧会话', 'DIRECT', 'ACTIVE',
+                'created', 'updated', NULL
+            )
+            """
+        )
+        connection.commit()
+
+        migrate(connection)
+
+        row = connection.execute(
+            "SELECT title, current_context_json FROM sessions WHERE id = ?",
+            ("session_4N9C1R7WBA",),
+        ).fetchone()
+        self.assertEqual(row, ("旧会话", "[]"))
+
 
 if __name__ == "__main__":
     unittest.main()

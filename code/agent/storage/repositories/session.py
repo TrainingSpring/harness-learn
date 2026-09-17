@@ -1,8 +1,10 @@
 """Session 的 SQLite 仓储。"""
 
+import json
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
+from typing import Any
 
 from ..database import StateDatabase
 from ..errors import StorageConflictError, StorageFormatError
@@ -115,6 +117,53 @@ class SessionRepository:
         ).fetchone()
         return None if row is None else self._from_row(row)
 
+    def load_current_context(self, session_id: str) -> list[dict[str, Any]]:
+        """读取 Session 当前实际模型上下文。"""
+        validate_id("session", session_id)
+        row = self.database.connection.execute(
+            "SELECT current_context_json FROM sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Session 不存在: {session_id}")
+        try:
+            messages = json.loads(row["current_context_json"])
+        except (TypeError, json.JSONDecodeError) as error:
+            raise StorageFormatError(
+                f"Session 当前上下文不是有效 JSON: {session_id}"
+            ) from error
+        self._validate_current_context(messages)
+        return messages
+
+    def save_current_context(
+        self,
+        session_id: str,
+        messages: list[dict[str, Any]],
+    ) -> None:
+        """覆盖保存 Session 当前实际模型上下文。"""
+        validate_id("session", session_id)
+        self._validate_current_context(messages)
+        try:
+            encoded = json.dumps(messages, ensure_ascii=False, sort_keys=True)
+        except (TypeError, ValueError) as error:
+            raise ValueError("当前上下文必须是可 JSON 序列化的消息列表") from error
+
+        with self.database.transaction() as connection:
+            exists = connection.execute(
+                "SELECT 1 FROM sessions WHERE id = ?",
+                (session_id,),
+            ).fetchone()
+            if exists is None:
+                raise ValueError(f"Session 不存在: {session_id}")
+            connection.execute(
+                """
+                UPDATE sessions
+                SET current_context_json = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (encoded, _utc_now(), session_id),
+            )
+
     def update_status(self, session_id: str, status: str) -> Session | None:
         """更新会话状态，并同步维护 closed_at。
 
@@ -216,6 +265,14 @@ class SessionRepository:
             )
         except (TypeError, ValueError) as error:
             raise StorageFormatError("Session 数据不符合领域约束") from error
+
+    @staticmethod
+    def _validate_current_context(messages: Any) -> None:
+        """验证当前上下文是由消息字典组成的数组。"""
+        if not isinstance(messages, list):
+            raise StorageFormatError("当前上下文必须编码为数组")
+        if not all(isinstance(message, dict) for message in messages):
+            raise StorageFormatError("当前上下文中的消息必须编码为对象")
 
 
 def _utc_now() -> str:

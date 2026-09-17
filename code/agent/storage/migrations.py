@@ -5,7 +5,7 @@ import sqlite3
 from .errors import StorageSchemaError
 
 
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
 
 
 def migrate(connection: sqlite3.Connection) -> None:
@@ -55,6 +55,9 @@ def migrate(connection: sqlite3.Connection) -> None:
         if version == 1:
             _migrate_version_one_to_two(connection)
             version = 2
+        if version == 2:
+            _migrate_version_two_to_three(connection)
+            version = 3
 
         if version != CURRENT_SCHEMA_VERSION:
             raise StorageSchemaError(
@@ -320,5 +323,22 @@ def _migrate_version_one_to_two(connection: sqlite3.Connection) -> None:
         WHERE key = 'schema_version';
 
         COMMIT;
+        """
+    )
+
+
+def _migrate_version_two_to_three(connection: sqlite3.Connection) -> None:
+    """为 Session 增加当前实际模型上下文字段。"""
+    connection.execute(
+        """
+        ALTER TABLE sessions
+        ADD COLUMN current_context_json TEXT NOT NULL DEFAULT '[]'
+        """
+    )
+    connection.execute(
+        """
+        UPDATE schema_metadata
+        SET value = '3'
+        WHERE key = 'schema_version'
         """
     )

@@ -1,11 +1,15 @@
 """会话上下文的业务事件写入与模型输入投影。"""
 
 import json
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from storage.ids import generate_id
 from storage.repositories.context_item import ContextItemRepository
+from storage.repositories.session import SessionRepository
 from storage.types import ContextItem
+
+if TYPE_CHECKING:
+    from context.context import Context
 
 
 class ContextService:
@@ -32,6 +36,7 @@ class ContextService:
         """
         self.repository = repository
         self.session_id = session_id
+        self.sessions = SessionRepository(repository.database)
 
     def append_user_message(
         self,
@@ -115,6 +120,43 @@ class ContextService:
     def load_visible(self, agent_id: str) -> list[ContextItem]:
         """读取指定会话 Agent 可见的时间线。"""
         return self.repository.list_visible(self.session_id, agent_id)
+
+    def load_current_context(self) -> list[dict[str, Any]]:
+        """读取当前 Session 已治理的模型上下文。"""
+        return self.sessions.load_current_context(self.session_id)
+
+    def save_current_context(self, messages: list[dict[str, Any]]) -> None:
+        """覆盖保存当前 Session 已治理的模型上下文。"""
+        self.sessions.save_current_context(self.session_id, messages)
+
+    def restore_context(
+        self,
+        context: "Context",
+        agent_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """把当前 Session 上下文恢复到独立 Context 实例。
+
+        已有治理快照优先于原始事件；只有快照为空时，才按 Agent 可见性从
+        ``context_items`` 构建初始 Responses 输入。Context 本身不访问数据库。
+        """
+        current = self.load_current_context()
+        if current:
+            context.restore(current)
+            return context.export()
+        if agent_id is None:
+            context.restore([])
+            return []
+        initial = self.to_responses_input(self.load_visible(agent_id))
+        context.restore(initial)
+        return context.export()
+
+    def save_context(self, context: "Context") -> None:
+        """保存 Context 的当前独立快照。"""
+        self.save_current_context(context.export())
+
+    # 这些别名让 Session 编排层可以使用更自然的“载入/保存”命名；实际
+    # 实现仍集中在 restore_context/save_context，避免出现多套恢复规则。
+    load_into = restore_context
 
     @staticmethod
     def to_responses_input(items: list[ContextItem]) -> list[dict[str, Any]]:
