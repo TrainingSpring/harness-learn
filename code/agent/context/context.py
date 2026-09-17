@@ -25,7 +25,6 @@ class Context:
     def __init__(
         self,
         llm: LLM | None = None,
-        ctx: Any | None = None,
         *,
         session_id: str | None = None,
         summarizer_llm: LLM | None = None,
@@ -34,8 +33,8 @@ class Context:
             llm = summarizer_llm
         if llm is None:
             raise TypeError("必须提供 llm 或 summarizer_llm")
-        if session_id is None and ctx is not None:
-            session_id = getattr(ctx, "session_id", None)
+        if session_id is None :
+            raise TypeError("必须提供 session_id")
         self.sid = session_id
         self.messages: list[dict[str, Any]] = []
         self.llm = llm

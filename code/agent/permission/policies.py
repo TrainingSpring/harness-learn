@@ -37,6 +37,7 @@ def _normalise_absolute_path(path: str) -> str:
 
 def _is_path_within(path: str, root: str) -> bool:
     """判断 path 是否等于 root 或位于 root 子树中。
+    判断path是否在指定的资源目录下
 
     Args:
         path: 已规范化的目标路径。
@@ -56,7 +57,9 @@ def _is_path_within(path: str, root: str) -> bool:
 
 
 class HardSafetyPolicy:
-    """无条件拒绝少量、明确且不可接受的高危操作。
+    """
+    强制安全规则
+    无条件拒绝少量、明确且不可接受的高危操作。
 
     Attributes:
         _critical_write_paths: 绝不允许通过文件工具修改的关键系统文件。
