@@ -18,7 +18,7 @@ from permission.types import (
     PermissionScope,
 )
 from runtime.agent import Agent as StableAgent
-from runtime.session_agent_factory import SessionAgentRuntimeFactory
+from session.session_agent_factory import SessionAgentRuntimeFactory
 from runtime.runtime import PermissionRequiredEvent, Runtime
 from storage.ids import generate_id
 from storage.types import AgentProfile, SessionAgent
