@@ -3,7 +3,7 @@
 from head.credential_resolver import CredentialResolver
 from head.types import LLMConfig
 from permission.types import PermissionMode
-from runtime.agent_definition import AgentDefinition
+from runtime.agent import Agent
 from runtime.prompt_builder import PromptBuilder
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
@@ -44,13 +44,13 @@ class AgentFactory:
     def load(
         self,
         agent_id: str,
-    ) -> AgentDefinition:
-        """根据 Agent ID 加载可跨 Session 复用的 AgentDefinition。
+    ) -> Agent:
+        """根据 Agent ID 加载可跨 Session 复用的稳定 Agent。
 
         Args:
             agent_id: AgentProfile 的稳定 ID。
         Returns:
-            不携带 Session 状态的 AgentDefinition。
+            不携带 Session 状态的 Agent。
 
         Raises:
             ValueError: Agent 或其 LLM 配置不存在，或权限模式非法。
@@ -82,7 +82,7 @@ class AgentFactory:
             instructions=instructions,
         )
 
-        return AgentDefinition(
+        return Agent(
             agent_id=profile.id,
             profile=profile,
             llm_config=llm_config,
