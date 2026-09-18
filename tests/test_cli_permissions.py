@@ -18,7 +18,7 @@ from permission.types import (  # noqa: E402
     PermissionRequest,
     PermissionScope,
 )
-from runtime.runtime import PermissionRequiredEvent  # noqa: E402
+from runtime.runtime_events import PermissionRequiredEvent  # noqa: E402
 
 
 class CliPermissionTests(unittest.TestCase):

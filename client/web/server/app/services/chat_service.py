@@ -6,7 +6,7 @@ from typing import Any
 from head.types import LLMResponse
 from permission.types import PermissionDecision, PermissionResponse, PermissionScope
 from runtime.agent_factory import AgentFactory
-from runtime.runtime import PermissionRequiredEvent
+from runtime.runtime_events import PermissionRequiredEvent
 from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session_query import SessionQueryRepository
 from storage.types import ContextItem

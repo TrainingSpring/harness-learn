@@ -19,7 +19,8 @@ from permission.types import (  # noqa: E402
     PermissionResponse,
     PermissionScope,
 )
-from runtime.runtime import PermissionRequiredEvent, Runtime, RuntimeState  # noqa: E402
+from runtime.runtime import Runtime, RuntimeState  # noqa: E402
+from runtime.runtime_events import PermissionRequiredEvent  # noqa: E402
 from session.ExecutionContext import ExecutionContext  # noqa: E402
 from tools.tools import Tools  # noqa: E402
 from tools.types import Tool, ToolResult  # noqa: E402
