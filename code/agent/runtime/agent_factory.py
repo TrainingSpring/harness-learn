@@ -3,15 +3,12 @@
 from head.credential_resolver import CredentialResolver
 from head.types import LLMConfig
 from permission.types import PermissionMode
-from runtime.agent import Agent
-from runtime.context_service import ContextService
+from runtime.agent_definition import AgentDefinition
 from runtime.prompt_builder import PromptBuilder
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.repositories.permission_rule import PermissionRuleRepository
-from storage.repositories.context_item import ContextItemRepository
-from storage.repositories.session_agent import SessionAgentRepository
 from tools.catalog import ToolCatalog
 
 
@@ -47,16 +44,13 @@ class AgentFactory:
     def load(
         self,
         agent_id: str,
-        session_id: str | None = None,
-    ) -> Agent:
-        """根据 Agent ID 创建运行时 Agent。
+    ) -> AgentDefinition:
+        """根据 Agent ID 加载可跨 Session 复用的 AgentDefinition。
 
         Args:
             agent_id: AgentProfile 的稳定 ID。
-            session_id: 可选的现有会话 ID；不传时由 Agent 创建新会话 ID。
-
         Returns:
-            已加载 LLM、工具、Context 和权限管理器的 Agent。
+            不携带 Session 状态的 AgentDefinition。
 
         Raises:
             ValueError: Agent 或其 LLM 配置不存在，或权限模式非法。
@@ -88,26 +82,12 @@ class AgentFactory:
             instructions=instructions,
         )
 
-        context_service = None
-        if session_id is not None:
-            # agent_id 同时承担会话内作者身份，Factory 只需验证联合成员关系。
-            if not SessionAgentRepository(self.database).exists(session_id, agent_id):
-                raise ValueError("当前 Agent 不属于指定 Session")
-            context_service = ContextService(
-                ContextItemRepository(self.database),
-                session_id,
-            )
-
-        agent = Agent(
-            llm_config=llm_config,
-            tools=profile.tools,
+        return AgentDefinition(
             agent_id=profile.id,
+            profile=profile,
+            llm_config=llm_config,
+            tool_names=tuple(profile.tools),
             permission_mode=permission_mode,
             workspace=str(self.database.workspace),
-            session_id=session_id,
             permission_rule_repository=PermissionRuleRepository(self.database),
-            context_service=context_service,
         )
-        agent.agent_id = profile.id
-        agent.profile = profile
-        return agent

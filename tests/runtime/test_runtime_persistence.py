@@ -70,7 +70,7 @@ class RuntimePersistenceTests(unittest.TestCase):
         runtime = Runtime(
             FakeLLM(),
             tools,
-            Context(FakeLLM(), ctx),
+            Context(FakeLLM(), session_id=ctx.session_id),
             ctx,
             PermissionManager(
                 mode=PermissionMode.BUILD,

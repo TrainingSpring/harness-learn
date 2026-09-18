@@ -1,4 +1,4 @@
-"""AgentFactory 的 AgentDefinition 配置加载测试。"""
+"""AgentDefinition 的稳定身份与跨 Session 复用测试。"""
 
 import os
 import sys
@@ -17,8 +17,8 @@ from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
 from storage.types import AgentProfile, LLMProfile  # noqa: E402
 
 
-class AgentFactoryTests(unittest.TestCase):
-    """验证数据库配置可以加载为稳定 Agent 定义。"""
+class AgentDefinitionTests(unittest.TestCase):
+    """验证 AgentFactory 只加载可跨会话复用的 Agent 定义。"""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -42,7 +42,7 @@ class AgentFactoryTests(unittest.TestCase):
                 personality="务实",
                 expertise=["Python"],
                 llm_profile_id="llm_7KQ2M8P4XZ",
-                tools=["read", "write"],
+                tools=["read"],
                 permission_mode="BUILD",
             )
         )
@@ -51,22 +51,29 @@ class AgentFactoryTests(unittest.TestCase):
         self.database.close()
         self.temp_dir.cleanup()
 
-    def test_load_returns_stable_agent_definition(self):
-        """Factory 不应在加载定义时创建 Session 执行状态。"""
+    def test_factory_load_returns_reusable_definition_without_session_state(self):
+        """同一 AgentDefinition 不应携带 session、context 或工具执行环境。"""
         with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-value"}):
             definition = AgentFactory(self.database).load("agent_1V3ASAXQ2A")
 
         self.assertIsInstance(definition, AgentDefinition)
         self.assertEqual(definition.agent_id, "agent_1V3ASAXQ2A")
-        self.assertEqual(definition.workspace, str(Path(self.temp_dir.name).resolve()))
-        self.assertEqual(definition.tool_names, ("read", "write"))
+        self.assertEqual(definition.profile.id, definition.agent_id)
+        self.assertEqual(definition.tool_names, ("read",))
         self.assertFalse(hasattr(definition, "session_id"))
         self.assertFalse(hasattr(definition, "context"))
 
-    def test_load_raises_for_unknown_agent(self):
-        """不存在的 Agent 配置不能创建默认定义。"""
-        with self.assertRaises(ValueError):
-            AgentFactory(self.database).load("agent_8LRT3N5QYB")
+    def test_one_definition_creates_distinct_session_execution_contexts(self):
+        """同一稳定定义创建的两个执行实例必须拥有不同 Session 环境。"""
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-value"}):
+            definition = AgentFactory(self.database).load("agent_1V3ASAXQ2A")
+            first = definition.create_session_runtime("session_1ABCDEF234")
+            second = definition.create_session_runtime("session_2ABCDEF234")
+
+        self.assertIsNot(first, second)
+        self.assertEqual(first.ctx.agent_id, second.ctx.agent_id)
+        self.assertNotEqual(first.ctx.session_id, second.ctx.session_id)
+        self.assertIsNot(first.tools, second.tools)
 
 
 if __name__ == "__main__":

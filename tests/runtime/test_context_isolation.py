@@ -25,11 +25,11 @@ class ContextIsolationTests(unittest.TestCase):
         """一个 Context 的追加和加载不能影响另一个 Context。"""
         context_a = Context(
             FakeLLM(),
-            ExecutionContext("/workspace", "agent_1", "session_1"),
+            session_id="session_1",
         )
         context_b = Context(
             FakeLLM(),
-            ExecutionContext("/workspace", "agent_1", "session_2"),
+            session_id="session_2",
         )
 
         context_a.append_msg("会话 A")

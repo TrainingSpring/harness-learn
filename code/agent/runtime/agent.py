@@ -58,7 +58,10 @@ class Agent:
         # 注册工具
         self.tools.register_by_names(tools)
         # 上下文
-        self.context = context if context is not None else Context(LLM(llm_config.base_url,llm_config.api_key,llm_config.model,llm_config.instructions),self.ctx)
+        self.context = context if context is not None else Context(
+            LLM(llm_config.base_url, llm_config.api_key, llm_config.model, llm_config.instructions),
+            session_id=self.session_id,
+        )
         if context is None and context_service is not None:
             self.context.messages = ContextService.to_responses_input(
                 context_service.load_visible(self.agent_id)

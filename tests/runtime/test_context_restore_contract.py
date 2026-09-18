@@ -34,7 +34,7 @@ class ContextRestoreContractTests(unittest.TestCase):
         """恢复历史后，Context 应使用传入的历史消息。"""
         context = Context(
             FakeLLM(),
-            ExecutionContext("/workspace", "agent_1", "session_old"),
+            session_id="session_old",
         )
         context.append_msg("旧消息")
 

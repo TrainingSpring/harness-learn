@@ -94,7 +94,7 @@ class RuntimePermissionTests(unittest.TestCase):
     def _runtime(self, responses):
         """用预设 LLM 响应构造 Runtime，并替换网络调用。"""
         llm = FakeLLM(responses)
-        context = Context(FakeLLM([]), self.ctx)
+        context = Context(FakeLLM([]), session_id=self.ctx.session_id)
         runtime = Runtime(llm, self.tools, context, self.ctx, self.permission)
         runtime.call_llm = llm.next_response
         return runtime, llm
