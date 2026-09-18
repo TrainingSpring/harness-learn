@@ -59,7 +59,10 @@ class AgentFactoryTests(unittest.TestCase):
         self.assertIsInstance(definition, AgentDefinition)
         self.assertEqual(definition.agent_id, "agent_1V3ASAXQ2A")
         self.assertEqual(definition.workspace, str(Path(self.temp_dir.name).resolve()))
-        self.assertEqual(definition.tool_names, ("read", "write"))
+        self.assertEqual(
+            tuple(tool.schema["name"] for tool in definition.tool_definitions),
+            ("read", "write"),
+        )
         self.assertFalse(hasattr(definition, "session_id"))
         self.assertFalse(hasattr(definition, "context"))
 

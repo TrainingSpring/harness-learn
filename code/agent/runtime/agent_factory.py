@@ -72,7 +72,7 @@ class AgentFactory:
                 f"Agent 权限模式无效: {profile.permission_mode}"
             ) from error
 
-        self.tool_catalog.validate_names(profile.tools)
+        tool_definitions = tuple(self.tool_catalog.get(name) for name in profile.tools)
         api_key = self.credential_resolver.resolve(llm_profile.credential_ref)
         instructions = self.prompt_builder.build(profile)
         llm_config = LLMConfig(
@@ -86,7 +86,7 @@ class AgentFactory:
             agent_id=profile.id,
             profile=profile,
             llm_config=llm_config,
-            tool_names=tuple(profile.tools),
+            tool_definitions=tool_definitions,
             permission_mode=permission_mode,
             workspace=str(self.database.workspace),
             permission_rule_repository=PermissionRuleRepository(self.database),

@@ -9,6 +9,7 @@ from permission.types import PermissionMode
 from runtime.ExecutionContext import ExecutionContext
 from runtime.runtime import Runtime
 from tools.tools import Tools
+from tools.types import Tool
 from storage.types import AgentProfile
 
 
@@ -19,7 +20,7 @@ class AgentDefinition:
     agent_id: str
     profile: AgentProfile
     llm_config: LLMConfig
-    tool_names: tuple[str, ...]
+    tool_definitions: tuple[Tool, ...]
     permission_mode: PermissionMode
     workspace: str
     permission_rule_repository: object | None = None
@@ -38,7 +39,7 @@ class AgentDefinition:
             self.llm_config.instructions,
         )
         tools = Tools(ctx)
-        tools.register_by_names(list(self.tool_names))
+        tools.batch_register(list(self.tool_definitions))
         permission = PermissionManager(
             mode=self.permission_mode,
             workspace=self.workspace,
