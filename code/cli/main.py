@@ -3,15 +3,26 @@ import os
 import sys
 from pathlib import Path
 
-from head.types import LLMConfig
-from permission.types import PermissionDecision, PermissionResponse, PermissionScope
-from runtime.agent import Agent
-from runtime.runtime import PermissionRequiredEvent
-
 # 支持直接执行 `python code/cli/main.py`。
 AGENT_PATH = Path(__file__).resolve().parents[1] / "agent"
 if str(AGENT_PATH) not in sys.path:
     sys.path.insert(0, str(AGENT_PATH))
+
+from context.context import Context
+from head.llm import LLM
+from head.types import LLMConfig
+from permission.types import (
+    PermissionDecision,
+    PermissionMode,
+    PermissionResponse,
+    PermissionScope,
+)
+from runtime.agent import Agent as StableAgent
+from runtime.session_agent_factory import SessionAgentRuntimeFactory
+from runtime.runtime import PermissionRequiredEvent, Runtime
+from storage.ids import generate_id
+from storage.types import AgentProfile, SessionAgent
+from tools.catalog import ToolCatalog
 
 def print_help():
     print("可用命令:")
@@ -66,9 +77,9 @@ def _read_key():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
-def _record_context_text(agent):
+def _record_context_text(context: Context):
     lines = []
-    for index, message in enumerate(agent.message, start=1):
+    for index, message in enumerate(context.messages, start=1):
         role = message.get("role", "unknown")
         message_type = message.get("type", "")
         content = message.get("content", message.get("output", ""))
@@ -86,13 +97,13 @@ def _record_context_text(agent):
     return "\n\n".join(lines) or "(暂无上下文)"
 
 
-def _show_context(agent):
+def _show_context(context: Context):
     print("\n--- 已加载上下文 ---")
-    print(_record_context_text(agent))
+    print(_record_context_text(context))
     print("--- 上下文结束 ---")
 
 
-def render_event(event,agent):
+def render_event(event):
     event_type = event.type
 
     if event_type == "text":
@@ -168,12 +179,12 @@ def read_permission_response(event: PermissionRequiredEvent) -> PermissionRespon
         )
 
 
-def run_agent_events(events, agent):
+def run_agent_events(events, runtime):
     """消费 Agent 事件，并在权限事件处交互后继续消费恢复流。
 
     Args:
-        events: ``agent.send()`` 或 ``agent.resolve_permission()`` 返回的事件流。
-        agent: 当前 Agent，用于接收用户确认并恢复 Runtime。
+        events: ``runtime.run()`` 或 ``runtime.resolve_permission()`` 返回的事件流。
+        runtime: 当前会话的 Runtime，用于接收用户确认并恢复 Agent Loop。
 
     该函数把 CLI 的交互循环与 Runtime 状态机隔离开：Runtime 只产生事件，
     CLI 只收集输入并转发 PermissionResponse。
@@ -182,11 +193,11 @@ def run_agent_events(events, agent):
     while True:
         for event in current_events:
             if event.type != "permission_required":
-                render_event(event, agent)
+                render_event(event)
                 continue
             render_permission_request(event)
             response = read_permission_response(event)
-            current_events = agent.resolve_permission(response)
+            current_events = runtime.resolve_permission(response)
             break
         else:
             return
@@ -195,12 +206,41 @@ API_KEY = "sk-5c206cdd7da2521f5949d6f78f9f40d1320caf8414eb187423c0e23e0619c8a8"
 MODEL = "gpt-5.6-luna"
 SYSTEM_PROMPT = "你是一个智能助手，帮助解决问题，实现用户的需求。 "
 
-def main():
-    agent = Agent(LLMConfig(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),["read","write"])
-    # agent = read_record(os.path.join(agent.workspace,".training","sid_e8317d01f81f20abcc5cd51c.json"))
 
-    # agent.tools.eval("read",{"target_path":"屏幕截图 2026-08-14 221707.png"})
-    # agent.compact_context()
+def build_runtime() -> tuple[Runtime, Context]:
+    """为 CLI 创建稳定 Agent 和当前会话的隔离运行时。"""
+    agent_id = generate_id("agent")
+    session_id = generate_id("session")
+    tool_names = ["read", "write"]
+    profile = AgentProfile(
+        id=agent_id,
+        name="CLI Agent",
+        description="命令行中的个人 Agent",
+        personality="务实",
+        expertise=["通用任务"],
+        llm_profile_id=generate_id("llm"),
+        tools=tool_names,
+        permission_mode=PermissionMode.BUILD.value,
+    )
+    agent = StableAgent(
+        agent_id=agent_id,
+        profile=profile,
+        llm_config=LLMConfig(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),
+        tool_definitions=tuple(ToolCatalog().get(name) for name in tool_names),
+        permission_mode=PermissionMode.BUILD,
+        workspace=os.getcwd(),
+    )
+    member = SessionAgent(session_id, agent_id, "PRIMARY")
+    context = Context(
+        LLM(BASE_URL, API_KEY, MODEL),
+        session_id=session_id,
+    )
+    runtime = SessionAgentRuntimeFactory().create(agent, member, context)
+    return runtime, context
+
+
+def main():
+    runtime, context = build_runtime()
     print("Agent CLI 已启动，输入 /help 查看命令。")
 
     while True:
@@ -223,8 +263,8 @@ def main():
 
         if user_input == "/tools":
             print("已注册工具:")
-            for tool in agent.tools.list:
-                print(f"- {tool.name}")
+            for tool in runtime.tools.list:
+                print(f"- {tool['name']}")
             continue
 
         if user_input == "/resume":
@@ -232,12 +272,12 @@ def main():
             continue
 
         if user_input == "/clear":
-            agent.context.messages = []
+            context.messages = []
             print("会话上下文已清空。")
             continue
 
         try:
-            run_agent_events(agent.send(user_input), agent)
+            run_agent_events(runtime.run(user_input), runtime)
         except Exception as e:
             print(f"\n[error] {e}")
 
