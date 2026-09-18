@@ -44,4 +44,4 @@ class SessionAgentRuntimeFactory:
             agent_id=agent.agent_id,
             rule_repository=agent.permission_rule_repository,
         )
-        return Runtime(llm, tools, context, ctx, permission)
+        return Runtime(llm, tools, ctx, permission)

@@ -1,4 +1,4 @@
-"""Runtime 写入 ContextService 的集成边界测试。"""
+"""Runtime 写入调用方 Context 的边界测试。"""
 
 import sys
 import unittest
@@ -39,38 +39,22 @@ class FakeLLM:
         )
 
 
-class RecordingContextService:
-    """记录业务事件的测试替身，不暴露 Responses 协议字段。"""
-
-    def __init__(self):
-        """初始化事件记录。"""
-        self.events = []
-
-    def append_user_message(self, text):
-        """记录用户消息。"""
-        self.events.append(("user", text))
-
-    def append_agent_message(self, author_agent_id, text):
-        """记录 Agent 消息及其作者。"""
-        self.events.append(("agent", author_agent_id, text))
-
-
 class RuntimePersistenceTests(unittest.TestCase):
-    """验证 Runtime 事件同时进入持久化服务和内存投影。"""
+    """验证 Runtime 只修改调用方提供的上下文。"""
 
-    def test_run_records_user_and_agent_business_events(self):
-        """启用 ContextService 后，用户和 Agent 消息都应被记录。"""
+    def test_run_records_agent_message_in_passed_context(self):
+        """用户消息由调用方追加，Agent 输出由 Runtime 追加到同一 Context。"""
         ctx = ExecutionContext(
             "/workspace",
             "agent_1V3ASAXQ2A",
             "session_4N9C1R7WBA",
         )
         tools = Tools(ctx)
-        context_service = RecordingContextService()
+        context = Context(FakeLLM(), session_id=ctx.session_id)
+        context.append_user_message("请完成任务")
         runtime = Runtime(
             FakeLLM(),
             tools,
-            Context(FakeLLM(), session_id=ctx.session_id),
             ctx,
             PermissionManager(
                 mode=PermissionMode.BUILD,
@@ -78,19 +62,13 @@ class RuntimePersistenceTests(unittest.TestCase):
                 agent_id="agent_1V3ASAXQ2A",
                 protected_resource_policy=ProtectedResourcePolicy(["/system"]),
             ),
-            context_service=context_service,
         )
 
-        list(runtime.run("请完成任务"))
+        list(runtime.run(context))
 
-        self.assertEqual(
-            context_service.events,
-            [
-                ("user", "请完成任务"),
-                ("agent", "agent_1V3ASAXQ2A", "已完成"),
-            ],
-        )
-        self.assertEqual(runtime.context.messages[0]["content"], "请完成任务")
+        self.assertEqual(context.messages[0]["content"], "请完成任务")
+        self.assertEqual(context.messages[1]["content"], "已完成")
+        self.assertFalse(hasattr(runtime, "context_service"))
 
 
 if __name__ == "__main__":
