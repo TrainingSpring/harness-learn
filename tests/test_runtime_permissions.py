@@ -2,6 +2,7 @@
 
 import sys
 import unittest
+import copy
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -38,10 +39,12 @@ class FakeLLM:
         self.system_prompt = ""
         self.responses = list(responses)
         self.call_count = 0
+        self.contexts = []
 
-    def next_response(self, _context):
+    def next_response(self, context):
         """返回下一次预设的流事件。"""
         self.call_count += 1
+        self.contexts.append(copy.deepcopy(context.export()))
         response = self.responses.pop(0)
         return iter(response)
 
@@ -137,6 +140,11 @@ class RuntimePermissionTests(unittest.TestCase):
         self.assertEqual(self.executions[0]["target_path"], "src/app.py")
         self.assertEqual(runtime.state, RuntimeState.IDLE)
         self.assertEqual(llm.call_count, 2)
+        self.assertEqual(
+            llm.contexts[1][-1]["type"],
+            "function_call_output",
+        )
+        self.assertEqual(llm.contexts[1][-1]["call_id"], "call_001")
         output = context.messages[-1]
         self.assertEqual(output["type"], "function_call_output")
         self.assertEqual(output["call_id"], "call_001")
