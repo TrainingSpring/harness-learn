@@ -4,7 +4,7 @@ import subprocess
 import os
 
 from permission.types import PermissionAction, PermissionRequirement
-from runtime.ExecutionContext import ExecutionContext
+from session.ExecutionContext import ExecutionContext
 from tools.types import Tool, ToolResult
 
 

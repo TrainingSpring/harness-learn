@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
 from runtime.agent import Agent  # noqa: E402
-from runtime.session_agent_factory import SessionAgentRuntimeFactory  # noqa: E402
+from session.session_agent_factory import SessionAgentRuntimeFactory  # noqa: E402
 from runtime.agent_factory import AgentFactory  # noqa: E402
 from context.context import Context  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402

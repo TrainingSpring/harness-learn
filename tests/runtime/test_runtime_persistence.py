@@ -12,7 +12,7 @@ from head.types import LLMResponse, LLMResponseOutputItem  # noqa: E402
 from permission.PermissionManager import PermissionManager  # noqa: E402
 from permission.policies import ProtectedResourcePolicy  # noqa: E402
 from permission.types import PermissionMode  # noqa: E402
-from runtime.ExecutionContext import ExecutionContext  # noqa: E402
+from session.ExecutionContext import ExecutionContext  # noqa: E402
 from runtime.runtime import Runtime  # noqa: E402
 from tools.tools import Tools  # noqa: E402
 

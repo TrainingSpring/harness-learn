@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
-from runtime.context_service import ContextService  # noqa: E402
+from storage.context_service import ContextService  # noqa: E402
 from context.context import Context  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402

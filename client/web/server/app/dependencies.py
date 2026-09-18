@@ -10,7 +10,7 @@ install_agent_source_path()
 
 from runtime.agent_directory import AgentDirectory
 from runtime.agent_factory import AgentFactory
-from runtime.session_service import SessionService
+from session.session_service import SessionService
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, Query, status
 
-from runtime.session_service import SessionService
+from session.session_service import SessionService
 from storage.types import ContextItem, DirectSessionSummary
 
 from ..dependencies import ApplicationServices, get_services, get_session_service
@@ -127,4 +127,3 @@ async def list_messages(
     _find_direct(services, session_id)
     items = services.context_items.list_after(session_id, after_sequence)
     return ContextItemList(items=[_context_item(item) for item in items])
-

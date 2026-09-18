@@ -9,7 +9,7 @@ from permission.types import (
     PermissionResponse,
     PermissionScope,
 )
-from runtime.context_service import ContextService
+from storage.context_service import ContextService
 from runtime.runtime import PermissionRequiredEvent
 from storage.repositories.context_item import ContextItemRepository
 

@@ -15,7 +15,7 @@ from permission.types import (  # noqa: E402
     PermissionRule,
     PermissionScope,
 )
-from runtime.ExecutionContext import ExecutionContext  # noqa: E402
+from session.ExecutionContext import ExecutionContext  # noqa: E402
 
 
 class PermissionTypeTests(unittest.TestCase):

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Literal
 
 from permission.types import PermissionRequest, PermissionRequirement
-from runtime.ExecutionContext import ExecutionContext
+from session.ExecutionContext import ExecutionContext
 
 
 @dataclass

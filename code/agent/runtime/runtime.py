@@ -16,8 +16,8 @@ from permission.types import (
     PermissionResponse,
     PermissionScope,
 )
-from runtime.ExecutionContext import ExecutionContext
-from runtime.context_service import ContextService
+from session.ExecutionContext import ExecutionContext
+from storage.context_service import ContextService
 from tools.tools import Tools
 from tools.types import PreparedToolCall, ToolCallPreparationError, ToolResult
 

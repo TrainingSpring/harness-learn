@@ -8,7 +8,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
 from context.context import Context  # noqa: E402
-from runtime.ExecutionContext import ExecutionContext  # noqa: E402
 
 
 class FakeLLM:

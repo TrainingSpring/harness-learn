@@ -1,6 +1,6 @@
 """固定角色 1v1 会话 API 的集成测试。"""
 
-from runtime.context_service import ContextService
+from storage.context_service import ContextService
 from storage.database import StateDatabase
 from storage.repositories.context_item import ContextItemRepository
 

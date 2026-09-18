@@ -2,7 +2,7 @@ import os.path
 import mimetypes
 
 from permission.types import PermissionAction, PermissionRequirement
-from runtime.ExecutionContext import ExecutionContext
+from session.ExecutionContext import ExecutionContext
 from tools.types import Attachment, Tool, ToolResult, handle_path
 
 IMAGE_EXTENSIONS = {

@@ -2,7 +2,7 @@ import json
 import os
 from base64 import b64encode
 
-from runtime.ExecutionContext import ExecutionContext
+from session.ExecutionContext import ExecutionContext
 from tools.catalog import ToolCatalog
 from permission.types import PermissionRequest
 from tools.types import (

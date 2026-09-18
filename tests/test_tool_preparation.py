@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parents[1] / "code" / "agent"))
 
 from permission.types import PermissionAction, PermissionRequirement  # noqa: E402
-from runtime.ExecutionContext import ExecutionContext  # noqa: E402
+from session.ExecutionContext import ExecutionContext  # noqa: E402
 from tools.tools import Tools  # noqa: E402
 from tools.types import Tool, ToolCallPreparationError, ToolResult  # noqa: E402
 

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "code" / "agent"))
 
-from runtime.ExecutionContext import ExecutionContext
+from session.ExecutionContext import ExecutionContext
 from permission.types import PermissionAction, PermissionRequirement
 from tools.bash import bash
 from tools.edit import edit

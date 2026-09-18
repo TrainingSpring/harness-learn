@@ -1,7 +1,7 @@
 import os.path
 
 from permission.types import PermissionAction, PermissionRequirement
-from runtime.ExecutionContext import ExecutionContext
+from session.ExecutionContext import ExecutionContext
 from tools.types import Tool, ToolResult, handle_path
 
 
