@@ -9,15 +9,13 @@ description = "Harness Agent 的本地 Web API 适配层"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115,<1",
+    "httpx>=0.27,<1",
     "pydantic>=2.9,<3",
     "uvicorn[standard]>=0.30,<1",
 ]
 
 [project.optional-dependencies]
-test = [
-    "httpx>=0.27,<1",
-    "pytest>=8.3,<9",
-]
+test = ["pytest>=8.3,<9"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

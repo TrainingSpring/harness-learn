@@ -1,6 +1,6 @@
 """设置页面的查询和创建 DTO。"""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -8,45 +8,54 @@ from .common import ApiModel
 
 
 class LLMProfileSummary(ApiModel):
-    """不含凭据引用和值的 LLM 配置摘要。"""
+    """不含 API Key 的 LLM 配置摘要。"""
 
     id: str
     name: str
     provider: str
     base_url: str | None
     model: str
-    has_credential: bool
+    has_api_key: bool
     options: dict[str, Any]
 
 
 class CreateLLMProfileRequest(ApiModel):
-    """创建 LLM 配置时提交的连接参数。
-
-    credential_ref 只接受凭据引用，例如 ``env:OPENAI_API_KEY``；实际密钥
-    不应通过这个 Web 接口传输或写入数据库。
-    """
+    """创建 LLM 配置时提交并持久化的连接参数。"""
 
     name: str = Field(min_length=1)
-    provider: str = Field(min_length=1)
+    provider: Literal["openai"]
     base_url: str | None = None
     model: str = Field(min_length=1)
-    credential_ref: str = Field(min_length=1)
+    api_key: str = Field(min_length=1)
     options: dict[str, Any] = Field(default_factory=dict)
 
 
 class UpdateLLMProfileRequest(ApiModel):
     """更新 LLM 配置时提交的字段。
 
-    credential_ref 使用可选字段是有意设计：列表和详情接口不会返回凭据引用，
-    编辑时留空表示沿用原凭据；只有用户明确填写新引用时才替换它。
+    ``api_key`` 是可选字段，编辑时留空表示沿用数据库中的原密钥。
     """
 
     name: str = Field(min_length=1)
-    provider: str = Field(min_length=1)
+    provider: Literal["openai"]
     base_url: str | None = None
     model: str = Field(min_length=1)
-    credential_ref: str | None = None
+    api_key: str | None = None
     options: dict[str, Any] = Field(default_factory=dict)
+
+
+class ModelDiscoveryRequest(ApiModel):
+    """根据尚未保存的表单连接参数读取模型列表。"""
+
+    provider: Literal["openai"]
+    base_url: str | None = None
+    api_key: str = Field(min_length=1)
+
+
+class ModelListResponse(ApiModel):
+    """服务商返回的可选模型 ID。"""
+
+    models: list[str]
 
 
 class ToolSummary(ApiModel):

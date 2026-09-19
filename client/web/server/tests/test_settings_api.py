@@ -1,8 +1,12 @@
-"""只读设置 API 的公开字段和敏感信息测试。"""
+"""设置 API 的公开字段、敏感信息和模型发现测试。"""
+
+from unittest.mock import AsyncMock
+
+from storage.types import LLMProfile
 
 
-def test_list_llm_profiles_hides_credential_reference(client) -> None:
-    """浏览器只知道凭据是否配置，不能获得引用或真实值。"""
+def test_list_llm_profiles_hides_api_key(client) -> None:
+    """浏览器只知道 API Key 是否配置，不能获得真实值。"""
     response = client.get("/api/settings/llm-profiles")
 
     assert response.status_code == 200
@@ -13,11 +17,11 @@ def test_list_llm_profiles_hides_credential_reference(client) -> None:
         "provider": "openai",
         "baseUrl": "https://api.openai.com/v1",
         "model": "gpt-5",
-        "hasCredential": True,
+        "hasApiKey": True,
         "options": {"temperature": 0.2},
     }
-    assert "SECRET_TEST_KEY" not in response.text
-    assert "credentialRef" not in response.text
+    assert "sk-test-key" not in response.text
+    assert "apiKey" not in response.text
 
 
 def test_list_tools_returns_display_metadata_only(client) -> None:
@@ -35,8 +39,8 @@ def test_list_tools_returns_display_metadata_only(client) -> None:
     assert "permission" not in read
 
 
-def test_create_llm_profile_generates_id_and_hides_credential_reference(client) -> None:
-    """新增 LLM 配置后返回摘要，不把凭据引用暴露给浏览器。"""
+def test_create_llm_profile_generates_id_and_hides_api_key(client) -> None:
+    """新增 LLM 配置后返回摘要，不把 API Key 暴露给浏览器。"""
     response = client.post(
         "/api/settings/llm-profiles",
         json={
@@ -44,7 +48,7 @@ def test_create_llm_profile_generates_id_and_hides_credential_reference(client) 
             "provider": "openai",
             "baseUrl": "https://api.example.com/v1",
             "model": "gpt-5-mini",
-            "credentialRef": "env:BACKUP_OPENAI_KEY",
+            "apiKey": "sk-backup-key",
             "options": {"temperature": 0.1},
         },
     )
@@ -54,10 +58,10 @@ def test_create_llm_profile_generates_id_and_hides_credential_reference(client) 
     assert payload["id"].startswith("llm_")
     assert len(payload["id"]) == len("llm_XXXXXXXXXX")
     assert payload["name"] == "备用 GPT"
-    assert payload["hasCredential"] is True
+    assert payload["hasApiKey"] is True
     assert payload["options"] == {"temperature": 0.1}
-    assert "credentialRef" not in payload
-    assert "BACKUP_OPENAI_KEY" not in response.text
+    assert "apiKey" not in payload
+    assert "sk-backup-key" not in response.text
 
 
 def test_create_llm_profile_rejects_duplicate_name(client) -> None:
@@ -68,7 +72,7 @@ def test_create_llm_profile_rejects_duplicate_name(client) -> None:
             "name": "本地 GPT",
             "provider": "openai",
             "model": "gpt-5",
-            "credentialRef": "env:OTHER_KEY",
+            "apiKey": "sk-other-key",
         },
     )
 
@@ -76,13 +80,13 @@ def test_create_llm_profile_rejects_duplicate_name(client) -> None:
     assert response.json()["error"]["code"] == "LLM_PROFILE_CONFLICT"
 
 
-def test_update_llm_profile_preserves_credential_when_omitted(client) -> None:
-    """普通编辑不能因为前端看不到凭据引用而清空原凭据。"""
+def test_update_llm_profile_preserves_api_key_when_omitted(client) -> None:
+    """普通编辑不能因为前端看不到 API Key 而清空原密钥。"""
     response = client.patch(
         "/api/settings/llm-profiles/llm_TESTLLM001",
         json={
             "name": "更新后的 GPT",
-            "provider": "openai-compatible",
+            "provider": "openai",
             "baseUrl": "https://api.example.com/v1",
             "model": "gpt-5-mini",
             "options": {"temperature": 0.1},
@@ -92,8 +96,8 @@ def test_update_llm_profile_preserves_credential_when_omitted(client) -> None:
     assert response.status_code == 200
     assert response.json()["id"] == "llm_TESTLLM001"
     assert response.json()["name"] == "更新后的 GPT"
-    assert response.json()["hasCredential"] is True
-    assert "credentialRef" not in response.text
+    assert response.json()["hasApiKey"] is True
+    assert "apiKey" not in response.text
 
 
 def test_update_llm_profile_rejects_unknown_profile(client) -> None:
@@ -134,7 +138,7 @@ def test_delete_llm_profile_removes_unused_profile(client) -> None:
             "name": "可删除配置",
             "provider": "openai",
             "model": "gpt-5-mini",
-            "credentialRef": "env:DELETE_TEST_KEY",
+            "apiKey": "sk-delete-key",
             "options": {},
         },
     )
@@ -145,6 +149,48 @@ def test_delete_llm_profile_removes_unused_profile(client) -> None:
     assert response.status_code == 204
     listed_ids = [item["id"] for item in client.get("/api/settings/llm-profiles").json()["items"]]
     assert profile_id not in listed_ids
+
+
+def test_discover_draft_models_returns_only_model_ids(client, monkeypatch) -> None:
+    """草稿连接可用表单中的 API Key 拉取模型，响应不会回显密钥。"""
+    discover = AsyncMock(return_value=["gpt-5", "gpt-5-mini"])
+    monkeypatch.setattr("app.api.settings.discover_models", discover)
+
+    response = client.post(
+        "/api/settings/llm-profiles/models",
+        json={
+            "provider": "openai",
+            "baseUrl": "https://api.example.com/v1",
+            "apiKey": "sk-draft-key",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"models": ["gpt-5", "gpt-5-mini"]}
+    assert "sk-draft-key" not in response.text
+    discover.assert_awaited_once_with("openai", "https://api.example.com/v1", "sk-draft-key")
+
+
+def test_discover_saved_models_rejects_missing_api_key(client, monkeypatch) -> None:
+    """已迁移但尚未补填密钥的配置不能请求服务商。"""
+    current = LLMProfile(
+        id="llm_TESTLLM001",
+        name="无密钥配置",
+        provider="openai",
+        base_url="https://api.example.com/v1",
+        model="gpt-5-mini",
+        api_key="",
+    )
+    monkeypatch.setattr(
+        client.app.state.services.llm_profiles,
+        "get",
+        lambda _profile_id: current,
+    )
+
+    response = client.get("/api/settings/llm-profiles/llm_TESTLLM001/models")
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "API_KEY_REQUIRED"
 
 
 def test_delete_llm_profile_returns_not_found_for_unknown_profile(client) -> None:

@@ -12,23 +12,26 @@ from ..schemas.common import ListResponse, Pagination
 from ..schemas.settings import (
     CreateLLMProfileRequest,
     LLMProfileSummary,
+    ModelDiscoveryRequest,
+    ModelListResponse,
     ToolSummary,
     UpdateLLMProfileRequest,
 )
+from ..services.llm_model_discovery import ModelDiscoveryError, discover_models
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
 
 def _llm_summary(profile: LLMProfile) -> LLMProfileSummary:
-    """将内部 LLM 配置转换为不含 credential_ref 的摘要。"""
+    """将内部 LLM 配置转换为不含 API Key 的摘要。"""
     return LLMProfileSummary(
         id=profile.id,
         name=profile.name,
         provider=profile.provider,
         base_url=profile.base_url,
         model=profile.model,
-        has_credential=bool(profile.credential_ref),
+        has_api_key=bool(profile.api_key),
         options=profile.options,
     )
 
@@ -39,7 +42,7 @@ async def list_llm_profiles(
     offset: int = Query(default=0, ge=0),
     services: ApplicationServices = Depends(get_services),
 ) -> ListResponse[LLMProfileSummary]:
-    """分页返回不含凭据引用和值的 LLM 配置。"""
+    """分页返回不含 API Key 的 LLM 配置。"""
     profiles = services.llm_profiles.list_all(limit + 1, offset)
     has_more = len(profiles) > limit
     items = [
@@ -61,17 +64,14 @@ async def create_llm_profile(
     request: CreateLLMProfileRequest,
     services: ApplicationServices = Depends(get_services),
 ) -> LLMProfileSummary:
-    """创建一套可供角色引用的 LLM 配置。
-
-    请求中的 credential_ref 仅作为凭据定位引用持久化，响应始终返回脱敏摘要。
-    """
+    """创建一套可供角色引用的 LLM 配置，并返回脱敏摘要。"""
     profile = LLMProfile(
         id=generate_id("llm"),
         name=request.name,
         provider=request.provider,
         base_url=request.base_url,
         model=request.model,
-        credential_ref=request.credential_ref,
+        api_key=request.api_key,
         options=request.options,
     )
     try:
@@ -90,11 +90,7 @@ async def update_llm_profile(
     request: UpdateLLMProfileRequest,
     services: ApplicationServices = Depends(get_services),
 ) -> LLMProfileSummary:
-    """更新一套 LLM 配置并返回脱敏摘要。
-
-    编辑接口不会从浏览器回显凭据引用。请求未提供 credential_ref 时，
-    先读取并保留数据库中的原引用，避免一次普通编辑意外清空凭据。
-    """
+    """更新一套 LLM 配置并返回脱敏摘要。"""
     try:
         current = services.llm_profiles.get(profile_id)
     except ValueError as error:
@@ -108,7 +104,7 @@ async def update_llm_profile(
         provider=request.provider,
         base_url=request.base_url,
         model=request.model,
-        credential_ref=request.credential_ref or current.credential_ref,
+        api_key=request.api_key or current.api_key,
         options=request.options,
         created_at=current.created_at,
     )
@@ -117,6 +113,37 @@ async def update_llm_profile(
     except StorageConflictError as error:
         raise ApiError(409, "LLM_PROFILE_CONFLICT", "LLM 配置名称已存在") from error
     return _llm_summary(saved)
+
+
+@router.post("/llm-profiles/models", response_model=ModelListResponse)
+async def discover_draft_models(request: ModelDiscoveryRequest) -> ModelListResponse:
+    """用尚未保存的表单参数获取可选模型。"""
+    try:
+        models = await discover_models(request.provider, request.base_url, request.api_key)
+    except ModelDiscoveryError as error:
+        raise ApiError(502, "MODEL_DISCOVERY_FAILED", str(error)) from error
+    return ModelListResponse(models=models)
+
+
+@router.get("/llm-profiles/{profile_id}/models", response_model=ModelListResponse)
+async def discover_saved_models(
+    profile_id: str,
+    services: ApplicationServices = Depends(get_services),
+) -> ModelListResponse:
+    """用数据库中保存的 API Key 获取指定配置的可选模型。"""
+    try:
+        profile = services.llm_profiles.get(profile_id)
+    except ValueError as error:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在") from error
+    if profile is None:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在")
+    if not profile.api_key:
+        raise ApiError(400, "API_KEY_REQUIRED", "请先填写 API Key")
+    try:
+        models = await discover_models(profile.provider, profile.base_url, profile.api_key)
+    except ModelDiscoveryError as error:
+        raise ApiError(502, "MODEL_DISCOVERY_FAILED", str(error)) from error
+    return ModelListResponse(models=models)
 
 
 @router.delete("/llm-profiles/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
