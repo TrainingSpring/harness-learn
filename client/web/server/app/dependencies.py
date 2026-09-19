@@ -8,7 +8,6 @@ from .bootstrap import install_agent_source_path
 
 install_agent_source_path()
 
-from runtime.agent_directory import AgentDirectory
 from runtime.agent_factory import AgentFactory
 from session.session_service import SessionService
 from storage.database import StateDatabase
@@ -29,7 +28,6 @@ class ApplicationServices:
 
     Attributes:
         database: workspace 唯一的 SQLite 连接管理器。
-        agent_directory: 可供 UI 查询的 Agent 目录。
         agent_factory: 从持久化配置创建运行时 Agent 的工厂。
         session_service: 遵守固定成员约束的会话创建服务。
         agent_profiles: AgentProfile 写入和读取仓储。
@@ -43,7 +41,6 @@ class ApplicationServices:
     """
 
     database: StateDatabase
-    agent_directory: AgentDirectory
     agent_factory: AgentFactory
     session_service: SessionService
     agent_profiles: AgentProfileRepository
@@ -68,11 +65,6 @@ async def get_services(request: Request) -> ApplicationServices:
 async def get_database(request: Request) -> StateDatabase:
     """返回应用生命周期内唯一的状态数据库。"""
     return request.app.state.services.database
-
-
-async def get_agent_directory(request: Request) -> AgentDirectory:
-    """返回角色发现服务。"""
-    return request.app.state.services.agent_directory
 
 
 async def get_agent_factory(request: Request) -> AgentFactory:

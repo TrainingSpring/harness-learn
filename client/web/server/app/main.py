@@ -21,7 +21,6 @@ from .services.chat_service import ChatService
 from .services.run_registry import RunRegistry
 from .static import SpaStaticFiles
 
-from runtime.agent_directory import AgentDirectory
 from runtime.agent_factory import AgentFactory
 from session.session_service import SessionService
 from storage.database import StateDatabase
@@ -52,7 +51,6 @@ def create_app(settings: WebServerSettings) -> FastAPI:
         run_registry = RunRegistry()
         app.state.services = ApplicationServices(
             database=database,
-            agent_directory=AgentDirectory(AgentProfileRepository(database)),
             agent_factory=agent_factory,
             session_service=SessionService(database),
             agent_profiles=AgentProfileRepository(database),

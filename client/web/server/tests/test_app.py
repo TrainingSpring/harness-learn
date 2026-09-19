@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.config import WebServerSettings
 from app.main import create_app
+from storage.repositories.agent_profile import AgentProfileRepository
 
 
 def test_health_reports_ready_database(client) -> None:
@@ -14,6 +15,14 @@ def test_health_reports_ready_database(client) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"version": "0.1.0", "database": "ready"}
+
+
+def test_application_services_exposes_agent_profile_repository_without_directory(client) -> None:
+    """AgentProfile 的唯一读取入口应是存储仓储，而不是转发目录。"""
+    services = client.app.state.services
+
+    assert isinstance(services.agent_profiles, AgentProfileRepository)
+    assert not hasattr(services, "agent_directory")
 
 
 def test_validation_error_uses_public_error_shape(client) -> None:
