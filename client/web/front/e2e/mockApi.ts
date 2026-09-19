@@ -16,7 +16,7 @@ const llmProfile = {
   provider: "openai",
   baseUrl: "https://api.openai.com/v1",
   model: "gpt-5",
-  hasCredential: true,
+  hasApiKey: true,
   options: {},
 };
 
@@ -149,15 +149,17 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
         provider: requestBody.provider,
         baseUrl: requestBody.baseUrl,
         model: requestBody.model,
-        hasCredential: true,
+        hasApiKey: true,
         options: requestBody.options,
       };
       llmProfiles = [...llmProfiles, createdProfile];
       return json(route, createdProfile, 201);
     }
+    if (path === "/api/settings/llm-profiles/models" && method === "POST") return json(route, { models: ["gpt-5", "gpt-5-mini"] });
+    if (path === `/api/settings/llm-profiles/${llmProfile.id}/models` && method === "GET") return json(route, { models: ["gpt-5", "gpt-5-mini"] });
     const llmProfileMatch = path.match(/^\/api\/settings\/llm-profiles\/(llm_[A-Z0-9]+)$/);
     if (llmProfileMatch && method === "PATCH") {
-      const requestBody = request.postDataJSON() as Omit<typeof llmProfile, "id" | "hasCredential">;
+      const { apiKey: _apiKey, ...requestBody } = request.postDataJSON() as Omit<typeof llmProfile, "id" | "hasApiKey"> & { apiKey?: string };
       const profileId = llmProfileMatch[1];
       llmProfiles = llmProfiles.map((profile) => profile.id === profileId ? { ...profile, ...requestBody } : profile);
       return json(route, llmProfiles.find((profile) => profile.id === profileId));

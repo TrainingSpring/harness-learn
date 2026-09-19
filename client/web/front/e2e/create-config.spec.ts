@@ -24,9 +24,11 @@ test("可以从设置页面新增 LLM 配置并刷新列表", async ({ page }) =
 
   await page.getByRole("button", { name: "新增配置" }).click();
   await page.getByLabel("配置名称").fill("备用模型");
-  await page.getByLabel("服务商").fill("openai");
-  await page.getByLabel("模型").fill("gpt-5-mini");
-  await page.getByLabel("凭据引用").fill("env:BACKUP_KEY");
+  await page.getByLabel("服务商").selectOption("openai");
+  await page.getByLabel("Base URL").fill("https://api.openai.com/v1");
+  await page.getByLabel("API Key").fill("sk-backup-key");
+  await page.getByRole("button", { name: "刷新模型列表" }).click();
+  await page.getByLabel("模型", { exact: true }).selectOption("gpt-5-mini");
   await page.getByRole("button", { name: "创建配置" }).click();
 
   await expect(page.getByText("备用模型")).toBeVisible();
@@ -38,7 +40,8 @@ test("可以编辑并删除未被引用的 LLM 配置", async ({ page }) => {
   await page.goto("/settings/llms");
 
   await page.getByRole("button", { name: "编辑 本地 GPT" }).click();
-  await page.getByLabel("模型").fill("gpt-5-mini");
+  await page.getByRole("button", { name: "刷新模型列表" }).click();
+  await page.getByLabel("模型", { exact: true }).selectOption("gpt-5-mini");
   await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByText("gpt-5-mini")).toBeVisible();
 

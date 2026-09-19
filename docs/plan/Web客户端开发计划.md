@@ -483,6 +483,8 @@ callId, toolName, action, resource, allowedScopes
 
 ~~~text
 GET /api/settings/llm-profiles?limit=100&offset=0
+POST /api/settings/llm-profiles/models
+GET /api/settings/llm-profiles/{profileId}/models
 GET /api/settings/tools
 ~~~
 
@@ -490,10 +492,10 @@ LLM 列表 DTO：
 
 ~~~text
 LLMProfileSummary:
-  id, name, provider, baseUrl, model, hasCredential, options
+  id, name, provider, baseUrl, model, hasApiKey, options
 ~~~
 
-接口绝不返回实际 API Key。首期也不返回可被前端修改的 `credentialRef`；只返回 `hasCredential` 或“已配置/未配置”状态。
+接口绝不返回实际 API Key；列表只返回 `hasApiKey` 或“已配置/未配置”状态。创建时提交 `apiKey`，编辑时省略 `apiKey` 表示保留当前值。
 
 工具列表由 `ToolCatalog.list_available()` 生成，DTO 为：
 
@@ -734,7 +736,7 @@ parseSseStream(reader)
 
 - DTO 使用 camelCase JSON。
 - 所有错误符合统一结构。
-- LLM 响应中不存在 API Key 和 `credentialRef`。
+- LLM 响应中不存在 API Key。
 - OpenAPI schema 可生成且无重复模型名。
 
 #### 任务：建立 Front 工程和设计令牌
@@ -928,7 +930,7 @@ parseSseStream(reader)
 
 验收：
 
-- LLM 列表不返回凭据值或凭据引用。
+- LLM 列表不返回 API Key。
 - 工具列表只返回可展示元数据。
 - 无效工具模块不会导致整个列表失败，具体处理策略需在实施前明确测试。
 
@@ -1002,7 +1004,7 @@ python -m compileall -q code
 - API 使用 HTTPX ASGI client，不启动真实端口。
 - LLM 使用可控 FakeLLM，禁止测试调用外部模型服务。
 - SSE 测试覆盖事件顺序、权限暂停、恢复和取消。
-- 安全测试检查响应中不存在 API Key、credentialRef 和 traceback。
+- 安全测试检查响应中不存在 API Key 和 traceback。
 
 ### Front
 

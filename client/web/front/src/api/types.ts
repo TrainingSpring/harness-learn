@@ -115,28 +115,39 @@ export interface LLMProfileSummary {
   provider: string;
   baseUrl: string | null;
   model: string;
-  hasCredential: boolean;
+  hasApiKey: boolean;
   options: Record<string, unknown>;
 }
 
-/** 创建 LLM 配置时提交的连接参数；credentialRef 是引用而不是密钥。 */
+/** 创建 LLM 配置时提交并持久化的连接参数。 */
 export interface CreateLLMProfileRequest {
   name: string;
-  provider: string;
+  provider: "openai";
   baseUrl: string | null;
   model: string;
-  credentialRef: string;
+  apiKey: string;
   options: Record<string, unknown>;
 }
 
-/** 编辑 LLM 配置时提交的连接参数；省略 credentialRef 表示保留原凭据引用。 */
+/** 编辑 LLM 配置时省略 apiKey 表示保留数据库中的原密钥。 */
 export interface UpdateLLMProfileRequest {
   name: string;
-  provider: string;
+  provider: "openai";
   baseUrl: string | null;
   model: string;
-  credentialRef?: string;
+  apiKey?: string;
   options: Record<string, unknown>;
+}
+
+/** 用尚未保存的表单连接参数拉取模型列表。 */
+export interface DiscoverDraftModelsRequest {
+  provider: "openai";
+  baseUrl: string | null;
+  apiKey: string;
+}
+
+export interface ModelListResponse {
+  models: string[];
 }
 
 export interface ToolSummary {

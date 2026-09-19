@@ -10,7 +10,7 @@ import { createLlmProfile, deleteLlmProfile, listLlmProfiles, updateLlmProfile }
 import { CreateLlmDialog } from "../components/CreateLlmDialog";
 import { DeleteLlmDialog } from "../components/DeleteLlmDialog";
 
-/** LLM 配置管理页面，支持新增、修改和删除非引用中的模型连接。 */
+/** LLM 配置管理页面，支持新增、修改和删除不暴露 API Key 的模型连接。 */
 export function LLMSettingsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<LLMProfileSummary | null>(null);
@@ -37,13 +37,13 @@ export function LLMSettingsPage() {
       setDeletingProfile(null);
     },
   });
-  return <div className="settings-section"><div className="settings-section__header"><div><h2>LLM 配置</h2><p>角色可引用的模型连接配置。凭据仅显示配置状态。</p></div><Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsCreateOpen(true)}>新增配置</Button></div>
+  return <div className="settings-section"><div className="settings-section__header"><div><h2>LLM 配置</h2><p>角色可引用的模型连接配置。API Key 仅显示配置状态。</p></div><Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsCreateOpen(true)}>新增配置</Button></div>
     {profiles.isLoading && <Skeleton rows={4} />}
     {profiles.isError && <ErrorState message={profiles.error.message} onRetry={() => { void profiles.refetch(); }} />}
     {profiles.data?.items.length === 0 && <EmptyState icon={<Bot />} title="尚未配置 LLM" description="当前没有可供角色使用的模型配置。" />}
     {profiles.data && profiles.data.items.length > 0 && <div className="data-table data-table--llms" role="table" aria-label="LLM 配置">
-      <div className="data-table__row data-table__head" role="row"><span>名称</span><span>服务商 / 模型</span><span>地址</span><span>凭据</span><span>操作</span></div>
-      {profiles.data.items.map((profile) => <div className="data-table__row" role="row" key={profile.id}><strong>{profile.name}</strong><span>{profile.provider}<small>{profile.model}</small></span><code>{profile.baseUrl}</code><span className={`status ${profile.hasCredential ? "status--ok" : "status--muted"}`}>{profile.hasCredential ? "已配置" : "未配置"}</span><span className="table-actions"><button type="button" className="icon-button" aria-label={`编辑 ${profile.name}`} title="编辑配置" onClick={() => setEditingProfile(profile)}><Pencil size={16} /></button><button type="button" className="icon-button icon-button--danger" aria-label={`删除 ${profile.name}`} title="删除配置" onClick={() => setDeletingProfile(profile)}><Trash2 size={16} /></button></span></div>)}
+      <div className="data-table__row data-table__head" role="row"><span>名称</span><span>服务商 / 模型</span><span>地址</span><span>API Key</span><span>操作</span></div>
+      {profiles.data.items.map((profile) => <div className="data-table__row" role="row" key={profile.id}><strong>{profile.name}</strong><span>{profile.provider}<small>{profile.model}</small></span><code>{profile.baseUrl}</code><span className={`status ${profile.hasApiKey ? "status--ok" : "status--muted"}`}>{profile.hasApiKey ? "已配置" : "未配置"}</span><span className="table-actions"><button type="button" className="icon-button" aria-label={`编辑 ${profile.name}`} title="编辑配置" onClick={() => setEditingProfile(profile)}><Pencil size={16} /></button><button type="button" className="icon-button icon-button--danger" aria-label={`删除 ${profile.name}`} title="删除配置" onClick={() => setDeletingProfile(profile)}><Trash2 size={16} /></button></span></div>)}
     </div>}
     <CreateLlmDialog mode="create" isOpen={isCreateOpen} isSubmitting={createMutation.isPending} error={createMutation.error?.message ?? null} onClose={() => { if (!createMutation.isPending) setIsCreateOpen(false); }} onSubmit={(request) => { createMutation.mutate(request); }} />
     {editingProfile && <CreateLlmDialog mode="edit" profile={editingProfile} isOpen isSubmitting={updateMutation.isPending} error={updateMutation.error?.message ?? null} onClose={() => { if (!updateMutation.isPending) setEditingProfile(null); }} onSubmit={(request) => { updateMutation.mutate({ profileId: editingProfile.id, request }); }} />}

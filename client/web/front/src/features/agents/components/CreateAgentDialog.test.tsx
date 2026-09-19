@@ -16,7 +16,7 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
         provider: "openai",
         baseUrl: null,
         model: "gpt-5",
-        hasCredential: true,
+        hasApiKey: true,
         options: {},
       }]}
       tools={[
@@ -88,7 +88,7 @@ it("只有填写描述并选择 LLM 后才启用 AI 生成按钮", async () => {
         provider: "openai",
         baseUrl: null,
         model: "gpt-5",
-        hasCredential: true,
+        hasApiKey: true,
         options: {},
       }]}
       tools={[]}

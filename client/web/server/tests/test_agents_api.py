@@ -36,7 +36,7 @@ def test_get_agent_includes_runtime_configuration(client) -> None:
     payload = response.json()
     assert payload["llmProfileId"] == "llm_TESTLLM001"
     assert payload["permissionMode"] == "BUILD"
-    assert "credentialRef" not in payload
+    assert "apiKey" not in payload
 
 
 def test_get_unknown_agent_returns_stable_not_found(client) -> None:
