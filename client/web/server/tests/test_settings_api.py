@@ -24,6 +24,22 @@ def test_list_llm_profiles_hides_api_key(client) -> None:
     assert "apiKey" not in response.text
 
 
+def test_get_llm_profile_api_key_returns_saved_key_for_editing(client) -> None:
+    """编辑接口返回指定配置的实际 API Key，供本地 Web UI 回显。"""
+    response = client.get("/api/settings/llm-profiles/llm_TESTLLM001/api-key")
+
+    assert response.status_code == 200
+    assert response.json() == {"apiKey": "sk-test-key"}
+
+
+def test_get_llm_profile_api_key_rejects_unknown_profile(client) -> None:
+    """读取不存在配置的 API Key 时仍保持稳定的 404 契约。"""
+    response = client.get("/api/settings/llm-profiles/llm_UNKNOWN000/api-key")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "LLM_PROFILE_NOT_FOUND"
+
+
 def test_list_tools_returns_display_metadata_only(client) -> None:
     """工具接口只公开 schema 和权限动作所需的展示信息。"""
     response = client.get("/api/settings/tools")

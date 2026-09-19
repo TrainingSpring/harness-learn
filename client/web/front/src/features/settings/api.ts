@@ -1,5 +1,6 @@
 import { apiClient } from "../../api/client";
 import type {
+  ApiKeyResponse,
   CreateLLMProfileRequest,
   DiscoverDraftModelsRequest,
   ListResponse,
@@ -42,6 +43,11 @@ export function discoverDraftModels(request: DiscoverDraftModelsRequest): Promis
 /** 用已保存配置的 API Key 查询模型列表。 */
 export function listSavedLlmProfileModels(profileId: string): Promise<ModelListResponse> {
   return apiClient.get(`/api/settings/llm-profiles/${profileId}/models`);
+}
+
+/** 读取指定配置的 API Key，供编辑弹窗默认遮蔽回显。 */
+export function getLlmProfileApiKey(profileId: string): Promise<ApiKeyResponse> {
+  return apiClient.get(`/api/settings/llm-profiles/${profileId}/api-key`);
 }
 
 export function listTools(): Promise<ListResponse<ToolSummary>> {

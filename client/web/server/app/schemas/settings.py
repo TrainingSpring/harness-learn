@@ -19,6 +19,12 @@ class LLMProfileSummary(ApiModel):
     options: dict[str, Any]
 
 
+class ApiKeyResponse(ApiModel):
+    """仅用于编辑 LLM 配置时回显的 API Key。"""
+
+    api_key: str
+
+
 class CreateLLMProfileRequest(ApiModel):
     """创建 LLM 配置时提交并持久化的连接参数。"""
 

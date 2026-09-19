@@ -157,6 +157,7 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
     }
     if (path === "/api/settings/llm-profiles/models" && method === "POST") return json(route, { models: ["gpt-5", "gpt-5-mini"] });
     if (path === `/api/settings/llm-profiles/${llmProfile.id}/models` && method === "GET") return json(route, { models: ["gpt-5", "gpt-5-mini"] });
+    if (path === `/api/settings/llm-profiles/${llmProfile.id}/api-key` && method === "GET") return json(route, { apiKey: "sk-local-key" });
     const llmProfileMatch = path.match(/^\/api\/settings\/llm-profiles\/(llm_[A-Z0-9]+)$/);
     if (llmProfileMatch && method === "PATCH") {
       const { apiKey: _apiKey, ...requestBody } = request.postDataJSON() as Omit<typeof llmProfile, "id" | "hasApiKey"> & { apiKey?: string };

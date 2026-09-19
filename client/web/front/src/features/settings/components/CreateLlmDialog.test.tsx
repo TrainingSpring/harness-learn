@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { discoverDraftModels, listSavedLlmProfileModels } from "../api";
+import { discoverDraftModels, getLlmProfileApiKey, listSavedLlmProfileModels } from "../api";
 import { CreateLlmDialog } from "./CreateLlmDialog";
 
 vi.mock("../api", () => ({
   discoverDraftModels: vi.fn(),
+  getLlmProfileApiKey: vi.fn(),
   listSavedLlmProfileModels: vi.fn(),
 }));
 
@@ -46,10 +47,11 @@ it("提交 LLM 表单时保存 API Key 和 JSON 参数", async () => {
   });
 });
 
-it("编辑时预填公开字段，留空 API Key 表示不提交替换值", async () => {
+it("编辑时默认遮蔽回显 API Key，并支持显示和隐藏", async () => {
   const user = userEvent.setup();
   const onSubmit = vi.fn();
   vi.mocked(listSavedLlmProfileModels).mockResolvedValue({ models: ["gpt-5", "gpt-5-mini"] });
+  vi.mocked(getLlmProfileApiKey).mockResolvedValue({ apiKey: "sk-saved-key" });
   render(
     <CreateLlmDialog
       mode="edit"
@@ -71,7 +73,13 @@ it("编辑时预填公开字段，留空 API Key 表示不提交替换值", asyn
   );
 
   expect(screen.getByLabelText("配置名称")).toHaveValue("主模型");
-  expect(screen.getByLabelText("API Key")).toHaveValue("");
+  const apiKeyInput = await screen.findByLabelText("API Key", { exact: true });
+  expect(apiKeyInput).toHaveValue("sk-saved-key");
+  expect(apiKeyInput).toHaveAttribute("type", "password");
+  await user.click(screen.getByRole("button", { name: "显示 API Key" }));
+  expect(apiKeyInput).toHaveAttribute("type", "text");
+  await user.click(screen.getByRole("button", { name: "隐藏 API Key" }));
+  expect(apiKeyInput).toHaveAttribute("type", "password");
   await user.click(screen.getByRole("button", { name: "刷新模型列表" }));
   await user.selectOptions(screen.getByLabelText("模型"), "gpt-5-mini");
   await user.click(screen.getByRole("button", { name: "保存修改" }));
@@ -81,7 +89,9 @@ it("编辑时预填公开字段，留空 API Key 表示不提交替换值", asyn
     provider: "openai",
     baseUrl: "https://api.openai.com/v1",
     model: "gpt-5-mini",
+    apiKey: "sk-saved-key",
     options: { temperature: 0.2 },
   });
   expect(listSavedLlmProfileModels).toHaveBeenCalledWith("llm_OPENAI0001");
+  expect(getLlmProfileApiKey).toHaveBeenCalledWith("llm_OPENAI0001");
 });

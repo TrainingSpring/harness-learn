@@ -40,6 +40,11 @@ test("可以编辑并删除未被引用的 LLM 配置", async ({ page }) => {
   await page.goto("/settings/llms");
 
   await page.getByRole("button", { name: "编辑 本地 GPT" }).click();
+  const apiKey = page.getByLabel("API Key", { exact: true });
+  await expect(apiKey).toHaveValue("sk-local-key");
+  await expect(apiKey).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "显示 API Key" }).click();
+  await expect(apiKey).toHaveAttribute("type", "text");
   await page.getByRole("button", { name: "刷新模型列表" }).click();
   await page.getByLabel("模型", { exact: true }).selectOption("gpt-5-mini");
   await page.getByRole("button", { name: "保存修改" }).click();

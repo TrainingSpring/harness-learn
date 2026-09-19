@@ -10,6 +10,7 @@ from ..dependencies import ApplicationServices, get_services
 from ..errors import ApiError
 from ..schemas.common import ListResponse, Pagination
 from ..schemas.settings import (
+    ApiKeyResponse,
     CreateLLMProfileRequest,
     LLMProfileSummary,
     ModelDiscoveryRequest,
@@ -34,6 +35,21 @@ def _llm_summary(profile: LLMProfile) -> LLMProfileSummary:
         has_api_key=bool(profile.api_key),
         options=profile.options,
     )
+
+
+@router.get("/llm-profiles/{profile_id}/api-key", response_model=ApiKeyResponse)
+async def get_llm_profile_api_key(
+    profile_id: str,
+    services: ApplicationServices = Depends(get_services),
+) -> ApiKeyResponse:
+    """返回指定 LLM 配置的 API Key，供本地编辑表单默认遮蔽回显。"""
+    try:
+        profile = services.llm_profiles.get(profile_id)
+    except ValueError as error:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在") from error
+    if profile is None:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在")
+    return ApiKeyResponse(api_key=profile.api_key)
 
 
 @router.get("/llm-profiles", response_model=ListResponse[LLMProfileSummary])

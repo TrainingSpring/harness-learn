@@ -150,6 +150,11 @@ export interface ModelListResponse {
   models: string[];
 }
 
+/** 仅在编辑指定 LLM 配置时返回的 API Key。 */
+export interface ApiKeyResponse {
+  apiKey: string;
+}
+
 export interface ToolSummary {
   name: string;
   description: string;

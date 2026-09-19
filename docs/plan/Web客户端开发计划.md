@@ -483,6 +483,7 @@ callId, toolName, action, resource, allowedScopes
 
 ~~~text
 GET /api/settings/llm-profiles?limit=100&offset=0
+GET /api/settings/llm-profiles/{profileId}/api-key
 POST /api/settings/llm-profiles/models
 GET /api/settings/llm-profiles/{profileId}/models
 GET /api/settings/tools
@@ -495,7 +496,7 @@ LLMProfileSummary:
   id, name, provider, baseUrl, model, hasApiKey, options
 ~~~
 
-接口绝不返回实际 API Key；列表只返回 `hasApiKey` 或“已配置/未配置”状态。创建时提交 `apiKey`，编辑时省略 `apiKey` 表示保留当前值。
+列表只返回 `hasApiKey` 或“已配置/未配置”状态。创建时提交 `apiKey`；编辑指定配置时，客户端通过专用 API 读取并默认遮蔽显示当前 `apiKey`，保存时提交该值或更新后的值。
 
 工具列表由 `ToolCatalog.list_available()` 生成，DTO 为：
 
@@ -736,7 +737,7 @@ parseSseStream(reader)
 
 - DTO 使用 camelCase JSON。
 - 所有错误符合统一结构。
-- LLM 响应中不存在 API Key。
+- LLM 列表、创建、更新和模型发现响应中不存在 API Key；编辑 API Key 专用接口除外。
 - OpenAPI schema 可生成且无重复模型名。
 
 #### 任务：建立 Front 工程和设计令牌
@@ -1004,7 +1005,7 @@ python -m compileall -q code
 - API 使用 HTTPX ASGI client，不启动真实端口。
 - LLM 使用可控 FakeLLM，禁止测试调用外部模型服务。
 - SSE 测试覆盖事件顺序、权限暂停、恢复和取消。
-- 安全测试检查响应中不存在 API Key 和 traceback。
+- 安全测试检查除编辑 API Key 专用接口外的响应中不存在 API Key 和 traceback。
 
 ### Front
 
@@ -1020,7 +1021,7 @@ Web Server 能触发文件工具和 Bash，风险高于普通本地页面，因�
 - 默认绑定 `127.0.0.1`，不能默认监听 `0.0.0.0`。
 - 不配置通配 CORS；开发环境使用固定 Vite origin 或 proxy。
 - 不从 URL 接受任意 workspace 路径。
-- 不向 Front 返回 API Key、环境变量值、Python 路径或堆栈。
+- 除编辑指定 LLM 配置的 API Key 专用接口外，不向 Front 返回 API Key、环境变量值、Python 路径或堆栈。
 - 工具仍必须经过现有 PermissionManager，API 不提供绕过权限的执行接口。
 - 权限确认只提交 callId、decision 和 scope，服务端从 pending Runtime 读取真实资源。
 - Markdown 禁止原始 HTML，链接增加安全属性，避免模型输出注入可执行 DOM。
