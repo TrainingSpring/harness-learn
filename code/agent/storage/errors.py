@@ -15,7 +15,3 @@ class StorageFormatError(StorageError):
 
 class StorageConflictError(StorageError):
     """数据违反唯一约束或发生状态冲突。"""
-
-
-class CredentialResolutionError(StorageError):
-    """凭据引用无法解析为实际凭据。"""

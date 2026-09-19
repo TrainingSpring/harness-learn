@@ -17,8 +17,7 @@ class LLMProfileRepository:
     Attributes:
         database: 已初始化的状态数据库；仓储不负责创建数据库。
 
-    仓储只处理保存、查询和删除，不解析 credential_ref，也不会接触实际 API
-    Key。凭据解析属于运行时的 CredentialResolver。
+    仓储负责持久化本地 API Key，但不会把它暴露给 Web 查询响应。
     """
 
     def __init__(self, database: StateDatabase) -> None:
@@ -94,7 +93,7 @@ class LLMProfileRepository:
                 connection.execute(
                     """
                     INSERT INTO llm_profiles (
-                        id, name, provider, base_url, model, credential_ref,
+                        id, name, provider, base_url, model, api_key,
                         options_json, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
@@ -102,7 +101,7 @@ class LLMProfileRepository:
                         provider = excluded.provider,
                         base_url = excluded.base_url,
                         model = excluded.model,
-                        credential_ref = excluded.credential_ref,
+                        api_key = excluded.api_key,
                         options_json = excluded.options_json,
                         updated_at = excluded.updated_at
                     """,
@@ -112,7 +111,7 @@ class LLMProfileRepository:
                         updated_profile.provider,
                         updated_profile.base_url,
                         updated_profile.model,
-                        updated_profile.credential_ref,
+                        updated_profile.api_key,
                         json.dumps(
                             updated_profile.options,
                             ensure_ascii=False,
@@ -177,7 +176,7 @@ class LLMProfileRepository:
                 provider=row["provider"],
                 base_url=row["base_url"],
                 model=row["model"],
-                credential_ref=row["credential_ref"],
+                api_key=row["api_key"],
                 options=options,
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],

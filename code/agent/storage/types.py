@@ -26,7 +26,7 @@ class LLMProfile:
         provider: 模型服务商名称。
         base_url: 可选的服务地址。
         model: 模型名称。
-        credential_ref: 凭据引用，不保存实际 API Key。
+        api_key: 保存在当前 workspace SQLite 中的 API Key。
         options: 经过校验的额外调用参数。
         created_at: 创建时间；持久化时由 Repository 补充。
         updated_at: 最后更新时间；持久化时由 Repository 补充。
@@ -37,7 +37,7 @@ class LLMProfile:
     provider: str
     base_url: str | None
     model: str
-    credential_ref: str
+    api_key: str
     options: dict[str, Any] = field(default_factory=dict)
     created_at: str | None = None
     updated_at: str | None = None
@@ -48,7 +48,8 @@ class LLMProfile:
         _validate_non_empty(self.name, "name")
         _validate_non_empty(self.provider, "provider")
         _validate_non_empty(self.model, "model")
-        _validate_non_empty(self.credential_ref, "credential_ref")
+        if not isinstance(self.api_key, str):
+            raise ValueError("api_key 必须是字符串")
         if not isinstance(self.options, dict):
             raise ValueError("options 必须是字典")
 

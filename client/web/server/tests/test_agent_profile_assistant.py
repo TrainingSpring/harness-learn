@@ -15,13 +15,6 @@ class FakeRepository:
         return self.profile if self.profile and self.profile.id == profile_id else None
 
 
-class FakeCredentialResolver:
-    """返回固定测试凭据，避免单元测试读取真实环境变量。"""
-
-    def resolve(self, _credential_ref):
-        return "test-key"
-
-
 class FakeLLM:
     """记录请求并返回模拟 Responses API 输出。"""
 
@@ -40,12 +33,11 @@ def test_assistant_parses_model_json_into_profile_fields() -> None:
     profile = SimpleNamespace(
         id="llm_TESTLLM001",
         base_url="https://api.example.com/v1",
-        credential_ref="env:TEST_KEY",
+        api_key="sk-test-key",
         model="gpt-5",
     )
     assistant = AgentProfileAssistant(
         FakeRepository(profile),
-        credential_resolver=FakeCredentialResolver(),
         llm_factory=FakeLLM,
     )
 

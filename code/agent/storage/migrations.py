@@ -5,7 +5,7 @@ import sqlite3
 from .errors import StorageSchemaError
 
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 
 def migrate(connection: sqlite3.Connection) -> None:
@@ -58,6 +58,9 @@ def migrate(connection: sqlite3.Connection) -> None:
         if version == 2:
             _migrate_version_two_to_three(connection)
             version = 3
+        if version == 3:
+            _migrate_version_three_to_four(connection)
+            version = 4
 
         if version != CURRENT_SCHEMA_VERSION:
             raise StorageSchemaError(
@@ -339,6 +342,25 @@ def _migrate_version_two_to_three(connection: sqlite3.Connection) -> None:
         """
         UPDATE schema_metadata
         SET value = '3'
+        WHERE key = 'schema_version'
+        """
+    )
+
+
+def _migrate_version_three_to_four(connection: sqlite3.Connection) -> None:
+    """将 LLM 配置从环境变量引用迁移为本地 API Key 字段。
+
+    旧的 ``credential_ref`` 不是实际密钥，不能安全转换，因此升级后保留
+    配置本身但将 ``api_key`` 置空，要求用户在设置页面重新填写。
+    """
+    connection.execute(
+        "ALTER TABLE llm_profiles ADD COLUMN api_key TEXT NOT NULL DEFAULT ''"
+    )
+    connection.execute("ALTER TABLE llm_profiles DROP COLUMN credential_ref")
+    connection.execute(
+        """
+        UPDATE schema_metadata
+        SET value = '4'
         WHERE key = 'schema_version'
         """
     )

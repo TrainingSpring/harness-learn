@@ -36,7 +36,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
                 provider="openai",
                 base_url="https://api.openai.com/v1",
                 model="gpt-5",
-                credential_ref="env:SECRET_TEST_KEY",
+                api_key="sk-test-key",
                 options={"temperature": 0.2},
             )
         )

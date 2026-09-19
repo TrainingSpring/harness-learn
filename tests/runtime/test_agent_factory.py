@@ -1,11 +1,9 @@
 """AgentFactory 的稳定 Agent 配置加载测试。"""
 
-import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
@@ -31,7 +29,7 @@ class AgentFactoryTests(unittest.TestCase):
                 provider="openai",
                 base_url="https://api.openai.com/v1",
                 model="gpt-5",
-                credential_ref="env:OPENAI_API_KEY",
+                api_key="sk-test-key",
             )
         )
         AgentProfileRepository(self.database).save(
@@ -53,8 +51,7 @@ class AgentFactoryTests(unittest.TestCase):
 
     def test_load_returns_stable_agent(self):
         """Factory 不应在加载 Agent 时创建 Session 执行状态。"""
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "secret-value"}):
-            agent = AgentFactory(self.database).load("agent_1V3ASAXQ2A")
+        agent = AgentFactory(self.database).load("agent_1V3ASAXQ2A")
 
         self.assertIsInstance(agent, Agent)
         self.assertEqual(agent.agent_id, "agent_1V3ASAXQ2A")

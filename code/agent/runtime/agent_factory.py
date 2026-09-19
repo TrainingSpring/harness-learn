@@ -1,6 +1,5 @@
 """从持久化配置组装运行时 Agent。"""
 
-from head.credential_resolver import CredentialResolver
 from head.types import LLMConfig
 from permission.types import PermissionMode
 from runtime.agent import Agent
@@ -16,13 +15,12 @@ class AgentFactory:
     """负责把 AgentProfile 及其依赖转换为短生命周期 Agent。
 
     Factory 是配置层和运行时层之间的组装边界。它可以读取数据库，但 Agent
-    本身不需要知道 Repository、credential_ref 或工具模块如何加载。
+    本身不需要知道 Repository 或工具模块如何加载。
     """
 
     def __init__(
         self,
         database: StateDatabase,
-        credential_resolver: CredentialResolver | None = None,
         prompt_builder: PromptBuilder | None = None,
         tool_catalog: ToolCatalog | None = None,
     ) -> None:
@@ -30,14 +28,12 @@ class AgentFactory:
 
         Args:
             database: 已初始化的 workspace 状态数据库。
-            credential_resolver: 可选的凭据解析器，便于测试和未来扩展。
             prompt_builder: 可选的系统指令构建器。
             tool_catalog: 可选的受信任工具目录。
         """
         self.database = database
         self.llm_profiles = LLMProfileRepository(database)
         self.agent_profiles = AgentProfileRepository(database)
-        self.credential_resolver = credential_resolver or CredentialResolver()
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.tool_catalog = tool_catalog or ToolCatalog()
 
@@ -73,11 +69,12 @@ class AgentFactory:
             ) from error
 
         tool_definitions = tuple(self.tool_catalog.get(name) for name in profile.tools)
-        api_key = self.credential_resolver.resolve(llm_profile.credential_ref)
+        if not llm_profile.api_key:
+            raise ValueError(f"LLM 配置未设置 API Key: {llm_profile.id}")
         instructions = self.prompt_builder.build(profile)
         llm_config = LLMConfig(
             base_url=llm_profile.base_url or "",
-            api_key=api_key,
+            api_key=llm_profile.api_key,
             model=llm_profile.model,
             instructions=instructions,
         )

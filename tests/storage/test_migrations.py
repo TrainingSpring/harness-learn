@@ -175,6 +175,21 @@ class MigrationTests(unittest.TestCase):
         )
         connection.execute(
             """
+            CREATE TABLE llm_profiles (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                provider TEXT NOT NULL,
+                base_url TEXT,
+                model TEXT NOT NULL,
+                credential_ref TEXT NOT NULL,
+                options_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
             INSERT INTO sessions VALUES (
                 'session_4N9C1R7WBA', '旧会话', 'DIRECT', 'ACTIVE',
                 'created', 'updated', NULL
@@ -190,6 +205,52 @@ class MigrationTests(unittest.TestCase):
             ("session_4N9C1R7WBA",),
         ).fetchone()
         self.assertEqual(row, ("旧会话", "[]"))
+
+    def test_version_three_profile_drops_credential_reference_and_requires_api_key(self):
+        """v3 环境变量引用不能伪装成 API Key，升级后必须重新配置。"""
+        connection = sqlite3.connect(":memory:")
+        connection.execute(
+            "CREATE TABLE schema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '3')"
+        )
+        connection.execute(
+            """
+            CREATE TABLE llm_profiles (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                provider TEXT NOT NULL,
+                base_url TEXT,
+                model TEXT NOT NULL,
+                credential_ref TEXT NOT NULL,
+                options_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO llm_profiles VALUES (
+                'llm_7KQ2M8P4XZ', '旧模型', 'openai', 'https://api.openai.com/v1',
+                'gpt-5', 'env:OPENAI_API_KEY', '{}', 'created', 'updated'
+            )
+            """
+        )
+        connection.commit()
+
+        migrate(connection)
+
+        columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(llm_profiles)")
+        }
+        profile = connection.execute(
+            "SELECT api_key FROM llm_profiles WHERE id = 'llm_7KQ2M8P4XZ'"
+        ).fetchone()
+        self.assertIn("api_key", columns)
+        self.assertNotIn("credential_ref", columns)
+        self.assertEqual(profile[0], "")
 
 
 if __name__ == "__main__":

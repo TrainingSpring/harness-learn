@@ -86,19 +86,19 @@ class StorageTypeTests(unittest.TestCase):
                 status="ACTIVE",
             )
 
-    def test_llm_profile_keeps_only_a_credential_reference(self):
-        """LLM 配置保存凭据引用，不保存明文 API Key 字段。"""
+    def test_llm_profile_keeps_api_key_without_a_credential_reference(self):
+        """LLM 配置直接保存 API Key，不再保留环境变量引用字段。"""
         profile = LLMProfile(
             id="llm_7KQ2M8P4XZ",
             name="代码模型",
             provider="openai",
             base_url="https://api.openai.com/v1",
             model="gpt-5",
-            credential_ref="env:OPENAI_API_KEY",
+            api_key="sk-local-test-key",
         )
 
-        self.assertEqual(profile.credential_ref, "env:OPENAI_API_KEY")
-        self.assertFalse(hasattr(profile, "api_key"))
+        self.assertEqual(profile.api_key, "sk-local-test-key")
+        self.assertFalse(hasattr(profile, "credential_ref"))
 
 
 if __name__ == "__main__":

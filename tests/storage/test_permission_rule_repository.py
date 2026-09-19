@@ -40,7 +40,7 @@ class PermissionRuleRepositoryTests(unittest.TestCase):
                 provider="openai",
                 base_url="https://api.openai.com/v1",
                 model="gpt-5",
-                credential_ref="env:OPENAI_API_KEY",
+                api_key="sk-test-key",
             )
         )
         for agent_id, name in (

@@ -37,12 +37,12 @@ class LLMProfileRepositoryTests(unittest.TestCase):
             provider="openai",
             base_url="https://api.openai.com/v1",
             model="gpt-5",
-            credential_ref="env:OPENAI_API_KEY",
+            api_key="sk-local-test-key",
             options={"temperature": 0.2},
         )
 
-    def test_save_and_get_round_trip_preserves_configuration(self):
-        """保存后读取应还原配置，且不需要保存 API Key。"""
+    def test_save_and_get_round_trip_preserves_api_key(self):
+        """保存后读取应还原配置及其本地 API Key。"""
         profile = self.repository.save(self.make_profile())
 
         loaded = self.repository.get(profile.id)
@@ -50,10 +50,10 @@ class LLMProfileRepositoryTests(unittest.TestCase):
         self.assertIsNotNone(loaded)
         self.assertEqual(loaded.name, "代码模型")
         self.assertEqual(loaded.options, {"temperature": 0.2})
-        self.assertEqual(loaded.credential_ref, "env:OPENAI_API_KEY")
+        self.assertEqual(loaded.api_key, "sk-local-test-key")
         self.assertIsNotNone(loaded.created_at)
         self.assertIsNotNone(loaded.updated_at)
-        self.assertFalse(hasattr(loaded, "api_key"))
+        self.assertFalse(hasattr(loaded, "credential_ref"))
 
     def test_save_updates_existing_profile_without_changing_identity(self):
         """相同 ID 保存时应更新记录，而不是创建重复配置。"""
