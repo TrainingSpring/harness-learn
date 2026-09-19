@@ -175,7 +175,7 @@ client/
   → TypeScript API Client
     → FastAPI 路由与 Pydantic DTO
       → Web Application Service
-        → AgentDirectory / AgentFactory / SessionService
+        → AgentProfileRepository / AgentFactory / SessionService
           → Repository / Runtime / SQLite
 ~~~
 
@@ -233,7 +233,6 @@ class WebServerSettings(BaseSettings):
 新增 `client/web/server/app/dependencies.py`：
 
 - `get_database()`：返回应用生命周期内唯一的 `StateDatabase`。
-- `get_agent_directory()`：返回 Agent 查询服务。
 - `get_agent_factory()`：返回运行时 Agent 工厂。
 - `get_session_service()`：返回 1v1 会话创建服务。
 - `get_run_registry()`：返回当前进程的运行实例注册表。
@@ -306,7 +305,7 @@ GET /api/agents/{agentId}
 
 `GET /api/agents` 只返回启用的 Agent，供角色列表和新会话选择使用。详情接口可以读取指定配置，但对已禁用项返回明确的 `isEnabled=false`。
 
-实现时可直接使用 `AgentDirectory`。如果实施前决定删除当前过薄的 Directory，则路由改用 `AgentProfileRepository`，但两者只能保留一条查询路径，不能同时在路由和服务里重复启用判断。建议本期将 `can_join()` 改名为 `is_selectable()`，使术语符合固定成员会话。
+已采用 `AgentProfileRepository` 作为 Agent 配置的唯一查询路径。`GET /api/agents` 直接调用 `list_enabled()`；SessionService 在创建会话时读取 Profile 并明确区分“不存在”和“已禁用”。不保留仅转发 Repository 的 `AgentDirectory`，避免查询与资格判断出现两条实现路径。
 
 ### Session API
 
@@ -774,7 +773,7 @@ parseSseStream(reader)
 - `client/web/server/app/api/agents.py`
 - `client/web/server/app/schemas/agent.py`
 - `client/web/server/tests/test_agents_api.py`
-- 视决策修改 `code/agent/runtime/agent_directory.py`
+- `code/agent/storage/repositories/agent_profile.py`
 
 验收：
 
