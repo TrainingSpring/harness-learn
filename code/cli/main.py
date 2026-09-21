@@ -18,12 +18,14 @@ from permission.types import (
     PermissionScope,
 )
 from runtime.agent import Agent as StableAgent
-from session.session_agent_factory import SessionAgentRuntimeFactory
+from permission.PermissionManager import PermissionManager
 from runtime.runtime import Runtime
 from runtime.runtime_events import PermissionRequiredEvent
+from session.ExecutionContext import ExecutionContext
 from storage.ids import generate_id
-from storage.types import AgentProfile, SessionAgent
+from storage.types import AgentProfile
 from tools.catalog import ToolCatalog
+from tools.tools import Tools
 
 def print_help():
     print("可用命令:")
@@ -233,12 +235,24 @@ def build_runtime() -> tuple[Runtime, Context]:
         permission_mode=PermissionMode.BUILD,
         workspace=os.getcwd(),
     )
-    member = SessionAgent(session_id, agent_id, "PRIMARY")
     context = Context(
         LLM(BASE_URL, API_KEY, MODEL),
         session_id=session_id,
     )
-    runtime = SessionAgentRuntimeFactory().create(agent, member, context)
+    execution_context = ExecutionContext(os.getcwd(), agent_id, session_id)
+    tools = Tools(execution_context)
+    tools.batch_register(list(agent.tool_definitions))
+    permission = PermissionManager(
+        mode=agent.permission_mode,
+        workspace=agent.workspace,
+        agent_id=agent.agent_id,
+    )
+    runtime = Runtime(
+        LLM(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),
+        tools,
+        execution_context,
+        permission,
+    )
     return runtime, context
 
 

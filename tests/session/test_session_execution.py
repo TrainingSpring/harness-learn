@@ -1,4 +1,4 @@
-"""SessionCoordinator 与 SessionExecution 的会话边界测试。"""
+"""SessionService 与 SessionExecution 的会话边界测试。"""
 
 import sys
 import tempfile
@@ -17,7 +17,6 @@ from permission.types import (  # noqa: E402
     PermissionScope,
 )
 from runtime.runtime_events import PermissionRequiredEvent  # noqa: E402
-from session.session_coordinator import SessionCoordinator  # noqa: E402
 from session.session_service import SessionService  # noqa: E402
 from storage.context_service import ContextService  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
@@ -89,19 +88,20 @@ class FakeRuntime:
         )
 
 
-class FakeRuntimeFactory:
-    """记录每个成员独立创建 Runtime 的事实。"""
+class FakeSessionService(SessionService):
+    """以受控 Runtime 替换 Service 内部装配，隔离模型调用。"""
 
-    def __init__(self) -> None:
+    def __init__(self, database) -> None:
+        super().__init__(database)
         self.runtimes = {}
 
-    def create(self, agent, member, context):
+    def _create_runtime(self, agent, member):
         runtime = FakeRuntime(member.agent_id, member.session_id)
         self.runtimes[(member.session_id, member.agent_id)] = runtime
         return runtime
 
 
-class SessionCoordinatorTests(unittest.TestCase):
+class SessionExecutionTests(unittest.TestCase):
     """锁定 Session 拥有 Context、Runtime 保留 Agent Loop 的契约。"""
 
     def setUp(self):
@@ -132,39 +132,36 @@ class SessionCoordinatorTests(unittest.TestCase):
                     permission_mode="BUILD",
                 )
             )
-        self.sessions = SessionService(self.database)
-        self.runtime_factory = FakeRuntimeFactory()
-        self.coordinator = SessionCoordinator(
-            self.database,
-            runtime_factory=self.runtime_factory,
-        )
+        self.sessions = FakeSessionService(self.database)
 
     def tearDown(self):
         self.database.close()
         self.temp_dir.cleanup()
 
     def test_load_restores_governed_snapshot_into_the_only_session_context(self):
-        session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        created = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        session = created.session
         saved = [{"type": "message", "role": "developer", "content": "已有摘要"}]
         ContextService(
             ContextItemRepository(self.database), session.id
         ).save_current_context(saved)
 
-        execution = self.coordinator.load(session.id)
+        execution = self.sessions.load(session.id)
 
         self.assertEqual(execution.context.export(), saved)
-        runtime = self.runtime_factory.runtimes[(session.id, "agent_1V3ASAXQ2A")]
+        runtime = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
         self.assertEqual(runtime.contexts, [])
         self.assertEqual(len(execution.runtimes), 1)
         self.assertIs(execution.context, execution.context)
 
     def test_load_rebuilds_context_from_raw_timeline_when_snapshot_is_empty(self):
-        session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        created = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        session = created.session
         ContextService(
             ContextItemRepository(self.database), session.id
         ).append_user_message("从原始消息恢复")
 
-        execution = self.coordinator.load(session.id)
+        execution = self.sessions.load(session.id)
 
         self.assertEqual(
             execution.context.export(),
@@ -178,17 +175,17 @@ class SessionCoordinatorTests(unittest.TestCase):
         )
 
     def test_same_agent_in_two_sessions_gets_separate_context_and_runtime_state(self):
-        first_session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
-        second_session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
-        first = self.coordinator.load(first_session.id)
-        second = self.coordinator.load(second_session.id)
+        first = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        second = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        first_session = first.session
+        second_session = second.session
 
         list(first.send("仅第一会话的消息"))
 
-        first_runtime = self.runtime_factory.runtimes[
+        first_runtime = self.sessions.runtimes[
             (first_session.id, "agent_1V3ASAXQ2A")
         ]
-        second_runtime = self.runtime_factory.runtimes[
+        second_runtime = self.sessions.runtimes[
             (second_session.id, "agent_1V3ASAXQ2A")
         ]
         self.assertIsNot(first.context, second.context)
@@ -196,8 +193,8 @@ class SessionCoordinatorTests(unittest.TestCase):
         self.assertEqual(second.context.export(), [])
 
     def test_direct_send_persists_user_and_agent_events_with_current_context(self):
-        session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
-        execution = self.coordinator.load(session.id)
+        execution = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        session = execution.session
 
         events = list(execution.send("请检查 README"))
 
@@ -214,19 +211,19 @@ class SessionCoordinatorTests(unittest.TestCase):
             [item.kind for item in persisted.load_visible("agent_1V3ASAXQ2A")],
             ["USER_MESSAGE", "AGENT_MESSAGE"],
         )
-        runtime = self.runtime_factory.runtimes[(session.id, "agent_1V3ASAXQ2A")]
+        runtime = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
         self.assertEqual(runtime.contexts, [execution.context])
 
     def test_group_runs_members_in_order_with_one_shared_context(self):
-        session = self.sessions.create_group_session(
+        execution = self.sessions.create_group_session(
             ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
         )
-        execution = self.coordinator.load(session.id)
+        session = execution.session
 
         list(execution.send("请分别给出意见"))
 
-        first = self.runtime_factory.runtimes[(session.id, "agent_1V3ASAXQ2A")]
-        second = self.runtime_factory.runtimes[(session.id, "agent_9U3M7BKP2C")]
+        first = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
+        second = self.sessions.runtimes[(session.id, "agent_9U3M7BKP2C")]
         self.assertEqual(first.contexts, [execution.context])
         self.assertEqual(second.contexts, [execution.context])
         self.assertEqual(
@@ -239,12 +236,12 @@ class SessionCoordinatorTests(unittest.TestCase):
         )
 
     def test_permission_resume_uses_the_same_runtime_and_context_before_group_continues(self):
-        session = self.sessions.create_group_session(
+        execution = self.sessions.create_group_session(
             ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
         )
-        execution = self.coordinator.load(session.id)
-        first = self.runtime_factory.runtimes[(session.id, "agent_1V3ASAXQ2A")]
-        second = self.runtime_factory.runtimes[(session.id, "agent_9U3M7BKP2C")]
+        session = execution.session
+        first = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
+        second = self.sessions.runtimes[(session.id, "agent_9U3M7BKP2C")]
         first.wait_for_permission = True
 
         paused = list(execution.send("先读取文件"))

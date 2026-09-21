@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
-from session.session_service import SessionService  # noqa: E402
+from session.session_service import SessionExecution, SessionService  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
@@ -62,12 +62,14 @@ class SessionServiceTests(unittest.TestCase):
 
     def test_create_direct_session_has_exactly_one_primary_agent(self):
         """1v1 会话只能由用户选中的一个 Agent 构成。"""
-        session = self.service.create_direct_session(
+        execution = self.service.create_direct_session(
             "agent_1V3ASAXQ2A",
             title="代码讨论",
         )
+        session = execution.session
 
         members = self.members.list_for_session(session.id)
+        self.assertIsInstance(execution, SessionExecution)
         self.assertEqual(session.conversation_mode, "DIRECT")
         self.assertEqual(
             [(member.agent_id, member.role) for member in members],
@@ -76,11 +78,13 @@ class SessionServiceTests(unittest.TestCase):
 
     def test_create_group_session_requires_distinct_multiple_agents(self):
         """1vN 群聊至少选择两个不同的 Agent，所有成员地位相同。"""
-        session = self.service.create_group_session(
+        execution = self.service.create_group_session(
             ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
         )
+        session = execution.session
 
         members = self.members.list_for_session(session.id)
+        self.assertIsInstance(execution, SessionExecution)
         self.assertEqual(session.conversation_mode, "GROUP")
         self.assertEqual({member.role for member in members}, {"MEMBER"})
         self.assertEqual(

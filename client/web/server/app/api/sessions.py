@@ -74,14 +74,14 @@ async def create_session(
 ) -> SessionSummary:
     """创建绑定一个启用 Agent 的固定 DIRECT 会话。"""
     try:
-        session = session_service.create_direct_session(request.agent_id, request.title)
+        execution = session_service.create_direct_session(request.agent_id, request.title)
     except ValueError as error:
         raise ApiError(
             422,
             "AGENT_NOT_SELECTABLE",
             "所选 Agent 不存在或已禁用",
         ) from error
-    detail = services.session_queries.get_direct_detail(session.id)
+    detail = services.session_queries.get_direct_detail(execution.session.id)
     if detail is None:
         # 创建服务保证固定成员约束；查不到表示内部持久化状态不一致。
         raise ApiError(500, "SESSION_CREATE_FAILED", "会话创建失败")
