@@ -21,7 +21,6 @@ from .services.chat_service import ChatService
 from .services.run_registry import RunRegistry
 from .static import SpaStaticFiles
 
-from runtime.agent_factory import AgentFactory
 from session.session_service import SessionService
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
@@ -44,15 +43,14 @@ def create_app(settings: WebServerSettings) -> FastAPI:
         database = StateDatabase(str(settings.workspace))
         database.initialize()
         catalog = ToolCatalog()
-        agent_factory = AgentFactory(database, tool_catalog=catalog)
         session_queries = SessionQueryRepository(database)
         context_items = ContextItemRepository(database)
         llm_profiles = LLMProfileRepository(database)
         run_registry = RunRegistry()
+        session_service = SessionService(database)
         app.state.services = ApplicationServices(
             database=database,
-            agent_factory=agent_factory,
-            session_service=SessionService(database),
+            session_service=session_service,
             agent_profiles=AgentProfileRepository(database),
             llm_profiles=llm_profiles,
             agent_profile_assistant=AgentProfileAssistant(llm_profiles),
@@ -61,7 +59,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             context_items=context_items,
             run_registry=run_registry,
             chat_service=ChatService(
-                agent_factory,
+                session_service,
                 session_queries,
                 context_items,
                 run_registry,

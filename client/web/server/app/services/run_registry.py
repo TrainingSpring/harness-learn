@@ -1,4 +1,4 @@
-"""进程内活动 Runtime 注册表。"""
+"""进程内活动 SessionExecution 注册表。"""
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -21,8 +21,7 @@ class ActiveRun:
     Attributes:
         run_id: Web 运行标识，只用于进程内注册和 API 路由。
         session_id: 被本次运行修改的固定会话。
-        agent_id: 会话中唯一 Agent 的稳定身份。
-        agent: 持有 Runtime 和 pending 工具队列的原始 Agent 对象。
+        execution: 持有共享 Context 与成员 Runtime 状态的原 SessionExecution。
         created_at: 注册时间，供后续超时清理和诊断使用。
         last_sequence_no: 已转换成 SSE 的最后一个 ContextItem 序号。
         pending_call_id: 等待用户确认时唯一允许恢复的 function call ID。
@@ -31,8 +30,7 @@ class ActiveRun:
 
     run_id: str
     session_id: str
-    agent_id: str
-    agent: Any
+    execution: Any
     created_at: str
     last_sequence_no: int = 0
     pending_call_id: str | None = None
@@ -40,10 +38,10 @@ class ActiveRun:
 
 
 class RunRegistry:
-    """保证每个 Session 最多保留一个活动 Runtime。
+    """保证每个 Session 最多保留一个活动 SessionExecution。
 
-    注册表只保存当前进程对象，不承担持久化。权限确认必须取回这里的原 Agent，
-    因为重新通过 AgentFactory 加载会丢失 Runtime 中的 pending 工具调用。
+    注册表只保存当前进程对象，不承担持久化。权限确认必须取回这里的原
+    SessionExecution，因为重新打开会话会丢失 Runtime 中的 pending 工具调用。
     """
 
     def __init__(self) -> None:
@@ -51,15 +49,14 @@ class RunRegistry:
         self._runs: dict[str, ActiveRun] = {}
         self._session_runs: dict[str, str] = {}
 
-    def create(self, session_id: str, agent_id: str, agent: Any) -> ActiveRun:
+    def create(self, session_id: str, execution: Any) -> ActiveRun:
         """注册运行实例，并拒绝同一会话的并发运行。"""
         if session_id in self._session_runs:
             raise RunAlreadyActiveError(session_id)
         run = ActiveRun(
             run_id=self._generate_id(),
             session_id=session_id,
-            agent_id=agent_id,
-            agent=agent,
+            execution=execution,
             created_at=datetime.now(timezone.utc).isoformat(),
         )
         self._runs[run.run_id] = run
@@ -103,4 +100,3 @@ class RunRegistry:
         """生成与持久化 ID 风格一致的进程内 run_ 标识。"""
         suffix = "".join(secrets.choice(_ID_ALPHABET) for _ in range(10))
         return f"run_{suffix}"
-

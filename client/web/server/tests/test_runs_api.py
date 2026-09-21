@@ -33,8 +33,8 @@ def _create_session(client) -> str:
     return response.json()["id"]
 
 
-class FakeStreamingAgent:
-    """模拟会持久化文本回复的 Runtime Agent。"""
+class FakeStreamingExecution:
+    """模拟已打开 Session 的正常消息运行。"""
 
     def __init__(self, context: ContextService) -> None:
         """保存测试会话的业务上下文服务。"""
@@ -48,8 +48,8 @@ class FakeStreamingAgent:
         yield LLMResponse(type="done", data=[], is_stop=True)
 
 
-class FakePermissionAgent:
-    """模拟一次 read 权限暂停及确认后的恢复过程。"""
+class FakePermissionExecution:
+    """模拟一次 read 权限暂停及确认后的 Session 恢复过程。"""
 
     call_id = "call_PERMISSION01"
 
@@ -89,33 +89,37 @@ class FakePermissionAgent:
         yield LLMResponse(type="done", data=[], is_stop=True)
 
 
-class FakeAgentFactory:
-    """按测试场景创建无需外部凭据的 Agent。"""
+class FakeSessionService:
+    """按测试场景恢复无需外部模型的 SessionExecution。"""
 
-    def __init__(self, database, agent_type) -> None:
-        """保存数据库和要实例化的 FakeAgent 类型。"""
+    def __init__(self, database, execution_type) -> None:
+        """保存数据库和要实例化的 FakeSessionExecution 类型。"""
         self.database = database
-        self.agent_type = agent_type
+        self.execution_type = execution_type
+        self.loaded_session_ids: list[str] = []
 
-    def load(self, _agent_id: str, session_id: str):
-        """为指定会话创建带持久化上下文的 FakeAgent。"""
+    def load(self, session_id: str):
+        """为指定会话恢复带持久化上下文的 FakeSessionExecution。"""
+        self.loaded_session_ids.append(session_id)
         context = ContextService(ContextItemRepository(self.database), session_id)
-        return self.agent_type(context)
+        return self.execution_type(context)
 
 
-def _use_fake_factory(client, agent_type) -> None:
-    """替换 ChatService 的 Agent 创建边界。"""
+def _use_fake_session_service(client, execution_type) -> FakeSessionService:
+    """替换 ChatService 的 SessionExecution 恢复边界。"""
     services = client.app.state.services
-    services.chat_service.agent_factory = FakeAgentFactory(
+    session_service = FakeSessionService(
         services.database,
-        agent_type,
+        execution_type,
     )
+    services.chat_service.session_service = session_service
+    return session_service
 
 
 def test_message_stream_emits_ordered_lifecycle_and_cleans_run(client) -> None:
     """正常消息流应包含增量、持久化完成消息和终止事件。"""
     session_id = _create_session(client)
-    _use_fake_factory(client, FakeStreamingAgent)
+    session_service = _use_fake_session_service(client, FakeStreamingExecution)
 
     response = client.post(
         f"/api/sessions/{session_id}/messages",
@@ -133,13 +137,14 @@ def test_message_stream_emits_ordered_lifecycle_and_cleans_run(client) -> None:
     ]
     assert events[1]["data"]["text"] == "收到"
     assert events[2]["data"]["text"] == "收到"
+    assert session_service.loaded_session_ids == [session_id]
     assert client.app.state.services.run_registry.get_for_session(session_id) is None
 
 
-def test_permission_stream_pauses_and_resumes_original_agent(client) -> None:
-    """确认权限必须使用注册表中的原 Agent，并延续同一 runId。"""
+def test_permission_stream_pauses_and_resumes_original_session_execution(client) -> None:
+    """确认权限必须使用注册表中的原 SessionExecution，并延续同一 runId。"""
     session_id = _create_session(client)
-    _use_fake_factory(client, FakePermissionAgent)
+    session_service = _use_fake_session_service(client, FakePermissionExecution)
 
     first = client.post(
         f"/api/sessions/{session_id}/messages",
@@ -152,6 +157,10 @@ def test_permission_stream_pauses_and_resumes_original_agent(client) -> None:
         "permission.required",
     ]
     run_id = first_events[0]["runId"]
+    active = client.app.state.services.run_registry.get(run_id)
+    assert isinstance(active.execution, FakePermissionExecution)
+    assert not hasattr(active, "agent")
+    assert session_service.loaded_session_ids == [session_id]
     permission = first_events[-1]["data"]
     assert permission == {
         "callId": "call_PERMISSION01",
@@ -184,7 +193,7 @@ def test_permission_stream_pauses_and_resumes_original_agent(client) -> None:
 def test_invalid_permission_call_id_does_not_resume_tool(client) -> None:
     """浏览器伪造 callId 时应保持原运行暂停。"""
     session_id = _create_session(client)
-    _use_fake_factory(client, FakePermissionAgent)
+    _use_fake_session_service(client, FakePermissionExecution)
     first = client.post(
         f"/api/sessions/{session_id}/messages",
         json={"text": "读取 README"},
@@ -204,7 +213,7 @@ def test_invalid_permission_call_id_does_not_resume_tool(client) -> None:
 def test_session_rejects_second_active_run_and_can_cancel(client) -> None:
     """一个会话只有一个活动 Run，取消后释放占用。"""
     session_id = _create_session(client)
-    _use_fake_factory(client, FakePermissionAgent)
+    _use_fake_session_service(client, FakePermissionExecution)
     first = client.post(
         f"/api/sessions/{session_id}/messages",
         json={"text": "读取 README"},

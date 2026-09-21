@@ -75,7 +75,7 @@ async def resolve_permission(
     request: PermissionDecisionRequest,
     services: ApplicationServices = Depends(get_services),
 ) -> StreamingResponse:
-    """确认或拒绝权限，并从原始 Runtime 继续返回事件。"""
+    """确认或拒绝权限，并从原 SessionExecution 继续返回事件。"""
     try:
         events = services.chat_service.resolve_permission(run_id, request)
     except RunNotFoundError as error:

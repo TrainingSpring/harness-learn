@@ -8,7 +8,6 @@ from .bootstrap import install_agent_source_path
 
 install_agent_source_path()
 
-from runtime.agent_factory import AgentFactory
 from session.session_service import SessionService
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
@@ -28,7 +27,6 @@ class ApplicationServices:
 
     Attributes:
         database: workspace 唯一的 SQLite 连接管理器。
-        agent_factory: 从持久化配置创建运行时 Agent 的工厂。
         session_service: 遵守固定成员约束的会话创建服务。
         agent_profiles: AgentProfile 写入和读取仓储。
         llm_profiles: LLM 配置只读接口使用的仓储。
@@ -36,12 +34,11 @@ class ApplicationServices:
         tool_catalog: 受信任工具元数据目录。
         session_queries: 面向客户端的 DIRECT 会话聚合查询仓储。
         context_items: 会话时间线查询仓储。
-        run_registry: 进程内活动 Runtime 注册表。
-        chat_service: Runtime 到 SSE 的应用服务。
+        run_registry: 进程内活动 SessionExecution 注册表。
+        chat_service: SessionExecution 到 SSE 的应用服务。
     """
 
     database: StateDatabase
-    agent_factory: AgentFactory
     session_service: SessionService
     agent_profiles: AgentProfileRepository
     llm_profiles: LLMProfileRepository
@@ -65,11 +62,6 @@ async def get_services(request: Request) -> ApplicationServices:
 async def get_database(request: Request) -> StateDatabase:
     """返回应用生命周期内唯一的状态数据库。"""
     return request.app.state.services.database
-
-
-async def get_agent_factory(request: Request) -> AgentFactory:
-    """返回运行时 Agent 工厂。"""
-    return request.app.state.services.agent_factory
 
 
 async def get_session_service(request: Request) -> SessionService:

@@ -5,8 +5,8 @@ from typing import Any
 
 from head.types import LLMResponse
 from permission.types import PermissionDecision, PermissionResponse, PermissionScope
-from runtime.agent_factory import AgentFactory
 from runtime.runtime_events import PermissionRequiredEvent
+from session.session_service import SessionService
 from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session_query import SessionQueryRepository
 from storage.types import ContextItem
@@ -31,21 +31,21 @@ class ChatService:
     """协调 Agent 运行、上下文事件映射和权限暂停恢复。
 
     Attributes:
-        agent_factory: 根据持久化配置加载真实运行时 Agent 的边界。
+        session_service: 恢复包含共享 Context 的 SessionExecution。
         session_queries: 验证固定 DIRECT 会话并获得唯一 Agent。
         context_items: 读取 Runtime 已持久化的消息和工具事件。
-        registry: 保留跨权限确认请求的原始 Agent 对象。
+        registry: 保留跨权限确认请求的原 SessionExecution。
     """
 
     def __init__(
         self,
-        agent_factory: AgentFactory,
+        session_service: SessionService,
         session_queries: SessionQueryRepository,
         context_items: ContextItemRepository,
         registry: RunRegistry,
     ) -> None:
         """创建 Web 对话应用服务。"""
-        self.agent_factory = agent_factory
+        self.session_service = session_service
         self.session_queries = session_queries
         self.context_items = context_items
         self.registry = registry
@@ -66,17 +66,17 @@ class ChatService:
             raise SessionNotRunnableError(session_id) from error
         if summary is None or summary.session.status != "ACTIVE":
             raise SessionNotRunnableError(session_id)
-        agent = self.agent_factory.load(summary.agent_id, session_id)
-        active = self.registry.create(session_id, summary.agent_id, agent)
+        execution = self.session_service.load(session_id)
+        active = self.registry.create(session_id, execution)
         active.last_sequence_no = self._latest_sequence(session_id)
-        return self._stream(active, agent.send(text), include_started=True)
+        return self._stream(active, execution.send(text), include_started=True)
 
     def resolve_permission(
         self,
         run_id: str,
         request: PermissionDecisionRequest,
     ) -> Iterator[ServerEvent]:
-        """验证前端最小确认数据，并从原 Agent Runtime 恢复流。"""
+        """验证前端最小确认数据，并从原 SessionExecution 恢复流。"""
         active = self.registry.get(run_id)
         if active is None:
             raise RunNotFoundError(run_id)
@@ -92,7 +92,7 @@ class ChatService:
         active.pending_call_id = None
         return self._stream(
             active,
-            active.agent.resolve_permission(response),
+            active.execution.resolve_permission(response),
             include_started=False,
         )
 
