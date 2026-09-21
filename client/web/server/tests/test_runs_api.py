@@ -56,6 +56,7 @@ class FakePermissionExecution:
     def __init__(self, context: ContextService) -> None:
         """保存上下文服务和待确认请求。"""
         self.context = context
+        self.cancel_calls = 0
         self.request = PermissionRequest(
             action=PermissionAction.FILE_READ,
             resource="/workspace/README.md",
@@ -64,6 +65,10 @@ class FakePermissionExecution:
             session_id=context.session_id,
             agent_id="agent_ENABLED001",
         )
+
+    def cancel(self) -> None:
+        """记录 Web 取消已传递给原 SessionExecution。"""
+        self.cancel_calls += 1
 
     def send(self, message: str):
         """持久化调用后发出权限请求并暂停。"""
@@ -87,6 +92,25 @@ class FakePermissionExecution:
         yield LLMResponse(type="text", text="文件已读取")
         self.context.append_agent_message("agent_ENABLED001", "文件已读取")
         yield LLMResponse(type="done", data=[], is_stop=True)
+
+
+class FakeFailingExecution:
+    """模拟包含敏感内部文本的运行异常。"""
+
+    def __init__(self, context: ContextService) -> None:
+        """保存上下文服务以满足 SessionExecution 的最小契约。"""
+        self.context = context
+
+    def send(self, message: str):
+        """写入用户事件后抛出不应暴露给浏览器的异常。"""
+        self.context.append_user_message(message)
+        key_name = "api_key"
+        key_value = "sk-" + "internal-secret"
+        raise RuntimeError(f"sqlite /private/workspace {key_name}={key_value}")
+        yield
+
+    def cancel(self) -> None:
+        """失败执行没有可取消的 pending 状态。"""
 
 
 class FakeSessionService:
@@ -210,6 +234,24 @@ def test_invalid_permission_call_id_does_not_resume_tool(client) -> None:
     assert client.app.state.services.run_registry.get(run_id) is not None
 
 
+def test_runtime_failure_emits_generic_sse_error_without_internal_details(client) -> None:
+    """运行异常只向浏览器公开稳定错误码和通用文案。"""
+    session_id = _create_session(client)
+    _use_fake_session_service(client, FakeFailingExecution)
+
+    response = client.post(
+        f"/api/sessions/{session_id}/messages",
+        json={"text": "触发失败"},
+    )
+
+    events = _events(response)
+    assert [event["type"] for event in events] == ["run.started", "run.failed"]
+    assert events[-1]["data"] == {"code": "RUN_FAILED", "message": "运行失败"}
+    assert "sqlite" not in response.text
+    assert "api_key" not in response.text
+    assert "sk-internal-secret" not in response.text
+
+
 def test_session_rejects_second_active_run_and_can_cancel(client) -> None:
     """一个会话只有一个活动 Run，取消后释放占用。"""
     session_id = _create_session(client)
@@ -219,6 +261,7 @@ def test_session_rejects_second_active_run_and_can_cancel(client) -> None:
         json={"text": "读取 README"},
     )
     run_id = _events(first)[0]["runId"]
+    active = client.app.state.services.run_registry.get(run_id)
 
     conflict = client.post(
         f"/api/sessions/{session_id}/messages",
@@ -229,4 +272,5 @@ def test_session_rejects_second_active_run_and_can_cancel(client) -> None:
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "RUN_ALREADY_ACTIVE"
     assert cancelled.status_code == 204
+    assert active.execution.cancel_calls == 1
     assert client.app.state.services.run_registry.get(run_id) is None

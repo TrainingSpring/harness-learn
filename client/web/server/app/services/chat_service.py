@@ -98,8 +98,11 @@ class ChatService:
 
     def cancel(self, run_id: str) -> None:
         """停止一个活动 Run；不存在时返回稳定的未找到错误。"""
-        if not self.registry.cancel(run_id):
+        active = self.registry.get(run_id)
+        if active is None:
             raise RunNotFoundError(run_id)
+        active.execution.cancel()
+        self.registry.cancel(run_id)
 
     def _stream(
         self,
