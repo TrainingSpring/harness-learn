@@ -158,6 +158,43 @@ class SessionCoordinatorTests(unittest.TestCase):
         self.assertEqual(len(execution.runtimes), 1)
         self.assertIs(execution.context, execution.context)
 
+    def test_load_rebuilds_context_from_raw_timeline_when_snapshot_is_empty(self):
+        session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        ContextService(
+            ContextItemRepository(self.database), session.id
+        ).append_user_message("从原始消息恢复")
+
+        execution = self.coordinator.load(session.id)
+
+        self.assertEqual(
+            execution.context.export(),
+            [
+                {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": "从原始消息恢复"}],
+                }
+            ],
+        )
+
+    def test_same_agent_in_two_sessions_gets_separate_context_and_runtime_state(self):
+        first_session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        second_session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        first = self.coordinator.load(first_session.id)
+        second = self.coordinator.load(second_session.id)
+
+        list(first.send("仅第一会话的消息"))
+
+        first_runtime = self.runtime_factory.runtimes[
+            (first_session.id, "agent_1V3ASAXQ2A")
+        ]
+        second_runtime = self.runtime_factory.runtimes[
+            (second_session.id, "agent_1V3ASAXQ2A")
+        ]
+        self.assertIsNot(first.context, second.context)
+        self.assertIsNot(first_runtime, second_runtime)
+        self.assertEqual(second.context.export(), [])
+
     def test_direct_send_persists_user_and_agent_events_with_current_context(self):
         session = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
         execution = self.coordinator.load(session.id)
