@@ -41,6 +41,7 @@ class SessionExecution:
         self.members = members
         self.runtimes = runtimes
         self._active_member_index: int | None = None
+        self._current_member_index: int | None = None
         self._recorded_output_call_ids = {
             item.call_id
             for item in context_service.load_visible(members[0].agent_id)
@@ -71,6 +72,16 @@ class SessionExecution:
             runtime.resolve_permission(self.context, response),
         )
 
+    def cancel(self) -> None:
+        """取消当前成员 Runtime，并保留已经持久化的 Session Context。"""
+        member_index = self._active_member_index
+        if member_index is None:
+            member_index = self._current_member_index
+        if member_index is not None:
+            self.runtimes[self.members[member_index].agent_id].cancel()
+        self._active_member_index = None
+        self.context_service.save_context(self.context)
+
     def _drive_from(
         self,
         member_index: int,
@@ -85,13 +96,21 @@ class SessionExecution:
                 if index == member_index and current_events
                 else runtime.run(self.context)
             )
-            for event in events:
-                self._persist_runtime_changes(member.agent_id, event)
-                if isinstance(event, PermissionRequiredEvent):
-                    self._active_member_index = index
+            self._current_member_index = index
+            try:
+                for event in events:
+                    self._persist_runtime_changes(member.agent_id, event)
+                    if isinstance(event, PermissionRequiredEvent):
+                        self._active_member_index = index
+                        yield event
+                        return
                     yield event
-                    return
-                yield event
+            finally:
+                # 即使 LLM 或工具在下一个事件前异常，已经写入 Context 的协议项和
+                # 治理后的快照仍必须留在当前 Session，不能恢复为旧版本。
+                self._persist_function_protocol_items(member.agent_id)
+                self.context_service.save_context(self.context)
+                self._current_member_index = None
             current_events = None
 
     def _persist_runtime_changes(self, agent_id: str, event: RuntimeEvent) -> None:

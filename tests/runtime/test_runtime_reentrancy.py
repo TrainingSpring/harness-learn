@@ -113,3 +113,44 @@ def test_permission_resume_writes_tool_output_to_the_passed_context():
     assert executions == [{"target_path": "src/app.py"}]
     assert context_a.messages[-1]["type"] == "function_call_output"
     assert context_b.messages == []
+
+
+def test_cancel_clears_pending_permission_and_returns_runtime_to_idle():
+    execution_context = ExecutionContext("/workspace", "agent_TEST00004", "session_TEST06")
+    tools = Tools(execution_context)
+    tools.register(
+        Tool(
+            {"name": "write"},
+            lambda _ctx, **_arguments: ToolResult.success({"ok": True}),
+            PermissionRequirement(PermissionAction.FILE_WRITE, "target_path"),
+        )
+    )
+    runtime = Runtime(
+        PermissionLLM([
+            iter([LLMResponse(type="done", data=[_call("call_003")], is_stop=False)]),
+        ]),
+        tools,
+        execution_context,
+        PermissionManager(
+            mode=PermissionMode.BUILD,
+            workspace="/workspace",
+            agent_id=execution_context.agent_id,
+        ),
+    )
+    context = Context(PermissionLLM([]), session_id=execution_context.session_id)
+
+    events = list(runtime.run(context))
+    assert isinstance(events[0], PermissionRequiredEvent)
+
+    runtime.cancel()
+
+    assert runtime.state is RuntimeState.IDLE
+    with pytest.raises(ValueError, match="没有等待处理的权限请求"):
+        list(runtime.resolve_permission(
+            context,
+            PermissionResponse(
+                call_id="call_003",
+                decision=PermissionDecision.ALLOW,
+                scope=PermissionScope.ONCE,
+            ),
+        ))

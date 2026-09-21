@@ -34,6 +34,12 @@ class FakeRuntime:
         self.session_id = session_id
         self.contexts = []
         self.wait_for_permission = False
+        self.cancel_calls = 0
+
+    def cancel(self):
+        """记录 Session 只取消当前成员 Runtime 的调用。"""
+        self.cancel_calls += 1
+        self.wait_for_permission = False
 
     def run(self, context):
         self.contexts.append(context)
@@ -273,6 +279,38 @@ class SessionExecutionTests(unittest.TestCase):
             ],
         )
         self.assertEqual(persisted.load_current_context(), execution.context.export())
+
+    def test_cancel_only_stops_waiting_member_and_keeps_current_context(self):
+        """取消权限暂停的 GROUP 会话不能影响其他成员或回退上下文。"""
+        execution = self.sessions.create_group_session(
+            ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
+        )
+        session = execution.session
+        first = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
+        second = self.sessions.runtimes[(session.id, "agent_9U3M7BKP2C")]
+        first.wait_for_permission = True
+
+        paused = list(execution.send("读取后取消"))
+        saved_before_cancel = execution.context.export()
+
+        execution.cancel()
+
+        self.assertEqual(first.cancel_calls, 1)
+        self.assertEqual(second.cancel_calls, 0)
+        self.assertEqual(
+            ContextService(
+                ContextItemRepository(self.database), session.id
+            ).load_current_context(),
+            saved_before_cancel,
+        )
+        with self.assertRaises(ValueError):
+            list(execution.resolve_permission(
+                PermissionResponse(
+                    call_id=paused[-1].request.call_id,
+                    decision=PermissionDecision.ALLOW,
+                    scope=PermissionScope.ONCE,
+                )
+            ))
 
 
 if __name__ == "__main__":

@@ -57,6 +57,7 @@ class Runtime:
         self.permission = permission
         self.ctx = ctx
         self._state = RuntimeState.IDLE
+        self._cancelled = False
         self._pending_permission: PendingToolCall | None = None
         self._tool_queue: deque[PreparedToolCall] = deque()
         self.sys_message = [
@@ -103,8 +104,16 @@ class Runtime:
         self._validate_context(context)
         if self._state is not RuntimeState.IDLE:
             raise ValueError(f"Runtime 当前状态为 {self._state.value}，不能开始新消息")
+        self._cancelled = False
         self._state = RuntimeState.RUNNING
         yield from self._run_llm_loop(context)
+
+    def cancel(self) -> None:
+        """取消当前运行，丢弃未执行的工具调用和权限暂停状态。"""
+        self._cancelled = True
+        self._pending_permission = None
+        self._tool_queue.clear()
+        self._state = RuntimeState.IDLE
 
     def _run_llm_loop(
         self,
@@ -112,7 +121,13 @@ class Runtime:
     ) -> Generator[RuntimeEvent, None, None]:
         """持续请求 LLM，直到结束或遇到需要用户确认的工具调用。"""
         while True:
+            if self._cancelled:
+                self._state = RuntimeState.IDLE
+                return
             for response in self.call_llm(context):
+                if self._cancelled:
+                    self._state = RuntimeState.IDLE
+                    return
                 if response.type != "done":
                     yield response
                     continue
