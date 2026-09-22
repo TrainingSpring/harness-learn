@@ -41,7 +41,6 @@ export function CreateAgentDialog({
   const [expertise, setExpertise] = useState("");
   const [llmProfileId, setLlmProfileId] = useState("");
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
-  const [permissionMode, setPermissionMode] = useState("BUILD");
   const [isEnabled, setIsEnabled] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
@@ -54,7 +53,6 @@ export function CreateAgentDialog({
     setExpertise("");
     setLlmProfileId("");
     setSelectedTools([]);
-    setPermissionMode("BUILD");
     setIsEnabled(true);
     setFormError(null);
     setSuggestionError(null);
@@ -91,7 +89,6 @@ export function CreateAgentDialog({
       expertise: expertise.split(",").map((item) => item.trim()).filter(Boolean),
       llmProfileId,
       tools: selectedTools,
-      permissionMode,
       isEnabled,
     });
   };
@@ -163,9 +160,6 @@ export function CreateAgentDialog({
             {tools.length === 0 && <p className="form-hint">当前没有可配置工具。</p>}
             <div className="checkbox-grid">{tools.map((tool) => <label className="checkbox-option" key={tool.name}><input type="checkbox" checked={selectedTools.includes(tool.name)} onChange={() => toggleTool(tool.name)} /><span>{tool.name}</span></label>)}</div>
           </fieldset>
-          <label className="form-field"><span>权限模式</span>
-            <select value={permissionMode} onChange={(event) => setPermissionMode(event.target.value)}><option value="PLAN">PLAN · 只读规划</option><option value="BUILD">BUILD · 按权限执行</option><option value="YOLO">YOLO · 宽松执行</option></select>
-          </label>
           <label className="checkbox-option"><input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /><span>启用此角色</span></label>
           {(suggestionError || formError || error) && <p className="inline-error" role="alert">{suggestionError || formError || error}</p>}
           <div className="dialog-actions"><Button type="button" onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={isSubmitting} icon={<Plus size={16} />}>{isSubmitting ? "创建中…" : "创建角色"}</Button></div>

@@ -75,6 +75,7 @@ export function useChatRun(sessionId: string) {
       // 几乎同时切换时，旧请求的 finally 覆盖新请求的停止控制器。
       if (abortRef.current === controller) abortRef.current = null;
       await queryClient.invalidateQueries({ queryKey: ["messages", sessionId] });
+      await queryClient.invalidateQueries({ queryKey: ["session", sessionId] });
       await queryClient.invalidateQueries({ queryKey: ["sessions"] });
       // 工具完成事件已经进入持久化时间线；刷新完成后移除临时事件，避免同一
       // function call 同时以 SSE 临时状态和 ContextItem 再显示一次。

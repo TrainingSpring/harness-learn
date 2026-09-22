@@ -219,6 +219,7 @@ class SessionService:
         self,
         agent_id: str,
         title: str | None = None,
+        permission_mode: str = "plan",
     ) -> SessionExecution:
         """创建固定主 Agent 的 DIRECT Session，并立即打开它。"""
         self._require_enabled_agents([agent_id])
@@ -226,6 +227,7 @@ class SessionService:
             "DIRECT",
             [(agent_id, "PRIMARY")],
             title,
+            permission_mode,
         )
         return self._open(session)
 
@@ -233,6 +235,7 @@ class SessionService:
         self,
         agent_ids: list[str],
         title: str | None = None,
+        permission_mode: str = "plan",
     ) -> SessionExecution:
         """创建固定成员 GROUP Session，并立即打开它。"""
         if not isinstance(agent_ids, list):
@@ -246,6 +249,7 @@ class SessionService:
             "GROUP",
             [(agent_id, "MEMBER") for agent_id in agent_ids],
             title,
+            permission_mode,
         )
         return self._open(session)
 

@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import type { PermissionDecision, PermissionRequest, PermissionScope } from "../../../api/types";
 import { Button } from "../../../components/Button";
 import { useModalFocus } from "../../../hooks/useModalFocus";
-import { ScopeSelector, scopeActionLabel } from "./ScopeSelector";
 
 interface PermissionDialogProps {
   request: PermissionRequest;
@@ -16,8 +14,8 @@ interface PermissionDialogProps {
  * 用户必须明确拒绝或选择一个服务端允许的范围。
  */
 export function PermissionDialog({ request, isSubmitting, onDecision }: PermissionDialogProps) {
-  const [scope, setScope] = useState<PermissionScope>(request.allowedScopes[0] ?? "once");
   const dialog = useModalFocus<HTMLDivElement>();
+  const canPersist = request.allowedScopes.includes("session");
 
   return (
     <div className="dialog-backdrop">
@@ -33,12 +31,12 @@ export function PermissionDialog({ request, isSubmitting, onDecision }: Permissi
           <div><dt>权限动作</dt><dd>{request.action}</dd></div>
           <div><dt>目标资源</dt><dd><code>{request.resource ?? "无特定资源"}</code></dd></div>
         </dl>
-        <ScopeSelector scopes={request.allowedScopes} value={scope} onChange={setScope} />
+        {request.toolName === "bash" && <p className="form-hint">本会话允许或不再询问会影响后续终端命令。</p>}
         <div className="permission-dialog__actions">
+          <Button variant="primary" disabled={isSubmitting} onClick={() => onDecision("allow", "once")}>仅本次允许</Button>
+          {canPersist && <Button variant="primary" disabled={isSubmitting} onClick={() => onDecision("allow", "session")}>本会话允许</Button>}
           <Button disabled={isSubmitting} onClick={() => onDecision("deny", "once")}>拒绝</Button>
-          <Button variant="primary" disabled={isSubmitting} onClick={() => onDecision("allow", scope)}>
-            {isSubmitting ? "正在处理" : scopeActionLabel(scope)}
-          </Button>
+          {canPersist && <Button disabled={isSubmitting} onClick={() => onDecision("deny", "session")}>不再询问</Button>}
         </div>
       </div>
     </div>

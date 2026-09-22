@@ -40,7 +40,6 @@ export interface CreateAgentRequest {
   expertise: string[];
   llmProfileId: string;
   tools: string[];
-  permissionMode: string;
   isEnabled: boolean;
 }
 
@@ -60,7 +59,6 @@ export interface AgentProfileSuggestion {
 
 export interface AgentDetail extends AgentSummary {
   llmProfileId: string;
-  permissionMode: "PLAN" | "BUILD" | "YOLO" | string;
 }
 
 export type ConversationMode = "DIRECT";
@@ -76,12 +74,30 @@ export interface SessionSummary {
   lastSequenceNo: number | null;
   createdAt: string;
   updatedAt: string;
+  permissionMode: PermissionMode;
+  projectPath: string | null;
+  isProjectLocked: boolean;
 }
+
+export type PermissionMode = "plan" | "build" | "yolo";
 
 export interface CreateDirectSessionRequest {
   mode: "DIRECT";
   agentId: string;
   title?: string | null;
+  permissionMode?: PermissionMode;
+  projectPath?: string | null;
+}
+
+export interface ProjectDirectory {
+  path: string;
+  name: string;
+}
+
+export interface ProjectDirectoryResponse {
+  path: string;
+  name: string;
+  directories: ProjectDirectory[];
 }
 
 export type ContextItemKind =
@@ -162,7 +178,7 @@ export interface ToolSummary {
   permissionAction: string;
 }
 
-export type PermissionScope = "once" | "session" | "agent";
+export type PermissionScope = "once" | "session";
 export type PermissionDecision = "allow" | "deny";
 
 export interface PermissionRequest {

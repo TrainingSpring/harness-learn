@@ -54,6 +54,7 @@ class SessionRepository:
         mode: str,
         agent_roles: list[tuple[str, str]],
         title: str | None = None,
+        permission_mode: str = "plan",
     ) -> Session:
         """在一个事务内创建 Session 及其全部固定 Agent 成员。
 
@@ -74,7 +75,7 @@ class SessionRepository:
         """
         if not agent_roles:
             raise ValueError("会话必须至少包含一个 Agent")
-        session = self._new_session(mode, title)
+        session = self._new_session(mode, title, permission_mode)
         members = [
             SessionAgent(
                 session_id=session.id,
@@ -282,7 +283,7 @@ class SessionRepository:
             raise ValueError("offset 必须是非负整数")
 
     @staticmethod
-    def _new_session(mode: str, title: str | None) -> Session:
+    def _new_session(mode: str, title: str | None, permission_mode: str = "plan") -> Session:
         """构造带统一时间戳的新 Session 领域对象。"""
         now = _utc_now()
         return Session(
@@ -290,7 +291,7 @@ class SessionRepository:
             title=title,
             conversation_mode=mode,
             status="ACTIVE",
-            permission_mode="plan",
+            permission_mode=permission_mode,
             project_path=None,
             created_at=now,
             updated_at=now,

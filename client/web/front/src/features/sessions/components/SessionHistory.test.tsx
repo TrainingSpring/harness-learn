@@ -14,6 +14,9 @@ it("分组展示历史并标记当前会话", () => {
     lastSequenceNo: 3,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    permissionMode: "plan",
+    projectPath: null,
+    isProjectLocked: false,
   }];
 
   render(

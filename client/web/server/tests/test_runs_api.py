@@ -33,6 +33,16 @@ def _create_session(client) -> str:
     return response.json()["id"]
 
 
+def test_permission_api_rejects_removed_agent_scope(client) -> None:
+    """Agent scope 已从公开权限确认契约删除。"""
+    response = client.post(
+        "/api/runs/run_UNKNOWN01/permission",
+        json={"callId": "call_1", "decision": "allow", "scope": "agent"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
 class FakeStreamingExecution:
     """模拟已打开 Session 的正常消息运行。"""
 

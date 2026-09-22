@@ -42,7 +42,7 @@ export function parseServerEvent(value: unknown): ServerEvent {
     const validResource = data.resource === null || typeof data.resource === "string";
     const validScopes = Array.isArray(data.allowedScopes)
       && data.allowedScopes.length > 0
-      && data.allowedScopes.every((scope) => scope === "once" || scope === "session" || scope === "agent");
+      && data.allowedScopes.every((scope) => scope === "once" || scope === "session");
     if (
       typeof data.callId !== "string"
       || typeof data.toolName !== "string"

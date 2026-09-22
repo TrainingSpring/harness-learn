@@ -14,6 +14,8 @@ class CreateDirectSessionRequest(ApiModel):
     mode: Literal["DIRECT"]
     agent_id: str
     title: str | None = Field(default=None, max_length=200)
+    permission_mode: Literal["plan", "build", "yolo"] = "plan"
+    project_path: str | None = Field(default=None, max_length=2000)
 
 
 class SessionAgentSummary(ApiModel):
@@ -35,6 +37,9 @@ class SessionSummary(ApiModel):
     last_sequence_no: int | None
     created_at: str | None
     updated_at: str | None
+    permission_mode: Literal["plan", "build", "yolo"]
+    project_path: str | None
+    is_project_locked: bool
 
 
 class SessionDetail(SessionSummary):
@@ -48,3 +53,29 @@ class ContextItemList(ApiModel):
 
     items: list[ContextItemResponse]
 
+
+class UpdatePermissionModeRequest(ApiModel):
+    """更新当前 Session 的权限模式。"""
+
+    permission_mode: Literal["plan", "build", "yolo"]
+
+
+class UpdateProjectRequest(ApiModel):
+    """更新当前 Session 的 workspace-relative 项目目录。"""
+
+    project_path: str | None = Field(default=None, max_length=2000)
+
+
+class ProjectDirectory(ApiModel):
+    """可供浏览器选择的 workspace 子目录。"""
+
+    path: str
+    name: str
+
+
+class ProjectDirectoryResponse(ApiModel):
+    """当前目录及其可选的直接子目录。"""
+
+    path: str
+    name: str
+    directories: list[ProjectDirectory]

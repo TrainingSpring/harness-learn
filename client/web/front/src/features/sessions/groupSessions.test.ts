@@ -13,7 +13,10 @@ it("将会话按今天、昨天和更早分组", () => {
     lastMessage: null,
     lastSequenceNo: null,
     createdAt: updatedAt,
-    updatedAt,
+      updatedAt,
+      permissionMode: "plan",
+      projectPath: null,
+      isProjectLocked: false,
   });
 
   const groups = groupSessionsByDate([

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, MessageSquare, ShieldCheck, Wrench } from "lucide-react";
+import { ArrowLeft, MessageSquare, Wrench } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { ErrorState } from "../../../components/ErrorState";
 import { Skeleton } from "../../../components/Skeleton";
@@ -22,10 +22,7 @@ export function AgentDetailPage() {
       </header>
       <section className="detail-section"><h2>角色特征</h2><p>{agent.data.personality || "未设置"}</p><div className="tag-row">{agent.data.expertise.map((item) => <span className="tag" key={item}>{item}</span>)}</div></section>
       <section className="detail-section"><h2><Wrench size={17} />可用工具</h2><div className="plain-list">{agent.data.tools.map((tool) => <code key={tool}>{tool}</code>)}</div></section>
-      <section className="detail-section detail-grid">
-        <div><h2><ShieldCheck size={17} />权限模式</h2><p>{agent.data.permissionMode}</p></div>
-        <div><h2>LLM 配置</h2><p><code>{agent.data.llmProfileId}</code></p></div>
-      </section>
+      <section className="detail-section"><h2>LLM 配置</h2><p><code>{agent.data.llmProfileId}</code></p></section>
       <Link className="button button--primary profile-action" to={`/new?agentId=${encodeURIComponent(agent.data.id)}`}><MessageSquare size={16} />与该角色对话</Link>
     </div>
   );

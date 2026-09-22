@@ -28,6 +28,95 @@ def test_create_direct_session_binds_selected_agent(client) -> None:
     assert payload["status"] == "ACTIVE"
     assert payload["lastMessage"] is None
     assert "participantId" not in payload
+    assert payload["permissionMode"] == "plan"
+    assert payload["projectPath"] is None
+    assert payload["isProjectLocked"] is False
+
+
+def test_session_settings_are_session_scoped_and_project_is_workspace_relative(client) -> None:
+    """权限模式与项目目录应写入 Session，并且项目 API 不接收绝对路径。"""
+    project = client.app.state.services.database.workspace / "demo"
+    project.mkdir()
+    created = client.post(
+        "/api/sessions",
+        json={"mode": "DIRECT", "agentId": "agent_ENABLED001", "permissionMode": "build"},
+    ).json()
+
+    mode = client.patch(
+        f"/api/sessions/{created['id']}/permission-mode",
+        json={"permissionMode": "yolo"},
+    )
+    project_response = client.patch(
+        f"/api/sessions/{created['id']}/project",
+        json={"projectPath": "demo"},
+    )
+
+    assert mode.status_code == project_response.status_code == 200
+    assert mode.json()["permissionMode"] == "yolo"
+    assert project_response.json()["projectPath"] == "demo"
+    assert client.get("/api/sessions/projects?path=.").json()["directories"] == [{"path": "demo", "name": "demo"}]
+    rejected = client.patch(
+        f"/api/sessions/{created['id']}/project",
+        json={"projectPath": str(project)},
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["error"]["code"] == "INVALID_PROJECT_PATH"
+
+
+def test_project_directory_list_excludes_symlinks_outside_workspace(client, tmp_path) -> None:
+    """项目目录浏览不得把指向 workspace 外的软链接暴露给浏览器。"""
+    workspace = client.app.state.services.database.workspace
+    external_directory = tmp_path.parent / "external-project"
+    external_directory.mkdir()
+    (workspace / "inside").mkdir()
+    (workspace / "outside-link").symlink_to(external_directory, target_is_directory=True)
+
+    response = client.get("/api/sessions/projects?path=.")
+
+    assert response.status_code == 200
+    assert response.json()["directories"] == [{"path": "inside", "name": "inside"}]
+
+
+def test_active_run_rejects_session_setting_changes(client) -> None:
+    """运行中的 Session 不允许在同一执行过程中改变权限边界。"""
+    created = _create_session(client)
+    registry = client.app.state.services.run_registry
+    active = registry.create(created["id"], object())
+    try:
+        mode = client.patch(
+            f"/api/sessions/{created['id']}/permission-mode",
+            json={"permissionMode": "yolo"},
+        )
+        project = client.patch(
+            f"/api/sessions/{created['id']}/project",
+            json={"projectPath": None},
+        )
+    finally:
+        registry.remove(active.run_id)
+
+    assert mode.status_code == project.status_code == 409
+    assert mode.json()["error"]["code"] == "RUN_ALREADY_ACTIVE"
+    assert project.json()["error"]["code"] == "RUN_ALREADY_ACTIVE"
+
+
+def test_project_is_locked_after_first_user_message(client) -> None:
+    """首条用户消息后，项目修改必须返回稳定冲突错误。"""
+    created = _create_session(client)
+    database = StateDatabase(str(client.app.state.services.database.workspace))
+    database.initialize()
+    try:
+        ContextService(ContextItemRepository(database), created["id"]).append_user_message("锁定项目")
+    finally:
+        database.close()
+
+    detail = client.get(f"/api/sessions/{created['id']}")
+    response = client.patch(
+        f"/api/sessions/{created['id']}/project",
+        json={"projectPath": None},
+    )
+    assert detail.json()["isProjectLocked"] is True
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "PROJECT_LOCKED"
 
 
 def test_create_session_rejects_non_direct_mode(client) -> None:

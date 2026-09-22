@@ -97,13 +97,31 @@ code, pre { font-family: var(--font-mono); }
 .agent-option__check { display: grid; place-items: center; color: var(--accent); }
 
 .composer-dock { z-index: 2; width: min(calc(100% - 40px), var(--content-width)); margin: 0 auto; padding: 12px 0 calc(16px + env(safe-area-inset-bottom)); background: var(--bg-canvas); }
-.composer { position: relative; display: flex; align-items: flex-end; min-height: 58px; padding: 13px 50px 13px 15px; background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: 0 6px 20px rgb(0 0 0 / 7%); }
+.composer { position: relative; display: flex; align-items: flex-end; min-height: 58px; padding: 42px 50px 13px 15px; background: var(--bg-surface); border: 1px solid var(--border-strong); border-radius: var(--radius-md); box-shadow: 0 6px 20px rgb(0 0 0 / 7%); }
 .composer:focus-within { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus); }
 .composer textarea { width: 100%; min-height: 26px; max-height: 176px; padding: 2px 0; resize: none; overflow-y: auto; background: transparent; border: 0; outline: 0; }
 .composer textarea::placeholder { color: var(--text-muted); }
+.composer__toolbar { position: absolute; top: 9px; left: 12px; right: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.composer__project, .composer__mode { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-muted); font: inherit; font-size: 12px; background: transparent; border: 0; }
+.composer__project { max-width: 65%; padding: 3px 5px; cursor: pointer; }
+.composer__project span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer__project:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-subtle); border-radius: var(--radius-sm); }
+.composer__project:disabled { cursor: not-allowed; opacity: .7; }
+.composer__mode select { appearance: none; padding: 3px 18px 3px 5px; color: var(--text-secondary); font: inherit; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.composer__mode { position: relative; }
+.composer__mode svg { position: absolute; right: 4px; pointer-events: none; }
 .composer__submit { position: absolute; right: 11px; bottom: 11px; color: #102019; background: var(--accent); border-radius: 50%; }
 .composer__submit:hover:not(:disabled) { color: #102019; background: var(--accent-hover); }
 .composer-placeholder { display: grid; place-items: center; min-height: 58px; color: var(--text-muted); background: var(--bg-subtle); border: 1px dashed var(--border-strong); border-radius: var(--radius-md); }
+.project-picker { width: min(100%, 520px); }
+.project-picker__path { display: flex; align-items: center; gap: 7px; margin: 18px 0 10px; padding: 9px 10px; color: var(--text-secondary); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.project-picker__path code { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-picker__list { display: grid; max-height: 280px; overflow-y: auto; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.project-picker__item { display: flex; align-items: center; gap: 9px; padding: 10px 5px; color: var(--text-secondary); text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.project-picker__item:last-child { border-bottom: 0; }
+.project-picker__item:hover { color: var(--text-primary); background: var(--bg-subtle); }
+.project-picker__state { display: flex; align-items: center; gap: 7px; min-height: 90px; color: var(--text-muted); }
+.project-picker__actions { margin-top: 18px; }
 .inline-error { margin: 0 4px 8px; color: var(--danger); font-size: 12px; }
 
 .chat-header { display: flex; align-items: center; justify-content: space-between; }
@@ -197,14 +215,7 @@ code, pre { font-family: var(--font-mono); }
 .permission-dialog dt { color: var(--text-muted); }
 .permission-dialog dd { min-width: 0; margin: 0; }
 .permission-dialog dd code { white-space: pre-wrap; overflow-wrap: anywhere; }
-.scope-selector { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; border: 0; }
-.scope-selector legend { width: 100%; margin-bottom: 6px; color: var(--text-muted); font-size: 12px; }
-.scope-selector label { cursor: pointer; }
-.scope-selector input { position: absolute; opacity: 0; pointer-events: none; }
-.scope-selector span { display: inline-flex; padding: 5px 9px; color: var(--text-secondary); background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-sm); }
-.scope-selector input:checked + span { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
-.scope-selector input:focus-visible + span { outline: 2px solid var(--focus); outline-offset: 2px; }
-.permission-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.permission-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 22px; }
 .create-dialog { width: min(100%, 620px); }
 .delete-dialog { width: min(100%, 460px); }
 .delete-dialog__title { display: flex; align-items: flex-start; gap: 10px; }

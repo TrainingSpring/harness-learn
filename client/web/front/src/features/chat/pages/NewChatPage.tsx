@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { PermissionMode } from "../../../api/types";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../../components/EmptyState";
 import { ErrorState } from "../../../components/ErrorState";
@@ -14,11 +15,13 @@ import { Composer } from "../components/Composer";
 export function NewChatPage() {
   const [params] = useSearchParams();
   const [selectedId, setSelectedId] = useState<string | null>(params.get("agentId"));
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>("plan");
+  const [projectPath, setProjectPath] = useState<string | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const agents = useQuery({ queryKey: ["agents"], queryFn: listAgents });
   const create = useMutation({
-    mutationFn: ({ agentId, text }: { agentId: string; text: string }) => createSession({ mode: "DIRECT", agentId, title: null }).then((session) => ({ session, text })),
+    mutationFn: ({ agentId, text }: { agentId: string; text: string }) => createSession({ mode: "DIRECT", agentId, title: null, permissionMode, projectPath }).then((session) => ({ session, text })),
     onSuccess: ({ session, text }) => {
       void queryClient.invalidateQueries({ queryKey: ["sessions"] });
       navigate(`/sessions/${encodeURIComponent(session.id)}`, { replace: true, state: { initialMessage: text } });
@@ -46,7 +49,7 @@ export function NewChatPage() {
       <footer className="composer-dock">
         {create.isError && <p className="inline-error" role="alert">{create.error.message}</p>}
         {selected ? (
-          <Composer autoFocus isRunning={create.isPending} onStop={() => undefined} onSend={(text) => create.mutate({ agentId: selected.id, text })} placeholder={`发消息给 ${selected.name}`} />
+          <Composer autoFocus isRunning={create.isPending} onStop={() => undefined} onSend={(text) => create.mutate({ agentId: selected.id, text })} placeholder={`发消息给 ${selected.name}`} projectPath={projectPath} isProjectLocked={false} permissionMode={permissionMode} onProjectChange={setProjectPath} onPermissionModeChange={setPermissionMode} />
         ) : (
           <div className="composer-placeholder">选择角色后即可输入消息</div>
         )}

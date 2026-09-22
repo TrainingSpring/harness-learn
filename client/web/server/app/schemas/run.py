@@ -26,7 +26,7 @@ class PermissionDecisionRequest(ApiModel):
 
     call_id: str = Field(min_length=1, max_length=200)
     decision: Literal["allow", "deny"]
-    scope: Literal["once", "session", "agent"]
+    scope: Literal["once", "session"]
 
 
 class ServerEvent(ApiModel):
@@ -36,4 +36,3 @@ class ServerEvent(ApiModel):
     run_id: str
     session_id: str
     data: dict[str, Any]
-

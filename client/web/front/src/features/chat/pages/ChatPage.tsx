@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
@@ -6,7 +6,7 @@ import { EmptyState } from "../../../components/EmptyState";
 import { ErrorState } from "../../../components/ErrorState";
 import { Skeleton } from "../../../components/Skeleton";
 import { PermissionDialog } from "../../permissions/components/PermissionDialog";
-import { getSession, listMessages } from "../../sessions/api";
+import { getSession, listMessages, updateSessionPermissionMode, updateSessionProject } from "../../sessions/api";
 import { ChatHeader } from "../components/ChatHeader";
 import { Composer } from "../components/Composer";
 import { MessageList } from "../components/MessageList";
@@ -20,9 +20,18 @@ export function ChatPage() {
   const location = useLocation();
   const initialSent = useRef(false);
   const [optimisticText, setOptimisticText] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const session = useQuery({ queryKey: ["session", sessionId], queryFn: () => getSession(sessionId), enabled: Boolean(sessionId) });
   const messages = useQuery({ queryKey: ["messages", sessionId], queryFn: () => listMessages(sessionId), enabled: Boolean(sessionId) });
   const run = useChatRun(sessionId);
+  const updateMode = useMutation({
+    mutationFn: (permissionMode: "plan" | "build" | "yolo") => updateSessionPermissionMode(sessionId, permissionMode),
+    onSuccess: (updated) => { queryClient.setQueryData(["session", sessionId], (current: typeof updated | undefined) => current ? { ...current, ...updated } : updated); },
+  });
+  const updateProject = useMutation({
+    mutationFn: (projectPath: string | null) => updateSessionProject(sessionId, projectPath),
+    onSuccess: (updated) => { queryClient.setQueryData(["session", sessionId], (current: typeof updated | undefined) => current ? { ...current, ...updated } : updated); },
+  });
 
   const send = async (text: string) => {
     setOptimisticText(text);
@@ -54,7 +63,16 @@ export function ChatPage() {
       )}
       <footer className="composer-dock">
         {run.error && <p className="inline-error" role="alert">{run.error}</p>}
-        <Composer isRunning={run.status !== "idle"} onStop={() => { void run.stop(); }} onSend={(text) => { void send(text); }} />
+        <Composer
+          isRunning={run.status !== "idle"}
+          onStop={() => { void run.stop(); }}
+          onSend={(text) => { void send(text); }}
+          projectPath={session.data.projectPath}
+          isProjectLocked={session.data.isProjectLocked}
+          permissionMode={session.data.permissionMode}
+          onProjectChange={(path) => { updateProject.mutate(path); }}
+          onPermissionModeChange={(mode) => { updateMode.mutate(mode); }}
+        />
       </footer>
       {run.permission && <PermissionDialog request={run.permission} isSubmitting={run.permissionSubmitting} onDecision={(decision, scope) => { void run.resolvePermission(decision, scope); }} />}
     </div>

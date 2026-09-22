@@ -76,9 +76,9 @@ it("编辑时默认遮蔽回显 API Key，并支持显示和隐藏", async () =>
   const apiKeyInput = await screen.findByLabelText("API Key", { exact: true });
   expect(apiKeyInput).toHaveValue("sk-saved-key");
   expect(apiKeyInput).toHaveAttribute("type", "password");
-  await user.click(screen.getByRole("button", { name: "显示 API Key" }));
+  await user.click(screen.getByRole("button", { name: "显示 API Key 内容" }));
   expect(apiKeyInput).toHaveAttribute("type", "text");
-  await user.click(screen.getByRole("button", { name: "隐藏 API Key" }));
+  await user.click(screen.getByRole("button", { name: "隐藏 API Key 内容" }));
   expect(apiKeyInput).toHaveAttribute("type", "password");
   await user.click(screen.getByRole("button", { name: "刷新模型列表" }));
   await user.selectOptions(screen.getByLabelText("模型"), "gpt-5-mini");

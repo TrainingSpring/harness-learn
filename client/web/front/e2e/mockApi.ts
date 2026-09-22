@@ -30,6 +30,9 @@ const session = {
   lastSequenceNo: 2,
   createdAt: "2026-09-12T08:00:00Z",
   updatedAt: "2026-09-12T08:00:00Z",
+  permissionMode: "plan",
+  projectPath: null,
+  isProjectLocked: false,
 };
 
 const list = <T,>(items: T[]) => ({ items, pagination: { limit: 100, offset: 0, hasMore: false } });
@@ -74,7 +77,6 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
         expertise: string[];
         llmProfileId: string;
         tools: string[];
-        permissionMode: string;
         isEnabled: boolean;
       };
       const createdAgent = {
@@ -86,7 +88,6 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
         tools: requestBody.tools,
         isEnabled: requestBody.isEnabled,
         llmProfileId: requestBody.llmProfileId,
-        permissionMode: requestBody.permissionMode,
       };
       agents = [...agents, createdAgent];
       return json(route, createdAgent, 201);
@@ -100,12 +101,28 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
         expertise: ["Documentation", "Technical Writing"],
       });
     }
-    if (path === `/api/agents/${agent.id}`) return json(route, { ...agent, llmProfileId: "llm_LOCAL01", permissionMode: "BUILD" });
+    if (path === `/api/agents/${agent.id}`) return json(route, { ...agent, llmProfileId: "llm_LOCAL01" });
     if (path === "/api/sessions" && method === "GET") return json(route, list(hasSession ? [session] : []));
-    if (path === "/api/sessions" && method === "POST") { hasSession = true; return json(route, session, 201); }
+    if (path === "/api/sessions" && method === "POST") {
+      const requestBody = request.postDataJSON() as { permissionMode?: string; projectPath?: string | null };
+      session.permissionMode = requestBody.permissionMode ?? "plan";
+      session.projectPath = requestBody.projectPath ?? null;
+      hasSession = true;
+      return json(route, session, 201);
+    }
     if (path === `/api/sessions/${session.id}`) return json(route, { ...session, messages });
+    if (path === "/api/sessions/projects" && method === "GET") return json(route, { path: ".", name: "harness-learn", directories: [{ path: "code", name: "code" }, { path: "client", name: "client" }] });
+    if (path === `/api/sessions/${session.id}/permission-mode` && method === "PATCH") {
+      session.permissionMode = (request.postDataJSON() as { permissionMode: string }).permissionMode;
+      return json(route, session);
+    }
+    if (path === `/api/sessions/${session.id}/project` && method === "PATCH") {
+      session.projectPath = (request.postDataJSON() as { projectPath: string | null }).projectPath;
+      return json(route, session);
+    }
     if (path === `/api/sessions/${session.id}/messages` && method === "GET") return json(route, { items: messages });
     if (path === `/api/sessions/${session.id}/messages` && method === "POST") {
+      session.isProjectLocked = true;
       messages.push(contextItem("item_USER000001", 1, "USER_MESSAGE", { text: options.permission ? "写入说明" : "请检查权限模块" }));
       if (options.permission) {
         messages.push(contextItem("item_CALL000001", 2, "FUNCTION_CALL", { name: "write", arguments: '{"target_path":"README.md"}' }, "call_WRITE01"));
@@ -115,7 +132,7 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
       const body = options.permission
         ? event("run.started", { status: "running" })
           + event("tool.started", { itemId: "item_CALL000001", callId: "call_WRITE01", toolName: "write", arguments: '{"target_path":"README.md"}' })
-          + event("permission.required", { callId: "call_WRITE01", toolName: "write", action: "filesystem.write", resource: "/workspace/README.md", allowedScopes: ["once", "session", "agent"] })
+          + event("permission.required", { callId: "call_WRITE01", toolName: "write", action: "filesystem.write", resource: "/workspace/README.md", allowedScopes: ["once", "session"] })
         : event("run.started", { status: "running" })
           + event("message.delta", { text: "权限模块结构清晰。" })
           + event("message.completed", { itemId: "item_AGENT00001", text: "权限模块结构清晰。" })

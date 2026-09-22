@@ -42,7 +42,6 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
   await user.click(screen.getByLabelText("read"));
   await user.selectOptions(screen.getByLabelText("LLM 配置"), "llm_OPENAI0001");
   await user.click(screen.getByRole("button", { name: "AI 生成角色信息" }));
-  await user.selectOptions(screen.getByLabelText("权限模式"), "PLAN");
   await user.click(screen.getByRole("button", { name: "创建角色" }));
 
   expect(onSubmit).toHaveBeenCalledWith({
@@ -52,7 +51,6 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
     expertise: ["Documentation", "Technical Writing"],
     llmProfileId: "llm_OPENAI0001",
     tools: ["read"],
-    permissionMode: "PLAN",
     isEnabled: true,
   });
 });
