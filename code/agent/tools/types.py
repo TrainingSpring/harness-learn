@@ -135,15 +135,27 @@ class PreparedToolCall:
     permission_request: PermissionRequest
 
 
-def handle_path(ctx:ExecutionContext,target_path:str):
+def handle_path(ctx: ExecutionContext, target_path: str) -> str:
     """
     处理路径,
     如果是相对路径，则返回绝对路径，否则返回原路径
     :param ctx: ExecutionContext
     :param target_path: 目标路径
     """
-    if not os.path.isabs(target_path):
-        if os.name == "nt" and target_path.startswith("/"):
-            target_path = target_path[1:]
-        return os.path.join(ctx.workspace, target_path)
-    return target_path
+    if ctx.project_path is None:
+        raise ValueError("PROJECT_NOT_SELECTED")
+    path = target_path
+    if not os.path.isabs(path):
+        if os.name == "nt" and path.startswith("/"):
+            path = path[1:]
+        path = os.path.join(ctx.project_path, path)
+    resolved = os.path.normpath(os.path.abspath(path))
+    project = os.path.normpath(os.path.abspath(ctx.project_path))
+    try:
+        if os.path.commonpath([resolved, project]) != project:
+            raise ValueError("PROJECT_PATH_ESCAPE")
+    except ValueError as error:
+        if str(error) == "PROJECT_PATH_ESCAPE":
+            raise
+        raise ValueError("PROJECT_PATH_ESCAPE") from error
+    return resolved

@@ -1,6 +1,7 @@
 """Session 的 SQLite 仓储。"""
 
 import json
+import os
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -195,6 +196,70 @@ class SessionRepository:
             )
         return updated
 
+    def update_project_path_before_first_message(
+        self,
+        session_id: str,
+        project_path: str | None,
+    ) -> Session:
+        """仅允许在首条用户消息前设置或更换项目目录。"""
+        validate_id("session", session_id)
+        if project_path is not None:
+            if not isinstance(project_path, str) or not os.path.isabs(project_path):
+                raise ValueError("project_path 必须是绝对路径或 None")
+            project_path = os.path.normpath(os.path.abspath(project_path))
+            if not os.path.isdir(project_path):
+                raise ValueError("project_path 必须是存在的目录")
+        with self.database.transaction() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM sessions WHERE id = ?",
+                (session_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"Session 不存在: {session_id}")
+            locked = connection.execute(
+                """
+                SELECT 1 FROM context_items
+                WHERE session_id = ? AND kind = 'USER_MESSAGE'
+                LIMIT 1
+                """,
+                (session_id,),
+            ).fetchone()
+            if locked is not None:
+                raise ValueError("Session 已有用户消息，不能更改项目目录")
+            connection.execute(
+                """
+                UPDATE sessions
+                SET project_path = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (project_path, _utc_now(), session_id),
+            )
+        updated = self.get(session_id)
+        if updated is None:
+            raise ValueError(f"Session 不存在: {session_id}")
+        return updated
+
+    def update_permission_mode(self, session_id: str, permission_mode: str) -> Session:
+        """更新空闲 Session 的默认权限模式。"""
+        validate_id("session", session_id)
+        if permission_mode not in {"plan", "build", "yolo"}:
+            raise ValueError(f"未知的权限模式: {permission_mode}")
+        with self.database.transaction() as connection:
+            changed = connection.execute(
+                """
+                UPDATE sessions
+                SET permission_mode = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (permission_mode, _utc_now(), session_id),
+            ).rowcount
+            if changed == 0:
+                raise ValueError(f"Session 不存在: {session_id}")
+        updated = self.get(session_id)
+        if updated is None:
+            raise ValueError(f"Session 不存在: {session_id}")
+        return updated
+
     def list_recent(self, limit: int, offset: int) -> list[Session]:
         """按更新时间倒序分页读取最近会话。"""
         self._validate_page(limit, offset)
@@ -225,6 +290,8 @@ class SessionRepository:
             title=title,
             conversation_mode=mode,
             status="ACTIVE",
+            permission_mode="plan",
+            project_path=None,
             created_at=now,
             updated_at=now,
         )
@@ -235,15 +302,17 @@ class SessionRepository:
         connection.execute(
             """
             INSERT INTO sessions (
-                id, title, conversation_mode, status,
+                id, title, conversation_mode, status, permission_mode, project_path,
                 created_at, updated_at, closed_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 session.id,
                 session.title,
                 session.conversation_mode,
                 session.status,
+                session.permission_mode,
+                session.project_path,
                 session.created_at,
                 session.updated_at,
                 session.closed_at,
@@ -259,6 +328,8 @@ class SessionRepository:
                 title=row["title"],
                 conversation_mode=row["conversation_mode"],
                 status=row["status"],
+                permission_mode=row["permission_mode"],
+                project_path=row["project_path"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
                 closed_at=row["closed_at"],

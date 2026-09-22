@@ -57,7 +57,6 @@ class ContextServiceTests(unittest.TestCase):
                     expertise=["Python"],
                     llm_profile_id="llm_7KQ2M8P4XZ",
                     tools=["read"],
-                    permission_mode="BUILD",
                 )
             )
         self.session = SessionRepository(self.database).create_with_agents(

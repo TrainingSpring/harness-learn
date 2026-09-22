@@ -29,7 +29,6 @@ class StorageTypeTests(unittest.TestCase):
             expertise=["Python"],
             llm_profile_id="llm_7KQ2M8P4XZ",
             tools=["read", "write"],
-            permission_mode="build",
         )
 
         self.assertEqual(profile.tools, ["read", "write"])

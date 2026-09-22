@@ -67,7 +67,6 @@ def test_runtime_failure_persists_new_protocol_items_and_current_context():
                     expertise=["Python"],
                     llm_profile_id="llm_7KQ2M8P4XZ",
                     tools=["read"],
-                    permission_mode="BUILD",
                 )
             )
             session = SessionRepository(database).create_with_agents(
@@ -80,8 +79,10 @@ def test_runtime_failure_persists_new_protocol_items_and_current_context():
                 session=session,
                 context=context,
                 context_service=context_service,
+                session_repository=SessionRepository(database),
                 members=(member,),
                 runtimes={member.agent_id: FailingRuntime()},
+                refresh_runtimes=lambda _session: {member.agent_id: FailingRuntime()},
             )
 
             with pytest.raises(RuntimeError, match="provider unavailable"):

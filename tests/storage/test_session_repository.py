@@ -122,6 +122,55 @@ class SessionRepositoryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.repository.save_current_context(session.id, [{"value": object()}])
 
+    def test_new_session_has_plan_mode_and_no_project_path(self):
+        """新 Session 默认是 PLAN 空项目会话。"""
+        session = self.repository.create("DIRECT")
+
+        self.assertEqual(session.permission_mode, "plan")
+        self.assertIsNone(session.project_path)
+
+    def test_project_path_can_change_only_before_first_user_message(self):
+        """首条用户消息后，项目根目录不允许再切换。"""
+        session = self.repository.create("DIRECT")
+        project = str(Path(self.temp_dir.name) / "project")
+        Path(project).mkdir()
+
+        updated = self.repository.update_project_path_before_first_message(
+            session.id,
+            project,
+        )
+        self.assertEqual(updated.project_path, project)
+
+        self.database.connection.execute(
+            """
+            INSERT INTO context_items (
+                id, session_id, sequence_no, kind, author_agent_id,
+                target_agent_id, visibility, call_id, caused_by_item_id,
+                payload_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "item_4N9C1R7WBA",
+                session.id,
+                1,
+                "USER_MESSAGE",
+                None,
+                None,
+                "PUBLIC",
+                None,
+                None,
+                '{"text": "开始"}',
+                "2026-09-22T00:00:00+00:00",
+            ),
+        )
+        self.database.connection.commit()
+
+        with self.assertRaises(ValueError):
+            self.repository.update_project_path_before_first_message(
+                session.id,
+                None,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

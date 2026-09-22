@@ -154,39 +154,12 @@ class MigrationTests(unittest.TestCase):
     def test_version_two_database_is_upgraded_with_empty_current_context(self):
         """已有 v2 数据升级后应保留会话并增加空的当前上下文。"""
         connection = sqlite3.connect(":memory:")
+        _create_version_one_schema(connection)
         connection.execute(
             "CREATE TABLE schema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
         )
         connection.execute(
             "INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '2')"
-        )
-        connection.execute(
-            """
-            CREATE TABLE sessions (
-                id TEXT PRIMARY KEY,
-                title TEXT,
-                conversation_mode TEXT NOT NULL,
-                status TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                closed_at TEXT
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE llm_profiles (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
-                provider TEXT NOT NULL,
-                base_url TEXT,
-                model TEXT NOT NULL,
-                credential_ref TEXT NOT NULL,
-                options_json TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
         )
         connection.execute(
             """
@@ -209,26 +182,12 @@ class MigrationTests(unittest.TestCase):
     def test_version_three_profile_drops_credential_reference_and_requires_api_key(self):
         """v3 环境变量引用不能伪装成 API Key，升级后必须重新配置。"""
         connection = sqlite3.connect(":memory:")
+        _create_version_one_schema(connection)
         connection.execute(
             "CREATE TABLE schema_metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
         )
         connection.execute(
             "INSERT INTO schema_metadata (key, value) VALUES ('schema_version', '3')"
-        )
-        connection.execute(
-            """
-            CREATE TABLE llm_profiles (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL UNIQUE,
-                provider TEXT NOT NULL,
-                base_url TEXT,
-                model TEXT NOT NULL,
-                credential_ref TEXT NOT NULL,
-                options_json TEXT NOT NULL DEFAULT '{}',
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
         )
         connection.execute(
             """

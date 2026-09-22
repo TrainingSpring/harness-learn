@@ -70,8 +70,8 @@ class RuntimePermissionTests(unittest.TestCase):
         )
         self.permission = PermissionManager(
             mode=PermissionMode.BUILD,
-            workspace="/workspace",
-            agent_id="agent_1V3ASAXQ2A",
+            session_id=self.ctx.session_id,
+            project_path=self.ctx.project_path,
             hard_safety_policy=HardSafetyPolicy(),
             protected_resource_policy=ProtectedResourcePolicy(["/system"]),
         )

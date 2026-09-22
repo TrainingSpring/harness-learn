@@ -41,7 +41,6 @@ class AgentFactoryTests(unittest.TestCase):
                 expertise=["Python"],
                 llm_profile_id="llm_7KQ2M8P4XZ",
                 tools=["read", "write"],
-                permission_mode="BUILD",
             )
         )
 
@@ -55,7 +54,7 @@ class AgentFactoryTests(unittest.TestCase):
 
         self.assertIsInstance(agent, Agent)
         self.assertEqual(agent.agent_id, "agent_1V3ASAXQ2A")
-        self.assertEqual(agent.workspace, str(Path(self.temp_dir.name).resolve()))
+        self.assertFalse(hasattr(agent, "workspace"))
         self.assertEqual(
             tuple(tool.schema["name"] for tool in agent.tool_definitions),
             ("read", "write"),

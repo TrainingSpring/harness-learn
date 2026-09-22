@@ -77,6 +77,29 @@ class ToolPreparationTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.error.code, "INVALID_ARGUMENTS")
 
+    def test_prepare_call_rejects_path_escaping_the_session_project(self):
+        """项目外目标不能进入权限模式或实际工具执行。"""
+        with self.assertRaises(ToolCallPreparationError) as raised:
+            self.tools.prepare_call("read", {"target_path": "../secret.txt"}, "call_004")
+
+        self.assertEqual(raised.exception.error.code, "PROJECT_PATH_ESCAPE")
+
+    def test_prepare_call_rejects_file_tools_without_a_project(self):
+        """空项目仍可聊天，但文件工具必须返回稳定错误。"""
+        tools = Tools(ExecutionContext(None, "code_editor", "session_002"))
+        tools.register(
+            Tool(
+                {"name": "read"},
+                lambda _ctx, **_args: ToolResult.success(),
+                PermissionRequirement(PermissionAction.FILE_READ, "target_path"),
+            )
+        )
+
+        with self.assertRaises(ToolCallPreparationError) as raised:
+            tools.prepare_call("read", {"target_path": "README.md"}, "call_005")
+
+        self.assertEqual(raised.exception.error.code, "PROJECT_NOT_SELECTED")
+
     def test_default_grant_resource_is_file_parent_directory(self):
         """文件授权默认提升到目标父目录，以减少重复逐文件确认。"""
         call = self.tools.prepare_call("read", {"target_path": "src/app.py"}, "call_005")

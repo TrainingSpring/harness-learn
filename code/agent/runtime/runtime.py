@@ -50,7 +50,7 @@ class Runtime:
             llm: LLM 调用适配器。
             tools: 当前 Agent 已注册的工具集。
             ctx: 工具共享的执行环境和身份信息。
-            permission: 当前 Agent 的权限管理器。
+            permission: 当前 Session 的共享权限管理器。
         """
         self.llm = llm
         self.tools = tools
@@ -67,7 +67,10 @@ class Runtime:
                 "content": [
                     {
                         "type": "input_text",
-                        "text": f"当前系统环境：{'windows' if os.name == 'nt' else 'linux'},工作目录{ctx.workspace}",
+                        "text": (
+                            f"当前系统环境：{'windows' if os.name == 'nt' else 'linux'},"
+                            f"项目目录{ctx.project_path or '未选择'}"
+                        ),
                     }
                 ],
             }
@@ -330,7 +333,7 @@ class Runtime:
         """构造统一的权限拒绝工具结果。"""
         return ToolResult.failure(
             "PERMISSION_DENIED",
-            "当前 Agent 无权执行该工具调用",
+            "当前 Session 不允许执行该工具调用",
             details={
                 "action": request.action.value,
                 "resource": request.resource,

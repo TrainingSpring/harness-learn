@@ -1,14 +1,16 @@
 """创建、恢复和执行固定成员 Session 的应用服务。"""
 
 from collections.abc import Generator
+from collections.abc import Callable
 
 from context.context import Context
 from head.llm import LLM
 from head.types import LLMResponse, LLMResponseOutputItem
 from permission.PermissionManager import PermissionManager
-from permission.types import PermissionResponse
+from permission.types import PermissionMode, PermissionResponse
 from runtime.agent import Agent
 from runtime.agent_factory import AgentFactory
+from runtime.prompt_builder import PromptBuilder
 from runtime.runtime import Runtime
 from runtime.runtime_events import PermissionRequiredEvent, RuntimeEvent
 from storage.context_service import ContextService
@@ -17,6 +19,7 @@ from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session import SessionRepository
 from storage.repositories.session_agent import SessionAgentRepository
+from storage.repositories.session_permission_rule import SessionPermissionRuleRepository
 from storage.types import Session, SessionAgent
 from tools.tools import Tools
 
@@ -32,14 +35,18 @@ class SessionExecution:
         session: Session,
         context: Context,
         context_service: ContextService,
+        session_repository: SessionRepository,
         members: tuple[SessionAgent, ...],
         runtimes: dict[str, Runtime],
+        refresh_runtimes: Callable[[Session], dict[str, Runtime]],
     ) -> None:
         self.session = session
         self.context = context
         self.context_service = context_service
+        self._session_repository = session_repository
         self.members = members
         self.runtimes = runtimes
+        self._refresh_runtimes = refresh_runtimes
         self._active_member_index: int | None = None
         self._current_member_index: int | None = None
         self._recorded_output_call_ids = {
@@ -81,6 +88,28 @@ class SessionExecution:
             self.runtimes[self.members[member_index].agent_id].cancel()
         self._active_member_index = None
         self.context_service.save_context(self.context)
+
+    def set_project_path(self, project_path: str | None) -> None:
+        """在首条用户消息前更新当前 Session 的项目目录。"""
+        self._require_idle_for_settings()
+        self.session = self._session_repository.update_project_path_before_first_message(
+            self.session.id,
+            project_path,
+        )
+        self.runtimes = self._refresh_runtimes(self.session)
+
+    def set_permission_mode(self, permission_mode: str) -> None:
+        """在没有活动 Runtime 时更新当前 Session 的权限模式。"""
+        self._require_idle_for_settings()
+        self.session = self._session_repository.update_permission_mode(
+            self.session.id,
+            permission_mode,
+        )
+        self.runtimes = self._refresh_runtimes(self.session)
+
+    def _require_idle_for_settings(self) -> None:
+        if self._active_member_index is not None or self._current_member_index is not None:
+            raise ValueError("Session 正在运行，不能修改会话设置")
 
     def _drive_from(
         self,
@@ -248,38 +277,64 @@ class SessionService:
         )
         context_service = ContextService(ContextItemRepository(self.database), session.id)
         context_service.restore_context(context, members[0].agent_id)
-        runtimes = {
-            member.agent_id: self._create_runtime(agents[member.agent_id], member)
-            for member in members
-        }
+        def create_runtimes(current_session: Session) -> dict[str, Runtime]:
+            return self._create_runtimes(current_session, members, agents)
+
+        runtimes = create_runtimes(session)
         return SessionExecution(
             session=session,
             context=context,
             context_service=context_service,
+            session_repository=self.sessions,
             members=members,
             runtimes=runtimes,
+            refresh_runtimes=create_runtimes,
         )
 
+    def _create_runtimes(
+        self,
+        session: Session,
+        members: tuple[SessionAgent, ...],
+        agents: dict[str, Agent],
+    ) -> dict[str, Runtime]:
+        """为一个 Session 生成共享权限、独立执行状态的成员 Runtime。"""
+        permission = PermissionManager(
+            mode=PermissionMode(session.permission_mode),
+            session_id=session.id,
+            project_path=session.project_path,
+            rule_repository=SessionPermissionRuleRepository(self.database),
+        )
+        return {
+            member.agent_id: self._create_runtime(
+                agents[member.agent_id],
+                member,
+                permission,
+                session.permission_mode,
+                session.project_path,
+            )
+            for member in members
+        }
+
     @staticmethod
-    def _create_runtime(agent: Agent, member: SessionAgent) -> Runtime:
+    def _create_runtime(
+        agent: Agent,
+        member: SessionAgent,
+        permission: PermissionManager,
+        permission_mode: str,
+        project_path: str | None,
+    ) -> Runtime:
         """为固定成员构造独立的 Agent Runtime 能力环境。"""
         if member.agent_id != agent.agent_id:
             raise ValueError("SessionAgent 与 Agent 身份不一致")
-        ctx = ExecutionContext(agent.workspace, agent.agent_id, member.session_id)
+        ctx = ExecutionContext(project_path, agent.agent_id, member.session_id)
         llm = LLM(
             agent.llm_config.base_url,
             agent.llm_config.api_key,
             agent.llm_config.model,
-            agent.llm_config.instructions,
+            PromptBuilder().build(agent.profile, permission_mode=permission_mode),
         )
         tools = Tools(ctx)
         tools.batch_register(list(agent.tool_definitions))
-        permission = PermissionManager(
-            mode=agent.permission_mode,
-            workspace=agent.workspace,
-            agent_id=agent.agent_id,
-            rule_repository=agent.permission_rule_repository,
-        )
         return Runtime(llm, tools, ctx, permission)
 
     def _require_enabled_agents(self, agent_ids: list[str]) -> None:

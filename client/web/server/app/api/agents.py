@@ -40,7 +40,6 @@ def _detail(profile: AgentProfile) -> AgentDetail:
     return AgentDetail(
         **_summary(profile).model_dump(),
         llm_profile_id=profile.llm_profile_id,
-        permission_mode=profile.permission_mode,
     )
 
 
@@ -102,7 +101,7 @@ async def create_agent(
     """创建并持久化一个角色配置。
 
     Args:
-        request: 浏览器提交的角色描述、LLM 引用、工具和权限模式。
+        request: 浏览器提交的角色描述、LLM 引用和工具集合。
         services: 当前 workspace 共享的仓储与工具目录。
 
     Returns:
@@ -128,7 +127,6 @@ async def create_agent(
         expertise=request.expertise,
         llm_profile_id=request.llm_profile_id,
         tools=request.tools,
-        permission_mode=request.permission_mode,
         is_enabled=request.is_enabled,
     )
     try:

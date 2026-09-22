@@ -17,7 +17,6 @@ class PermissionRequiredEvent:
     available_scopes: tuple[PermissionScope, ...] = (
         PermissionScope.ONCE,
         PermissionScope.SESSION,
-        PermissionScope.AGENT,
     )
 
 

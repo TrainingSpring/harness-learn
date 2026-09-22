@@ -68,8 +68,8 @@ def _waiting_runtime(session_id: str, call_id: str) -> tuple[Runtime, Context]:
         execution_context,
         PermissionManager(
             mode=PermissionMode.BUILD,
-            workspace="/workspace",
-            agent_id=execution_context.agent_id,
+            session_id=execution_context.session_id,
+            project_path=execution_context.project_path,
         ),
     )
     return runtime, Context(PermissionLLM(call_id), session_id=session_id)

@@ -1,10 +1,7 @@
 """可跨 Session 复用的稳定 Agent 定义。"""
 
 from dataclasses import dataclass
-from typing import Any
-
 from head.types import LLMConfig
-from permission.types import PermissionMode
 from storage.types import AgentProfile
 from tools.types import Tool
 
@@ -17,6 +14,3 @@ class Agent:
     profile: AgentProfile
     llm_config: LLMConfig
     tool_definitions: tuple[Tool, ...]
-    permission_mode: PermissionMode
-    workspace: str
-    permission_rule_repository: Any | None = None

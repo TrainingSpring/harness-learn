@@ -5,7 +5,7 @@ import sqlite3
 from .errors import StorageSchemaError
 
 
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 
 def migrate(connection: sqlite3.Connection) -> None:
@@ -61,6 +61,9 @@ def migrate(connection: sqlite3.Connection) -> None:
         if version == 3:
             _migrate_version_three_to_four(connection)
             version = 4
+        if version == 4:
+            _migrate_version_four_to_five(connection)
+            version = 5
 
         if version != CURRENT_SCHEMA_VERSION:
             raise StorageSchemaError(
@@ -362,5 +365,45 @@ def _migrate_version_three_to_four(connection: sqlite3.Connection) -> None:
         UPDATE schema_metadata
         SET value = '4'
         WHERE key = 'schema_version'
+        """
+    )
+
+
+def _migrate_version_four_to_five(connection: sqlite3.Connection) -> None:
+    """把权限模式和授权规则迁移到 Session。
+
+    Agent 级规则没有可安全推断的目标 Session，因此不迁移。已有 Session
+    统一恢复为 PLAN 空项目会话。
+    """
+    connection.executescript(
+        """
+        ALTER TABLE sessions
+        ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'plan';
+
+        ALTER TABLE sessions
+        ADD COLUMN project_path TEXT;
+
+        CREATE TABLE session_permission_rules (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            action TEXT NOT NULL,
+            resource_kind TEXT NOT NULL,
+            resource_value TEXT,
+            decision TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (session_id, action, resource_kind, resource_value),
+            FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX idx_session_permission_rules_session
+            ON session_permission_rules(session_id, updated_at);
+
+        DROP TABLE permission_agent_rules;
+        ALTER TABLE agent_profiles DROP COLUMN permission_mode;
+
+        UPDATE schema_metadata
+        SET value = '5'
+        WHERE key = 'schema_version';
         """
     )

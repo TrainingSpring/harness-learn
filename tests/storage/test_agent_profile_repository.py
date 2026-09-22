@@ -57,7 +57,6 @@ class AgentProfileRepositoryTests(unittest.TestCase):
             expertise=expertise or ["Python", "代码实现"],
             llm_profile_id="llm_7KQ2M8P4XZ",
             tools=["read", "write"],
-            permission_mode="BUILD",
             is_enabled=is_enabled,
         )
 
@@ -70,7 +69,7 @@ class AgentProfileRepositoryTests(unittest.TestCase):
         self.assertEqual(loaded.name, "代码专家")
         self.assertEqual(loaded.expertise, ["Python", "代码实现"])
         self.assertEqual(loaded.tools, ["read", "write"])
-        self.assertEqual(loaded.permission_mode, "BUILD")
+        self.assertFalse(hasattr(loaded, "permission_mode"))
         self.assertIsNotNone(loaded.created_at)
 
     def test_list_enabled_can_filter_by_expertise(self):

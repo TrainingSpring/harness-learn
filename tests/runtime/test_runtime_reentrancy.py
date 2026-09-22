@@ -55,8 +55,8 @@ def test_running_runtime_rejects_a_second_run_until_the_first_finishes():
     tools = Tools(execution_context)
     permission = PermissionManager(
         mode=PermissionMode.BUILD,
-        workspace="/workspace",
-        agent_id=execution_context.agent_id,
+        session_id=execution_context.session_id,
+        project_path=execution_context.project_path,
     )
     runtime = Runtime(llm, tools, execution_context, permission)
     context = Context(PermissionLLM([]), session_id=execution_context.session_id)
@@ -90,8 +90,8 @@ def test_permission_resume_writes_tool_output_to_the_passed_context():
     ])
     permission = PermissionManager(
         mode=PermissionMode.BUILD,
-        workspace="/workspace",
-        agent_id=execution_context.agent_id,
+        session_id=execution_context.session_id,
+        project_path=execution_context.project_path,
         protected_resource_policy=ProtectedResourcePolicy(["/system"]),
     )
     runtime = Runtime(llm, tools, execution_context, permission)
@@ -133,8 +133,8 @@ def test_cancel_clears_pending_permission_and_returns_runtime_to_idle():
         execution_context,
         PermissionManager(
             mode=PermissionMode.BUILD,
-            workspace="/workspace",
-            agent_id=execution_context.agent_id,
+            session_id=execution_context.session_id,
+            project_path=execution_context.project_path,
         ),
     )
     context = Context(PermissionLLM([]), session_id=execution_context.session_id)

@@ -161,18 +161,16 @@ def read_permission_response(event: PermissionRequiredEvent) -> PermissionRespon
     options = {
         "1": (PermissionDecision.ALLOW, PermissionScope.ONCE),
         "2": (PermissionDecision.ALLOW, PermissionScope.SESSION),
-        "3": (PermissionDecision.ALLOW, PermissionScope.AGENT),
-        "4": (PermissionDecision.DENY, PermissionScope.ONCE),
-        "5": (PermissionDecision.DENY, PermissionScope.SESSION),
-        "6": (PermissionDecision.DENY, PermissionScope.AGENT),
+        "3": (PermissionDecision.DENY, PermissionScope.ONCE),
+        "4": (PermissionDecision.DENY, PermissionScope.SESSION),
     }
-    print("1. 允许本次  2. 当前会话允许  3. 当前 Agent 允许")
-    print("4. 拒绝本次  5. 当前会话拒绝  6. 当前 Agent 拒绝")
+    print("1. 允许本次  2. 当前会话允许")
+    print("3. 拒绝本次  4. 当前会话拒绝")
     while True:
         choice = input("请选择: ").strip()
         selected = options.get(choice)
         if selected is None:
-            print("无效选择，请输入 1-6。")
+            print("无效选择，请输入 1-4。")
             continue
         decision, scope = selected
         return PermissionResponse(
@@ -225,15 +223,12 @@ def build_runtime() -> tuple[Runtime, Context]:
         expertise=["通用任务"],
         llm_profile_id=generate_id("llm"),
         tools=tool_names,
-        permission_mode=PermissionMode.BUILD.value,
     )
     agent = StableAgent(
         agent_id=agent_id,
         profile=profile,
         llm_config=LLMConfig(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),
         tool_definitions=tuple(ToolCatalog().get(name) for name in tool_names),
-        permission_mode=PermissionMode.BUILD,
-        workspace=os.getcwd(),
     )
     context = Context(
         LLM(BASE_URL, API_KEY, MODEL),
@@ -243,9 +238,9 @@ def build_runtime() -> tuple[Runtime, Context]:
     tools = Tools(execution_context)
     tools.batch_register(list(agent.tool_definitions))
     permission = PermissionManager(
-        mode=agent.permission_mode,
-        workspace=agent.workspace,
-        agent_id=agent.agent_id,
+        mode=PermissionMode.BUILD,
+        session_id=session_id,
+        project_path=os.getcwd(),
     )
     runtime = Runtime(
         LLM(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),

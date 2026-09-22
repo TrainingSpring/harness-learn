@@ -82,6 +82,11 @@ class Tools:
                 ToolError("TOOL_NOT_FOUND", f"工具不存在: {name}")
             )
 
+        if self.ctx.project_path is None:
+            raise ToolCallPreparationError(
+                ToolError("PROJECT_NOT_SELECTED", "当前 Session 未选择项目目录")
+            )
+
         try:
             args = {} if arguments is None else (
                 json.loads(arguments) if isinstance(arguments, str) else arguments
@@ -98,7 +103,12 @@ class Tools:
 
         try:
             request = self.build_permission_request(tool, name, args, call_id)
-        except (KeyError, TypeError, ValueError) as error:
+        except ValueError as error:
+            code = str(error)
+            if code not in {"PROJECT_NOT_SELECTED", "PROJECT_PATH_ESCAPE"}:
+                code = "INVALID_ARGUMENTS"
+            raise ToolCallPreparationError(ToolError(code, str(error))) from error
+        except (KeyError, TypeError) as error:
             raise ToolCallPreparationError(
                 ToolError("INVALID_ARGUMENTS", str(error))
             ) from error
@@ -139,7 +149,6 @@ class Tools:
             tool_name=tool_name,
             call_id=call_id,
             session_id=self.ctx.session_id,
-            agent_id=self.ctx.agent_id,
         )
 
     def execute(self, call: PreparedToolCall) -> ToolResult:
@@ -181,9 +190,9 @@ class Tools:
 
     def _resolve_path(self, target_path: str) -> str:
         """将工具路径参数解析为基于当前 workspace 的路径。"""
-        if os.path.isabs(target_path):
-            return target_path
-        return os.path.join(self.ctx.workspace, target_path)
+        from tools.types import handle_path
+
+        return handle_path(self.ctx, target_path)
 
     @staticmethod
     def encode_result(result):

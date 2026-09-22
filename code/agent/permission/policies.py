@@ -191,17 +191,19 @@ class ModePolicy:
     """在未命中硬策略或显式规则时提供模式默认决定。
 
     Attributes:
-        _workspace: 当前 Agent 工作目录的规范化绝对路径，用于识别项目外
+        _project_path: 当前 Session 项目目录的规范化绝对路径，用于识别项目外
             文件资源。它用于默认决策，不是路径安全沙箱。
     """
 
-    def __init__(self, workspace: str) -> None:
+    def __init__(self, project_path: str | None) -> None:
         """创建工作区相关的模式策略。
 
         Args:
-            workspace: 当前 Agent 的工作目录，必须是绝对路径。
+            project_path: 当前 Session 的项目目录，必须是绝对路径。
         """
-        self._workspace = _normalise_absolute_path(workspace)
+        self._project_path = (
+            _normalise_absolute_path(project_path) if project_path else None
+        )
 
     def decide(
         self,
@@ -217,17 +219,19 @@ class ModePolicy:
         Returns:
             该模式对此类普通请求的默认 allow、deny 或 ask 决定。
 
-        项目外资源先于动作表处理：PLAN 拒绝，BUILD 询问，YOLO 允许。
+        项目外资源先于动作表处理：PLAN 拒绝，BUILD 和 YOLO 都要求确认。
         bash 的 resource 为 None，因此直接使用动作表，不会伪造项目内外
         归属。
         """
+        if self._project_path is None:
+            return PermissionDecision.DENY
         if request.resource is not None and not _is_path_within(
-            request.resource, self._workspace
+            request.resource, self._project_path
         ):
             return {
                 PermissionMode.PLAN: PermissionDecision.DENY,
                 PermissionMode.BUILD: PermissionDecision.ASK,
-                PermissionMode.YOLO: PermissionDecision.ALLOW,
+                PermissionMode.YOLO: PermissionDecision.ASK,
             }[mode]
 
         decisions = {

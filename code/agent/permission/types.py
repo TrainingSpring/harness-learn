@@ -38,7 +38,6 @@ class PermissionScope(StrEnum):
 
     ONCE = "once"
     SESSION = "session"
-    AGENT = "agent"
 
 
 class PermissionMode(StrEnum):
@@ -79,7 +78,6 @@ class PermissionRequest:
         tool_name: 发起请求的已注册工具名，仅用于呈现和诊断。
         call_id: 模型本次 function_call 的标识，用于 ONCE 规则和恢复。
         session_id: 当前 Agent 会话标识，用于 SESSION 规则。
-        agent_id: 稳定逻辑 Agent 标识，用于跨会话的 AGENT 规则。
     """
 
     action: PermissionAction
@@ -87,7 +85,6 @@ class PermissionRequest:
     tool_name: str
     call_id: str
     session_id: str
-    agent_id: str
 
     def __post_init__(self) -> None:
         """保证用于规则匹配和恢复的身份字段都存在。"""
@@ -97,8 +94,6 @@ class PermissionRequest:
             raise ValueError("call_id 不能为空")
         if not self.session_id:
             raise ValueError("session_id 不能为空")
-        if not self.agent_id:
-            raise ValueError("agent_id 不能为空")
 
 
 @dataclass(frozen=True)
@@ -110,42 +105,20 @@ class PermissionRule:
         resource: 覆盖的资源根；文件操作通常是目录，None 仅用于无资源
             动作，例如 bash.execute。
         decision: 持久化的允许或拒绝决定，禁止保存 ASK。
-        scope: 规则的生效范围。
-        call_id: ONCE 规则绑定的调用标识。
         session_id: SESSION 规则绑定的会话标识。
-        agent_id: AGENT 规则绑定的逻辑 Agent 标识。
     """
 
     action: PermissionAction
     resource: str | None
     decision: PermissionDecision
-    scope: PermissionScope
-    call_id: str | None = None
     session_id: str | None = None
-    agent_id: str | None = None
 
     def __post_init__(self) -> None:
-        """确保每种 scope 只携带自己需要的身份字段。"""
+        """Session 规则只能绑定当前 Session。"""
         if self.decision is PermissionDecision.ASK:
             raise ValueError("ASK 是暂态权限结果，不能保存为 PermissionRule")
-
-        expected_identity = {
-            PermissionScope.ONCE: ("call_id", self.call_id),
-            PermissionScope.SESSION: ("session_id", self.session_id),
-            PermissionScope.AGENT: ("agent_id", self.agent_id),
-        }
-        identity_name, identity_value = expected_identity[self.scope]
-        other_values = {
-            "call_id": self.call_id,
-            "session_id": self.session_id,
-            "agent_id": self.agent_id,
-        }
-        other_values.pop(identity_name)
-
-        if not identity_value:
-            raise ValueError(f"{self.scope.value} 规则必须绑定 {identity_name}")
-        if any(other_values.values()):
-            raise ValueError(f"{self.scope.value} 规则不能绑定其他作用域身份")
+        if not self.session_id:
+            raise ValueError("Session 规则必须绑定 session_id")
 
 
 @dataclass(frozen=True)
@@ -168,3 +141,5 @@ class PermissionResponse:
             raise ValueError("call_id 不能为空")
         if self.decision is PermissionDecision.ASK:
             raise ValueError("PermissionResponse 只能允许或拒绝")
+        if self.scope not in {PermissionScope.ONCE, PermissionScope.SESSION}:
+            raise ValueError("PermissionResponse 只支持 once 或 session")

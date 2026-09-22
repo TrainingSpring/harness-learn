@@ -34,8 +34,8 @@ def _runtime(llm):
     tools = Tools(execution_context)
     permission = PermissionManager(
         mode=PermissionMode.BUILD,
-        workspace="/workspace",
-        agent_id=execution_context.agent_id,
+        session_id=execution_context.session_id,
+        project_path=execution_context.project_path,
     )
     return Runtime(llm, tools, execution_context, permission)
 

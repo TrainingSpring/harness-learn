@@ -111,9 +111,8 @@ class AgentProfileRepository:
                     """
                     INSERT INTO agent_profiles (
                         id, name, description, personality, expertise_json,
-                        llm_profile_id, tools_json, permission_mode,
-                        is_enabled, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        llm_profile_id, tools_json, is_enabled, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         name = excluded.name,
                         description = excluded.description,
@@ -121,7 +120,6 @@ class AgentProfileRepository:
                         expertise_json = excluded.expertise_json,
                         llm_profile_id = excluded.llm_profile_id,
                         tools_json = excluded.tools_json,
-                        permission_mode = excluded.permission_mode,
                         is_enabled = excluded.is_enabled,
                         updated_at = excluded.updated_at
                     """,
@@ -139,7 +137,6 @@ class AgentProfileRepository:
                             updated_profile.tools,
                             ensure_ascii=False,
                         ),
-                        updated_profile.permission_mode,
                         int(updated_profile.is_enabled),
                         created_at,
                         now,
@@ -203,7 +200,6 @@ class AgentProfileRepository:
                 expertise=expertise,
                 llm_profile_id=row["llm_profile_id"],
                 tools=tools,
-                permission_mode=row["permission_mode"],
                 is_enabled=bool(row["is_enabled"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],

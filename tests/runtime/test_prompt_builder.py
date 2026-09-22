@@ -24,7 +24,6 @@ class PromptBuilderTests(unittest.TestCase):
             expertise=["Python", "安全审查"],
             llm_profile_id="llm_7KQ2M8P4XZ",
             tools=["read"],
-            permission_mode="PLAN",
         )
 
     def test_build_contains_profile_semantics_and_runtime_capabilities(self):
@@ -44,12 +43,12 @@ class PromptBuilderTests(unittest.TestCase):
         self.assertIn("PLAN", prompt)
         self.assertIn("当前任务是审查 src 目录", prompt)
 
-    def test_build_uses_profile_tools_and_mode_when_no_override_is_given(self):
-        """未提供运行时覆盖值时使用 Profile 中的工具和模式。"""
+    def test_build_uses_profile_tools_without_inventing_a_permission_mode(self):
+        """权限模式只能由 Session 显式传入，不能从 AgentProfile 推导。"""
         prompt = PromptBuilder().build(self.profile)
 
         self.assertIn("read", prompt)
-        self.assertIn("PLAN", prompt)
+        self.assertNotIn("当前权限模式", prompt)
 
     def test_build_rejects_empty_profile_description(self):
         """关键 Agent 描述为空时不能生成无意义指令。"""

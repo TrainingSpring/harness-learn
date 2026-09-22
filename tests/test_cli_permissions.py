@@ -32,7 +32,6 @@ class CliPermissionTests(unittest.TestCase):
             tool_name="write",
             call_id="call_001",
             session_id="session_001",
-            agent_id="agent_1V3ASAXQ2A",
         )
         self.event = PermissionRequiredEvent(
             type="permission_required",
@@ -61,11 +60,11 @@ class CliPermissionTests(unittest.TestCase):
 
     def test_read_permission_response_retries_invalid_choice(self):
         """非法选项只重新询问，不能默认放行。"""
-        with patch("builtins.input", side_effect=["invalid", "6"]):
+        with patch("builtins.input", side_effect=["invalid", "4"]):
             response = read_permission_response(self.event)
 
         self.assertEqual(response.decision, PermissionDecision.DENY)
-        self.assertEqual(response.scope, PermissionScope.AGENT)
+        self.assertEqual(response.scope, PermissionScope.SESSION)
 
 
 if __name__ == "__main__":

@@ -1,13 +1,11 @@
 """从持久化配置组装运行时 Agent。"""
 
 from head.types import LLMConfig
-from permission.types import PermissionMode
 from runtime.agent import Agent
 from runtime.prompt_builder import PromptBuilder
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
-from storage.repositories.permission_rule import PermissionRuleRepository
 from tools.catalog import ToolCatalog
 
 
@@ -49,7 +47,7 @@ class AgentFactory:
             不携带 Session 状态的 Agent。
 
         Raises:
-            ValueError: Agent 或其 LLM 配置不存在，或权限模式非法。
+            ValueError: Agent 或其 LLM 配置不存在。
         """
         profile = self.agent_profiles.get(agent_id)
         if profile is None:
@@ -60,13 +58,6 @@ class AgentFactory:
             raise ValueError(
                 f"Agent 引用的 LLM 配置不存在: {profile.llm_profile_id}"
             )
-
-        try:
-            permission_mode = PermissionMode(profile.permission_mode.lower())
-        except (AttributeError, ValueError) as error:
-            raise ValueError(
-                f"Agent 权限模式无效: {profile.permission_mode}"
-            ) from error
 
         tool_definitions = tuple(self.tool_catalog.get(name) for name in profile.tools)
         if not llm_profile.api_key:
@@ -84,7 +75,4 @@ class AgentFactory:
             profile=profile,
             llm_config=llm_config,
             tool_definitions=tool_definitions,
-            permission_mode=permission_mode,
-            workspace=str(self.database.workspace),
-            permission_rule_repository=PermissionRuleRepository(self.database),
         )

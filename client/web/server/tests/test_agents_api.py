@@ -29,13 +29,13 @@ def test_list_agents_filters_by_expertise(client) -> None:
 
 
 def test_get_agent_includes_runtime_configuration(client) -> None:
-    """详情公开 LLM 引用和权限模式，但不公开任何凭据。"""
+    """详情公开 LLM 引用，但不公开任何凭据或权限模式。"""
     response = client.get("/api/agents/agent_ENABLED001")
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["llmProfileId"] == "llm_TESTLLM001"
-    assert payload["permissionMode"] == "BUILD"
+    assert "permissionMode" not in payload
     assert "apiKey" not in payload
 
 
@@ -64,7 +64,6 @@ def test_create_agent_generates_id_and_persists_configuration(client) -> None:
             "expertise": ["Documentation"],
             "llmProfileId": "llm_TESTLLM001",
             "tools": ["read"],
-            "permissionMode": "PLAN",
             "isEnabled": True,
         },
     )
@@ -75,7 +74,7 @@ def test_create_agent_generates_id_and_persists_configuration(client) -> None:
     assert len(payload["id"]) == len("agent_XXXXXXXXXX")
     assert payload["name"] == "文档助手"
     assert payload["llmProfileId"] == "llm_TESTLLM001"
-    assert payload["permissionMode"] == "PLAN"
+    assert "permissionMode" not in payload
     assert client.get(f"/api/agents/{payload['id']}").json() == payload
 
 
@@ -87,7 +86,6 @@ def test_create_agent_rejects_unknown_llm_profile(client) -> None:
             "name": "无效角色",
             "llmProfileId": "llm_UNKNOWN000",
             "tools": [],
-            "permissionMode": "PLAN",
         },
     )
 
@@ -103,7 +101,6 @@ def test_create_agent_rejects_unknown_tool(client) -> None:
             "name": "无效工具角色",
             "llmProfileId": "llm_TESTLLM001",
             "tools": ["not-a-tool"],
-            "permissionMode": "PLAN",
         },
     )
 

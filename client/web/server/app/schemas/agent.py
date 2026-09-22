@@ -31,7 +31,6 @@ class CreateAgentRequest(ApiModel):
     expertise: list[str] = Field(default_factory=list)
     llm_profile_id: str
     tools: list[str] = Field(default_factory=list)
-    permission_mode: str = "BUILD"
     is_enabled: bool = True
 
 
@@ -70,4 +69,3 @@ class AgentDetail(AgentSummary):
     """角色详情额外公开的运行配置引用。"""
 
     llm_profile_id: str
-    permission_mode: str

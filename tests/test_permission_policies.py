@@ -43,7 +43,6 @@ class PermissionPolicyTests(unittest.TestCase):
             tool_name="test_tool",
             call_id="call_001",
             session_id="session_001",
-            agent_id="agent_1V3ASAXQ2A",
         )
 
     def test_hard_safety_denies_writing_critical_system_files(self):
@@ -139,7 +138,7 @@ class PermissionPolicyTests(unittest.TestCase):
             PermissionDecision.ASK,
         )
 
-    def test_yolo_mode_allows_regular_external_actions(self):
+    def test_yolo_mode_requires_confirmation_for_external_actions(self):
         """YOLO 只决定普通资源默认值，硬安全和保护策略由 Manager 先处理。"""
         policy = ModePolicy("/workspace")
 
@@ -148,7 +147,7 @@ class PermissionPolicyTests(unittest.TestCase):
                 PermissionMode.YOLO,
                 self._request(PermissionAction.FILE_WRITE, "/outside/file.txt"),
             ),
-            PermissionDecision.ALLOW,
+            PermissionDecision.ASK,
         )
         self.assertEqual(
             policy.decide(
@@ -156,6 +155,14 @@ class PermissionPolicyTests(unittest.TestCase):
                 self._request(PermissionAction.BASH_EXECUTE, None),
             ),
             PermissionDecision.ALLOW,
+        )
+
+    def test_empty_project_denies_every_project_tool_action(self):
+        policy = ModePolicy(None)
+
+        self.assertEqual(
+            policy.decide(PermissionMode.YOLO, self._request(PermissionAction.FILE_READ)),
+            PermissionDecision.DENY,
         )
 
 

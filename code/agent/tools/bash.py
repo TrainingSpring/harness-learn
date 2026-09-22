@@ -47,13 +47,15 @@ def bash(ctx:ExecutionContext,command:str,timeout:int|None = None) -> ToolResult
             "-lc",
             command,
         ]
+    if ctx.project_path is None:
+        return ToolResult.failure("PROJECT_NOT_SELECTED", "当前 Session 未选择项目目录")
     result = subprocess.run(
         command,
         stdin=subprocess.DEVNULL,
         timeout=timeout,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=ctx.workspace
+        cwd=ctx.project_path
     )
     return ToolResult.success({
         "command": command,

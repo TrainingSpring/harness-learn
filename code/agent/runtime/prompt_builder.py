@@ -23,7 +23,7 @@ class PromptBuilder:
             profile: 已校验的 AgentProfile。
             session_context: 当前会话需要附加的运行时背景。
             tools: 可选的运行时工具列表；为空时使用 profile.tools。
-            permission_mode: 可选的运行时权限模式；为空时使用 profile 配置。
+        permission_mode: 可选的运行时权限模式。
 
         Returns:
             组合后的系统指令文本。
@@ -35,11 +35,6 @@ class PromptBuilder:
             raise ValueError("Agent description 不能为空")
 
         effective_tools = profile.tools if tools is None else tools
-        effective_mode = (
-            profile.permission_mode
-            if permission_mode is None
-            else permission_mode
-        )
         expertise = "、".join(profile.expertise) or "未指定"
         tool_text = "、".join(effective_tools) or "无"
 
@@ -49,9 +44,10 @@ class PromptBuilder:
             f"Agent 性格：{profile.personality or '未指定'}",
             f"擅长领域：{expertise}",
             f"可使用工具：{tool_text}",
-            f"当前权限模式：{effective_mode}",
             "请遵循系统规则，明确区分分析、工具调用和最终回答。",
         ]
+        if permission_mode is not None:
+            sections.append(f"当前权限模式：{permission_mode}")
         if session_context:
             sections.append(f"当前会话背景：{session_context}")
         return "\n".join(sections)

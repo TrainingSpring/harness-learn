@@ -29,22 +29,18 @@ class PermissionTypeTests(unittest.TestCase):
             tool_name="write",
             call_id="call_001",
             session_id="session_001",
-            agent_id="agent_1V3ASAXQ2A",
         )
 
-    def test_once_rule_binds_only_the_current_call(self):
-        """ONCE 规则只能绑定 call_id，不能混入会话或 Agent 身份。"""
+    def test_rule_binds_only_a_session(self):
+        """持久化规则必须绑定 Session，不能承载一次性 call_id。"""
         rule = PermissionRule(
             action=PermissionAction.FILE_WRITE,
             resource="/workspace/src",
             decision=PermissionDecision.ALLOW,
-            scope=PermissionScope.ONCE,
-            call_id="call_001",
+            session_id="session_001",
         )
 
-        self.assertEqual(rule.call_id, "call_001")
-        self.assertIsNone(rule.session_id)
-        self.assertIsNone(rule.agent_id)
+        self.assertEqual(rule.session_id, "session_001")
 
     def test_rule_rejects_ask_as_a_persisted_decision(self):
         """ASK 是暂态结果，不能被保存为允许/拒绝规则。"""
@@ -53,20 +49,16 @@ class PermissionTypeTests(unittest.TestCase):
                 action=PermissionAction.FILE_WRITE,
                 resource="/workspace/src",
                 decision=PermissionDecision.ASK,
-                scope=PermissionScope.ONCE,
-                call_id="call_001",
+                session_id="session_001",
             )
 
-    def test_rule_rejects_scope_identity_from_another_scope(self):
-        """SESSION 规则不能错误绑定 call_id，避免规则作用范围失真。"""
+    def test_rule_rejects_missing_session_identity(self):
+        """持久化规则不能脱离其所属 Session。"""
         with self.assertRaises(ValueError):
             PermissionRule(
                 action=PermissionAction.FILE_WRITE,
                 resource="/workspace/src",
                 decision=PermissionDecision.ALLOW,
-                scope=PermissionScope.SESSION,
-                call_id="call_001",
-                session_id="session_001",
             )
 
     def test_response_rejects_ask_decision(self):
@@ -86,7 +78,6 @@ class PermissionTypeTests(unittest.TestCase):
             tool_name="bash",
             call_id="call_002",
             session_id="session_001",
-            agent_id="agent_1V3ASAXQ2A",
         )
 
         self.assertIsNone(request.resource)
@@ -94,12 +85,12 @@ class PermissionTypeTests(unittest.TestCase):
     def test_execution_context_separates_agent_and_session_identity(self):
         """Agent 长期身份与当前会话身份必须是不同字段。"""
         ctx = ExecutionContext(
-            workspace="/workspace",
+            project_path="/workspace",
             agent_id="agent_1V3ASAXQ2A",
             session_id="session_001",
         )
 
-        self.assertEqual(ctx.workspace, "/workspace")
+        self.assertEqual(ctx.project_path, "/workspace")
         self.assertEqual(ctx.agent_id, "agent_1V3ASAXQ2A")
         self.assertEqual(ctx.session_id, "session_001")
         self.assertEqual(ctx.max_tool_call_length, 20_000)

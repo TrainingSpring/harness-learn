@@ -63,7 +63,6 @@ class FakePermissionExecution:
             tool_name="read",
             call_id=self.call_id,
             session_id=context.session_id,
-            agent_id="agent_ENABLED001",
         )
 
     def cancel(self) -> None:
@@ -191,7 +190,7 @@ def test_permission_stream_pauses_and_resumes_original_session_execution(client)
         "toolName": "read",
         "action": "filesystem.read",
         "resource": "/workspace/README.md",
-        "allowedScopes": ["once", "session", "agent"],
+        "allowedScopes": ["once", "session"],
     }
 
     resumed = client.post(

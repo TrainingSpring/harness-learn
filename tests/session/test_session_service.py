@@ -49,7 +49,6 @@ class SessionServiceTests(unittest.TestCase):
                     expertise=["Python"],
                     llm_profile_id="llm_7KQ2M8P4XZ",
                     tools=["read"],
-                    permission_mode="BUILD",
                 )
             )
         self.service = SessionService(self.database)
@@ -121,6 +120,33 @@ class SessionServiceTests(unittest.TestCase):
             "SELECT COUNT(*) FROM session_agents"
         ).fetchone()[0]
         self.assertEqual((session_count, member_count), (0, 0))
+
+    def test_group_runtimes_share_one_session_permission_manager(self):
+        """群聊成员各有 Runtime，但必须使用同一份会话权限策略。"""
+        execution = self.service.create_group_session(
+            ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
+        )
+        runtimes = list(execution.runtimes.values())
+
+        self.assertIs(runtimes[0].permission, runtimes[1].permission)
+        self.assertEqual(runtimes[0].permission._session_id, execution.session.id)
+
+    def test_settings_refresh_runtime_environment_before_first_message(self):
+        """项目与模式属于 Session，更新后必须重建 Runtime 环境。"""
+        execution = self.service.create_direct_session("agent_1V3ASAXQ2A")
+        project = Path(self.temp_dir.name) / "project"
+        project.mkdir()
+        old_runtime = execution.runtimes["agent_1V3ASAXQ2A"]
+
+        execution.set_project_path(str(project))
+        execution.set_permission_mode("yolo")
+
+        runtime = execution.runtimes["agent_1V3ASAXQ2A"]
+        self.assertIsNot(runtime, old_runtime)
+        self.assertEqual(execution.session.project_path, str(project))
+        self.assertEqual(execution.session.permission_mode, "yolo")
+        self.assertEqual(runtime.ctx.project_path, str(project))
+        self.assertEqual(runtime.permission._mode.value, "yolo")
 
 
 if __name__ == "__main__":

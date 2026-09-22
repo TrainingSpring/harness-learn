@@ -66,7 +66,6 @@ class AgentProfile:
         expertise: Agent 擅长的领域标签。
         llm_profile_id: 该 Agent 使用的 LLMProfile ID。
         tools: 该 Agent 配置拥有的工具名称列表。
-        permission_mode: 没有命中明确规则时使用的默认权限模式。
         is_enabled: 是否允许用户选择和加载该 Agent。
         created_at: 创建时间。
         updated_at: 最后更新时间。
@@ -79,7 +78,6 @@ class AgentProfile:
     expertise: list[str]
     llm_profile_id: str
     tools: list[str]
-    permission_mode: str
     is_enabled: bool = True
     created_at: str | None = None
     updated_at: str | None = None
@@ -97,8 +95,6 @@ class AgentProfile:
             isinstance(item, str) and item.strip() for item in self.tools
         ):
             raise ValueError("tools 必须是非空字符串列表")
-        if not isinstance(self.permission_mode, str) or not self.permission_mode:
-            raise ValueError("permission_mode 必须是非空字符串")
 
 
 @dataclass
@@ -109,6 +105,8 @@ class Session:
     title: str | None
     conversation_mode: str
     status: str
+    permission_mode: str = "plan"
+    project_path: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
     closed_at: str | None = None
@@ -120,6 +118,10 @@ class Session:
             raise ValueError(f"未知的会话模式: {self.conversation_mode}")
         if self.status not in {"ACTIVE", "PAUSED", "COMPLETED", "CLOSED", "FAILED"}:
             raise ValueError(f"未知的会话状态: {self.status}")
+        if self.permission_mode not in {"plan", "build", "yolo"}:
+            raise ValueError(f"未知的权限模式: {self.permission_mode}")
+        if self.project_path is not None and not self.project_path:
+            raise ValueError("project_path 必须是非空路径或 None")
 
 
 @dataclass(frozen=True)

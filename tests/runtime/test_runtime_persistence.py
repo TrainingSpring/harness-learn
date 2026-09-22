@@ -58,8 +58,8 @@ class RuntimePersistenceTests(unittest.TestCase):
             ctx,
             PermissionManager(
                 mode=PermissionMode.BUILD,
-                workspace="/workspace",
-                agent_id="agent_1V3ASAXQ2A",
+                session_id=ctx.session_id,
+                project_path=ctx.project_path,
                 protected_resource_policy=ProtectedResourcePolicy(["/system"]),
             ),
         )

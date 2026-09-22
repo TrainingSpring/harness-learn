@@ -58,7 +58,6 @@ class FakeRuntime:
                     tool_name="read",
                     call_id=f"call_{self.agent_id[-4:]}",
                     session_id=self.session_id,
-                    agent_id=self.agent_id,
                 ),
             )
             return
@@ -101,7 +100,7 @@ class FakeSessionService(SessionService):
         super().__init__(database)
         self.runtimes = {}
 
-    def _create_runtime(self, agent, member):
+    def _create_runtime(self, agent, member, *_args):
         runtime = FakeRuntime(member.agent_id, member.session_id)
         self.runtimes[(member.session_id, member.agent_id)] = runtime
         return runtime
@@ -135,7 +134,6 @@ class SessionExecutionTests(unittest.TestCase):
                     expertise=["Python"],
                     llm_profile_id="llm_7KQ2M8P4XZ",
                     tools=["read"],
-                    permission_mode="BUILD",
                 )
             )
         self.sessions = FakeSessionService(self.database)
