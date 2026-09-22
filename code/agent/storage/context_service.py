@@ -154,10 +154,6 @@ class ContextService:
         """保存 Context 的当前独立快照。"""
         self.save_current_context(context.export())
 
-    # 这些别名让 Session 编排层可以使用更自然的“载入/保存”命名；实际
-    # 实现仍集中在 restore_context/save_context，避免出现多套恢复规则。
-    load_into = restore_context
-
     @staticmethod
     def to_responses_input(items: list[ContextItem]) -> list[dict[str, Any]]:
         """把业务上下文项转换为当前 LLM 适配器需要的 Responses 输入。"""

@@ -31,8 +31,8 @@ class ContextIsolationTests(unittest.TestCase):
             session_id="session_2",
         )
 
-        context_a.append_msg("会话 A")
-        context_b.append_msg("会话 B")
+        context_a.append_user_message("会话 A")
+        context_b.append_user_message("会话 B")
 
         self.assertEqual([item["content"] for item in context_a.messages], ["会话 A"])
         self.assertEqual([item["content"] for item in context_b.messages], ["会话 B"])

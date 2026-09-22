@@ -47,6 +47,19 @@ def test_runtime_does_not_store_context_or_context_service():
     assert not hasattr(runtime, "context_service")
 
 
+def test_runtime_uses_context_model_input_without_legacy_get_msg():
+    """Runtime 必须通过正式的 to_model_input 接口读取调用方 Context。"""
+    llm = RecordingLLM()
+    runtime = _runtime(llm)
+    context = Context(RecordingLLM(), session_id="session_TEST01")
+    context.append_user_message("当前会话")
+
+    list(runtime.run(context))
+
+    assert llm.inputs[0][-1]["content"] == "当前会话"
+    assert not hasattr(context, "get_msg")
+
+
 def test_run_reads_only_the_context_passed_by_the_caller():
     llm = RecordingLLM()
     runtime = _runtime(llm)

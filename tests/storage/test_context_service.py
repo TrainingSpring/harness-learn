@@ -98,6 +98,10 @@ class ContextServiceTests(unittest.TestCase):
             [user_item.id, agent_item.id, targeted_item.id],
         )
 
+    def test_service_does_not_expose_legacy_load_alias(self):
+        """Session 编排只能使用 restore_context 这一恢复边界。"""
+        self.assertFalse(hasattr(self.service, "load_into"))
+
     def test_function_call_and_output_are_projected_to_responses_items(self):
         """工具事件应被转换成 Responses 所需的 function call 结构。"""
         call = self.service.append_function_call(

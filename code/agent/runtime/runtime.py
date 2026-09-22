@@ -81,7 +81,7 @@ class Runtime:
     def call_llm(self, context: Context) -> Generator[LLMResponse, None, None]:
         """使用调用方提供的 Context 和工具 schema 请求一次 LLM 流。"""
         return self.llm.call_responses_stream(
-            context.get_msg(self.sys_message),
+            context.to_model_input(self.sys_message),
             self.tools.list,
         )
 

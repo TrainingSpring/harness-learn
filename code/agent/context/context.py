@@ -17,9 +17,8 @@ def rough_tokens(text: str) -> int:
 class Context:
     """保存一个 Session 的模型上下文，并负责上下文治理。
 
-    ``ctx`` 仍作为第二个位置参数接受，以兼容旧调用方；Context 只从它
-    读取 ``session_id``，不再持有或依赖工具执行环境。新的调用方应直接传
-    ``session_id``，从而让同一个 Agent 的多个 Session 使用各自 Context。
+    Context 由 Session 创建并使用稳定的 ``session_id`` 标识；它不持有或依赖
+    Agent、Runtime 或工具执行环境。
     """
 
     def __init__(
@@ -33,9 +32,9 @@ class Context:
             llm = summarizer_llm
         if llm is None:
             raise TypeError("必须提供 llm 或 summarizer_llm")
-        if session_id is None :
+        if session_id is None:
             raise TypeError("必须提供 session_id")
-        self.sid = session_id
+        self.session_id = session_id
         self.messages: list[dict[str, Any]] = []
         self.llm = llm
         self.call_result_num = 5
@@ -84,7 +83,7 @@ class Context:
         usage: LLMUsage | None = None,
     ) -> dict[str, Any]:
         """追加用户消息。"""
-        return self.append_msg(text, role="user", usage=usage)
+        return self._append(text, role="user", usage=usage)
 
     def append_agent_message(
         self,
@@ -95,7 +94,7 @@ class Context:
     ) -> dict[str, Any]:
         """追加 Agent 的 assistant 消息。Agent ID 供调用方追踪作者。"""
         del agent_id
-        return self.append_msg(text, role="assistant", usage=usage)
+        return self._append(text, role="assistant", usage=usage)
 
     def append_function_call(
         self,
@@ -125,7 +124,7 @@ class Context:
             }
         if normalized.get("type") != "function_call":
             raise ValueError("消息类型必须是 function_call")
-        return self.append_msg(normalized)
+        return self._append(normalized)
 
     def append_function_call_output(
         self,
@@ -147,16 +146,16 @@ class Context:
             normalized["output"] = output
         if normalized.get("type") != "function_call_output":
             raise ValueError("消息类型必须是 function_call_output")
-        return self.append_msg(normalized)
+        return self._append(normalized)
 
-    def append_msg(
+    def _append(
         self,
         msg: LLMResponseOutputItem | dict[str, Any] | str,
         type: str = "message",
         role: str = "user",
         usage: LLMUsage | None = None,
     ) -> dict[str, Any]:
-        """追加一条消息；保留此方法作为旧 Runtime 的兼容接口。"""
+        """规范化并追加一条模型上下文项。"""
         normalized = self._normalize_message(msg, type=type, role=role)
         self.messages.append(normalized)
         if usage is not None:
@@ -237,18 +236,6 @@ class Context:
         elif rate >= 0.7:
             self.compact_context()
         return self.export()
-
-    def get_msg(self, prev: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
-        """返回当前消息快照，兼容旧 Runtime。"""
-        if prev is None:
-            return self.export()
-        self._validate_messages(prev)
-        return copy.deepcopy(prev) + self.export()
-
-    def load_history(self, sid: str, context: list[dict[str, Any]]) -> None:
-        """兼容旧接口，转发到 restore。"""
-        self.restore(context)
-        self.sid = sid
 
     @staticmethod
     def _normalize_message(
