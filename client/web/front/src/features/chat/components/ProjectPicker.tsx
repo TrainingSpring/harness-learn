@@ -38,7 +38,10 @@ export function ProjectPicker({ selectedPath, onSelect, onClose }: ProjectPicker
     return () => { cancelled = true; };
   }, [currentPath]);
 
-  const parentPath = currentPath === "." ? null : currentPath.split("/").slice(0, -1).join("/") || ".";
+  const parentPath = currentPath === "." || currentPath === "/"
+    ? null
+    : currentPath.replace(/\/+$/, "").split("/").slice(0, -1).join("/")
+      || (currentPath.startsWith("/") ? "/" : ".");
 
   return (
     <div className="dialog-backdrop" role="presentation">
@@ -54,7 +57,7 @@ export function ProjectPicker({ selectedPath, onSelect, onClose }: ProjectPicker
           <div className="project-picker__list">
             {parentPath && <button type="button" className="project-picker__item" onClick={() => setCurrentPath(parentPath)}><ArrowLeft size={16} /><span>返回上级目录</span></button>}
             {directories.map((directory) => <button type="button" className="project-picker__item" key={directory.path} onClick={() => setCurrentPath(directory.path)}><Folder size={16} /><span>{directory.name}</span></button>)}
-            {directories.length === 0 && !parentPath && <p className="project-picker__state">当前 workspace 没有可选子目录。</p>}
+            {directories.length === 0 && <p className="project-picker__state">当前目录没有可选子目录。</p>}
           </div>
         )}
         <div className="dialog-actions project-picker__actions">

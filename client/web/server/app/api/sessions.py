@@ -67,33 +67,30 @@ def _summary(
 
 
 def _display_project_path(workspace: Path, project_path: str | None) -> str | None:
-    """把数据库中的绝对项目路径转换为客户端可见的 workspace-relative 路径。"""
+    """把项目路径转换成客户端可继续浏览的相对或绝对路径。"""
     if project_path is None:
         return None
     path = Path(project_path)
-    # Session 项目路径由 _resolve_project_path 写入，已保证在 workspace 内；
-    # 这里仅为旧数据提供稳定展示，不把服务器绝对路径泄露给浏览器。
     try:
         relative = path.relative_to(workspace.resolve())
     except ValueError:
-        return path.name
+        return path.as_posix()
     return "." if str(relative) == "." else relative.as_posix()
 
 
 def _resolve_project_path(workspace: Path, value: str | None) -> str | None:
-    """将相对 workspace 的目录安全解析成数据库使用的绝对路径。"""
+    """将相对或绝对本机目录解析成数据库使用的绝对路径。"""
     if value is None:
         return None
     if not isinstance(value, str) or not value.strip():
         raise ValueError("项目目录不能为空或必须为 None")
     candidate = Path(value)
-    if candidate.is_absolute() or ".." in candidate.parts:
-        raise ValueError("项目目录必须是 workspace 内的相对路径")
-    resolved = (workspace / candidate).resolve()
-    try:
-        resolved.relative_to(workspace.resolve())
-    except ValueError as error:
-        raise ValueError("项目目录必须位于 workspace 内") from error
+    if candidate.is_absolute():
+        resolved = candidate.resolve()
+    else:
+        if ".." in candidate.parts:
+            raise ValueError("相对项目目录不能包含 ..")
+        resolved = (workspace / candidate).resolve()
     if not resolved.is_dir():
         raise ValueError("项目目录不存在或不是目录")
     return str(resolved)
@@ -195,7 +192,7 @@ async def list_project_directories(
     path: str = Query(default=".", max_length=2000),
     services: ApplicationServices = Depends(get_services),
 ) -> ProjectDirectoryResponse:
-    """列出 workspace 当前目录及其直接子目录。"""
+    """列出当前本机目录及其直接子目录。"""
     try:
         resolved = _resolve_project_path(services.database.workspace, path)
     except ValueError as error:
@@ -203,13 +200,9 @@ async def list_project_directories(
     directory = Path(resolved or services.database.workspace)
     children: list[ProjectDirectory] = []
     for child in sorted(directory.iterdir(), key=lambda item: item.name.lower()):
-        if child.name.startswith(".") or not child.is_dir():
+        if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
-        try:
-            relative_path = _relative_path(services.database.workspace, child)
-        except ValueError:
-            # 目录软链接若逃出 workspace，不能作为项目根暴露给浏览器。
-            continue
+        relative_path = _relative_path(services.database.workspace, child)
         children.append(ProjectDirectory(path=relative_path, name=child.name))
     return ProjectDirectoryResponse(
         path=_relative_path(services.database.workspace, directory),
@@ -219,8 +212,12 @@ async def list_project_directories(
 
 
 def _relative_path(workspace: Path, path: Path) -> str:
-    """返回前端统一使用的 POSIX workspace-relative 路径。"""
-    relative = path.resolve().relative_to(workspace.resolve())
+    """返回 workspace 内的相对路径，否则返回可继续浏览的绝对路径。"""
+    resolved = path.resolve()
+    try:
+        relative = resolved.relative_to(workspace.resolve())
+    except ValueError:
+        return resolved.as_posix()
     return "." if str(relative) == "." else relative.as_posix()
 
 

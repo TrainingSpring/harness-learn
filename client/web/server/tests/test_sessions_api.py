@@ -57,14 +57,14 @@ def test_session_settings_are_session_scoped_and_project_is_workspace_relative(c
     assert client.get("/api/sessions/projects?path=.").json()["directories"] == [{"path": "demo", "name": "demo"}]
     rejected = client.patch(
         f"/api/sessions/{created['id']}/project",
-        json={"projectPath": str(project)},
+        json={"projectPath": "../outside"},
     )
     assert rejected.status_code == 422
     assert rejected.json()["error"]["code"] == "INVALID_PROJECT_PATH"
 
 
 def test_project_directory_list_excludes_symlinks_outside_workspace(client, tmp_path) -> None:
-    """项目目录浏览不得把指向 workspace 外的软链接暴露给浏览器。"""
+    """项目目录浏览跳过软链接，但允许选择 workspace 外的真实目录。"""
     workspace = client.app.state.services.database.workspace
     external_directory = tmp_path.parent / "external-project"
     external_directory.mkdir()
@@ -75,6 +75,25 @@ def test_project_directory_list_excludes_symlinks_outside_workspace(client, tmp_
 
     assert response.status_code == 200
     assert response.json()["directories"] == [{"path": "inside", "name": "inside"}]
+
+    external_response = client.get(f"/api/sessions/projects?path={external_directory}")
+    assert external_response.status_code == 200
+    assert external_response.json()["path"] == str(external_directory)
+
+
+def test_external_project_directory_can_be_selected(client, tmp_path) -> None:
+    """本地 Web 客户端可以把 workspace 外的本机目录设置为 Session 项目。"""
+    external_directory = tmp_path.parent / "external-project-selection"
+    external_directory.mkdir()
+    created = _create_session(client)
+
+    response = client.patch(
+        f"/api/sessions/{created['id']}/project",
+        json={"projectPath": str(external_directory)},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["projectPath"] == str(external_directory)
 
 
 def test_active_run_rejects_session_setting_changes(client) -> None:
