@@ -27,6 +27,7 @@ from runtime.runtime import (  # noqa: E402
 )
 from runtime.runtime_events import PermissionRequiredEvent  # noqa: E402
 from tools.tools import Tools  # noqa: E402
+from tools.bash import REGISTER as BASH_TOOL  # noqa: E402
 from tools.types import Tool, ToolResult  # noqa: E402
 from permission.types import PermissionRequirement  # noqa: E402
 
@@ -251,20 +252,16 @@ class RuntimePermissionTests(unittest.TestCase):
 
     def test_process_inspection_and_stop_do_not_pause_for_permission(self):
         """后台进程状态操作不应产生新的外部副作用授权弹窗。"""
-        for action, name in (
-            (PermissionAction.PROCESS_INSPECT, "process_status"),
-            (PermissionAction.PROCESS_STOP, "process_stop"),
+        for expected_action, arguments in (
+            (PermissionAction.PROCESS_INSPECT, {"action": "status", "process_id": "proc_1"}),
+            (PermissionAction.PROCESS_STOP, {"action": "stop", "process_id": "proc_1"}),
         ):
-            with self.subTest(action=action):
+            with self.subTest(action=expected_action):
                 request = self.tools.build_permission_request(
-                    Tool(
-                        {"name": name},
-                        lambda _ctx: ToolResult.success(),
-                        PermissionRequirement(action, None),
-                    ),
-                    name,
-                    {"process_id": "proc_1"},
-                    f"call_{name}",
+                    BASH_TOOL,
+                    "bash",
+                    arguments,
+                    f"call_{expected_action.value}",
                 )
                 self.assertEqual(self.permission.check(request), PermissionDecision.ALLOW)
 

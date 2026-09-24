@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from tools.shell_execution import (
+from tools.shell.execution import (
     ShellExecutor,
     decode_output,
     platform_shell_name,

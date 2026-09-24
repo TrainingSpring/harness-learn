@@ -5,12 +5,8 @@ from typing import Any, Protocol
 
 from permission.types import PermissionAction, PermissionRequirement
 from session.ExecutionContext import ExecutionContext
-from tools.process_logs import process_logs
-from tools.process_start import process_start
-from tools.process_status import process_status
-from tools.process_stop import process_stop
-from tools.process_wait import process_wait
-from tools.shell_execution import ShellExecutionError, ShellExecutor, platform_shell_name
+from tools.shell.execution import ShellExecutionError, ShellExecutor, platform_shell_name
+from tools.shell.process import logs, start, status, stop, wait
 from tools.types import Tool, ToolResult
 
 
@@ -110,15 +106,15 @@ def bash(
         return ToolResult.failure("INVALID_ARGUMENTS", str(error), retryable=True)
 
     if arguments["action"] == "start":
-        return process_start(ctx, arguments["command"])
+        return start(ctx, arguments["command"])
     if arguments["action"] == "status":
-        return process_status(ctx, arguments["process_id"])
+        return status(ctx, arguments["process_id"])
     if arguments["action"] == "logs":
-        return process_logs(ctx, arguments["process_id"], arguments.get("cursor"), arguments.get("limit"))
+        return logs(ctx, arguments["process_id"], arguments.get("cursor"), arguments.get("limit"))
     if arguments["action"] == "wait":
-        return process_wait(ctx, arguments["process_id"], arguments.get("timeout"))
+        return wait(ctx, arguments["process_id"], arguments.get("timeout"))
     if arguments["action"] == "stop":
-        return process_stop(ctx, arguments["process_id"])
+        return stop(ctx, arguments["process_id"])
 
     if len(arguments["command"]) > ctx.max_bash_command_chars:
         return ToolResult.failure(

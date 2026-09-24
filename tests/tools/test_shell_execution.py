@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
-from tools.shell_execution import (  # noqa: E402
+from tools.shell.execution import (  # noqa: E402
     BoundedByteBuffer,
     ShellExecutionError,
     ShellExecutor,
@@ -44,7 +44,7 @@ class BoundedByteBufferTests(unittest.TestCase):
     def test_minimal_environment_excludes_unrelated_host_variables(self) -> None:
         """子进程不能无条件继承宿主进程中可能含凭据的环境变量。"""
         with patch.dict(
-            "tools.shell_execution.os.environ",
+            "tools.shell.execution.os.environ",
             {"PATH": "/bin", "HOME": "/tmp", "SENSITIVE_TOKEN": "hidden"},
             clear=True,
         ):
@@ -54,9 +54,9 @@ class BoundedByteBufferTests(unittest.TestCase):
 
     def test_builds_platform_shell_arguments_without_string_concatenation(self) -> None:
         """平台 Shell 的命令和参数边界必须由 argv 表达。"""
-        with patch("tools.shell_execution.os.name", "posix"):
+        with patch("tools.shell.execution.os.name", "posix"):
             self.assertEqual(build_shell_argv("echo hello"), ["bash", "-lc", "echo hello"])
-        with patch("tools.shell_execution.os.name", "nt"):
+        with patch("tools.shell.execution.os.name", "nt"):
             self.assertEqual(
                 build_shell_argv("echo hello"),
                 ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", "echo hello"],
@@ -64,7 +64,7 @@ class BoundedByteBufferTests(unittest.TestCase):
 
     def test_maps_missing_shell_to_a_stable_error_code(self) -> None:
         """Shell 未安装时不能泄露底层异常，也不能变成泛化失败。"""
-        with patch("tools.shell_execution.subprocess.Popen", side_effect=FileNotFoundError):
+        with patch("tools.shell.execution.subprocess.Popen", side_effect=FileNotFoundError):
             with self.assertRaises(ShellExecutionError) as raised:
                 ShellExecutor().start("echo hello", cwd="/tmp")
 

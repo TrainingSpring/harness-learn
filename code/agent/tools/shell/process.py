@@ -1,22 +1,12 @@
-"""Session Process Tool 共用的参数和受控错误映射。"""
+"""Bash Tool 使用的 Session 后台进程内部操作。"""
 
+import os
 from typing import Any
 
 from session.ExecutionContext import ExecutionContext
 from session.session_process_manager import ProcessManagerError
-from tools.shell_execution import ShellExecutionError
+from tools.shell.execution import ShellExecutionError
 from tools.types import ToolResult
-
-
-def parse_process_id(arguments: dict[str, Any], *, allowed: set[str]) -> dict[str, Any]:
-    """验证所有进程操作共有的 ID 和严格字段白名单。"""
-    unknown = set(arguments) - allowed
-    if unknown:
-        raise ValueError(f"process 工具不支持参数: {', '.join(sorted(unknown))}")
-    process_id = arguments.get("process_id")
-    if not isinstance(process_id, str) or not process_id.strip():
-        raise ValueError("process_id 必须是非空字符串")
-    return {"process_id": process_id}
 
 
 def require_process_manager(ctx: ExecutionContext) -> Any:
@@ -52,3 +42,111 @@ def process_error_result(error: Exception) -> ToolResult:
             retryable=code != "BASH_EXECUTABLE_NOT_FOUND",
         )
     return ToolResult.failure("PROCESS_EXECUTION_FAILED", "后台进程操作失败", retryable=True)
+
+
+def start(ctx: ExecutionContext, command: str) -> ToolResult:
+    """在当前工作目录启动持续服务，启动后立即返回进程标识。"""
+    if len(command) > ctx.max_bash_command_chars:
+        return ToolResult.failure("INVALID_ARGUMENTS", "command 超过本地字符上限", retryable=True)
+    if ctx.project_path is None:
+        return ToolResult.failure("PROJECT_NOT_SELECTED", "当前 Session 未选择项目目录")
+    if not os.path.isdir(ctx.project_path):
+        return ToolResult.failure(
+            "WORKSPACE_NOT_FOUND",
+            "当前 Session 的工作目录不存在或不是目录",
+            retryable=True,
+        )
+    try:
+        return ToolResult.success(require_process_manager(ctx).start(command, cwd=ctx.project_path))
+    except Exception as error:
+        return process_error_result(error)
+
+
+def status(ctx: ExecutionContext, process_id: str) -> ToolResult:
+    """返回当前 Session 后台进程的状态、PID、退出码和启动时间。"""
+    try:
+        return ToolResult.success(require_process_manager(ctx).status(process_id))
+    except Exception as error:
+        return process_error_result(error)
+
+
+def logs(
+    ctx: ExecutionContext,
+    process_id: str,
+    cursor: str | None = None,
+    limit: int | None = None,
+) -> ToolResult:
+    """用不透明 cursor 读取新增 stdout/stderr，不使用 tail -f。"""
+    from session.session_process_manager import decode_log_cursor, encode_log_cursor
+
+    actual_limit = limit or ctx.max_process_log_return_chars
+    if actual_limit > ctx.max_process_log_return_chars:
+        return ToolResult.failure("INVALID_ARGUMENTS", "limit 超过本地字符上限", retryable=True)
+    try:
+        cursor_process_id, stdout_offset, stderr_offset = decode_log_cursor(cursor)
+        stream_limit = max(1, actual_limit // 2)
+        process_logs = require_process_manager(ctx).logs(
+            process_id,
+            cursor_process_id=cursor_process_id,
+            stdout_offset=stdout_offset,
+            stderr_offset=stderr_offset,
+            limit=stream_limit,
+        )
+        if process_logs["cursor_expired"]:
+            return ToolResult.failure(
+                "LOG_CURSOR_EXPIRED",
+                "请求的日志 cursor 已被环形缓冲淘汰，请从头重新读取",
+                retryable=True,
+            )
+        stdout = process_logs["stdout"]
+        stderr = process_logs["stderr"]
+        remaining = actual_limit
+        stdout = stdout[:remaining]
+        remaining -= len(stdout)
+        stderr = stderr[:remaining]
+        truncated = (
+            process_logs["truncated"]
+            or len(stdout) < len(process_logs["stdout"])
+            or len(stderr) < len(process_logs["stderr"])
+        )
+        return ToolResult.success(
+            {
+                "process_id": process_id,
+                "stdout": stdout,
+                "stderr": stderr,
+                "next_cursor": encode_log_cursor(
+                    process_id,
+                    process_logs["stdout_offset"],
+                    process_logs["stderr_offset"],
+                ),
+                "truncated": truncated,
+                "cursor_expired": False,
+            }
+        )
+    except Exception as error:
+        return process_error_result(error)
+
+
+def wait(
+    ctx: ExecutionContext,
+    process_id: str,
+    timeout: float | None = None,
+) -> ToolResult:
+    """有限等待后台进程，时间到达时返回当前状态而不阻塞 Agent Loop。"""
+    timeout_seconds = timeout or ctx.default_bash_timeout_seconds
+    if timeout_seconds > ctx.max_bash_timeout_seconds:
+        return ToolResult.failure("INVALID_ARGUMENTS", "timeout 超过本地秒数上限", retryable=True)
+    try:
+        return ToolResult.success(
+            require_process_manager(ctx).wait(process_id, timeout_seconds=timeout_seconds)
+        )
+    except Exception as error:
+        return process_error_result(error)
+
+
+def stop(ctx: ExecutionContext, process_id: str) -> ToolResult:
+    """幂等地停止当前 Session 的目标后台进程树。"""
+    try:
+        return ToolResult.success(require_process_manager(ctx).stop(process_id))
+    except Exception as error:
+        return process_error_result(error)

@@ -24,24 +24,24 @@
 
 ### 3.1 一次性命令
 
-`bash` 只负责有限时长的前台命令，例如 `git status`、测试、构建、安装依赖和单次脚本执行。每次执行都有本地默认 timeout 和最大 timeout，输出在读取过程中受本地硬上限保护。
+`bash(action="execute")` 负责有限时长的前台命令，例如 `git status`、测试、构建、安装依赖和单次脚本执行。每次执行都有本地默认 timeout 和最大 timeout，输出在读取过程中受本地硬上限保护。
 
 ### 3.2 持续进程
 
 新增 Session 归属的 Process Manager，供 Agent 启动开发服务、worker 或持续任务。进程启动后立即返回 `process_id`，Agent 可独立查询状态、分页读取新增日志、等待有限时长或停止进程。
 
 ```text
-process_start("npm run dev")
+bash(action="start", command="npm run dev")
     -> process_id、pid、running/exited 状态、日志 cursor
 
-process_logs(process_id, cursor)
+bash(action="logs", process_id, cursor)
     -> 新日志片段、next_cursor、是否截断
 
-process_stop(process_id)
+bash(action="stop", process_id)
     -> 终止该进程组及其后代
 ```
 
-`tail -f` 不再作为日志监听方案。日志由 Process Manager 捕获，`process_logs` 以 cursor 续读，单次返回仍受输出上限控制。
+`tail -f` 不再作为日志监听方案。日志由 Process Manager 捕获，`bash(action="logs")` 以 cursor 续读，单次返回仍受输出上限控制。
 
 ### 3.3 生命周期
 
@@ -55,7 +55,7 @@ process_stop(process_id)
 
 ### 4.1 Bash 与 Process 的职责边界
 
-| 能力 | `bash` | `process` |
+| 能力 | `bash(action="execute")` | `bash(action="start/status/logs/wait/stop")` |
 | --- | --- | --- |
 | 用途 | 有限的一次性前台命令 | 持续运行或需要后续管理的命令 |
 | 等待方式 | 等到退出或 timeout | 启动即返回，不等待退出 |
@@ -64,7 +64,7 @@ process_stop(process_id)
 | 生命周期 | 调用结束即结束 | 显式 stop、Session 关闭或应用退出时结束 |
 | 示例 | `pytest -q`、`git diff` | `npm run dev`、worker、日志采集服务 |
 
-禁止把 `timeout=None` 当作后台服务能力；也禁止让 `bash` 自动猜测某命令是否应后台运行。调用方必须明确选择 `bash` 或 `process_start`。
+禁止把 `timeout=None` 当作后台服务能力；也禁止让 `bash` 自动猜测某命令是否应后台运行。调用方必须显式提供 `action`。
 
 ### 4.2 Process Manager 的归属
 
@@ -79,22 +79,23 @@ SessionExecution
         ├─ stdout/stderr 环形缓冲区
         └─ 进程组终止与 Session 清理
 
-Runtime -> Tools -> process_* Tool -> ctx.process_manager
+Runtime -> Tools -> bash -> shell.process -> ctx.process_manager
 ```
 
-### 4.3 进程工具接口
+### 4.3 进程动作接口
 
-首期新增五个职责单一的 Tool：`process_start`、`process_status`、`process_logs`、`process_wait`、`process_stop`。当前 `Tool` 使用静态 `PermissionRequirement`，拆分后每个 Tool 可以直接声明自己的权限动作，不需要增加动态权限分派。
+对模型只公开一个 `bash` Tool。它的 `action` 是严格判别字段：`execute`、`start`、`status`、`logs`、`wait`、`stop`；不能省略 action，也不能混用不同 action 的参数。`tools/shell/` 只包含内部执行和进程适配实现，没有 `REGISTER`，因此不会进入 Tool Catalog。
 
 ```json
-{"command":"npm run dev"}                         // process_start
-{"process_id":"proc_..."}                         // process_status
-{"process_id":"proc_...","cursor":"...","limit":200} // process_logs
-{"process_id":"proc_...","timeout":10}         // process_wait
-{"process_id":"proc_..."}                         // process_stop
+{"action":"execute","command":"pytest -q"}
+{"action":"start","command":"npm run dev"}
+{"action":"status","process_id":"proc_..."}
+{"action":"logs","process_id":"proc_...","cursor":"...","limit":200}
+{"action":"wait","process_id":"proc_...","timeout":10}
+{"action":"stop","process_id":"proc_..."}
 ```
 
-每个 Tool 都有独立的参数解析器和字段白名单；不允许把不同操作的字段混合为一个宽松 Schema。权限声明为：`process_start` 复用 `BASH_EXECUTE`，`process_status/process_logs/process_wait` 使用 `PROCESS_INSPECT`，`process_stop` 使用 `PROCESS_STOP`。
+`bash` 的参数解析器按 action 严格校验字段白名单；不允许将不同动作字段混合为宽松 Schema。动态权限解析器使用已校验 action：`execute/start` 使用 `BASH_EXECUTE`，`status/logs/wait` 使用 `PROCESS_INSPECT`，`stop` 使用 `PROCESS_STOP`。权限需求被固化到 `PreparedToolCall`，执行阶段不再重新解析。
 
 成功结果的稳定字段：
 
@@ -116,9 +117,9 @@ Runtime -> Tools -> process_* Tool -> ctx.process_manager
 
 Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚本、解释器、`cd`、子进程和网络访问多种资源，因此首期不能假装能实现“工作目录内 Bash 自动允许、目录外 Bash 请求授权”。
 
-1. 保留 `BASH_EXECUTE`：用于一次性 `bash` 以及 `process_start`，按 Session 权限模式整体决策。
-2. `process_status`、`process_logs` 和 `process_wait` 只允许访问当前 Session 的 Process Manager 记录，不读取外部资源；新增 `PROCESS_INSPECT`，所有模式默认允许。
-3. `process_stop` 只允许停止当前 Session 所有的进程；新增 `PROCESS_STOP`，所有模式默认允许，因为它只减少已启动进程的影响范围。
+1. 保留 `BASH_EXECUTE`：用于 `bash(action="execute/start")`，按 Session 权限模式整体决策。
+2. `bash(action="status/logs/wait")` 只允许访问当前 Session 的 Process Manager 记录，不读取外部资源；使用 `PROCESS_INSPECT`，所有模式默认允许。
+3. `bash(action="stop")` 只允许停止当前 Session 所有的进程；使用 `PROCESS_STOP`，所有模式默认允许，因为它只减少已启动进程的影响范围。
 4. `plan` 拒绝 `BASH_EXECUTE`；`build` 请求确认；`yolo` 允许，但仍保留硬安全策略。
 5. 现有 Bash 规则是 Session 级 `resource=None` 规则。用户选择“本会话允许/拒绝”后，影响该 Session 后续 Bash 和 Process Start，不影响其他 Session。
 
@@ -135,7 +136,7 @@ Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚�
 | `max_bash_timeout_seconds` | 600 | 前台命令允许请求的最大 timeout。 |
 | `max_bash_output_bytes` | 256 KiB | 单个 Bash 调用 stdout 与 stderr 各自的本地捕获上限。 |
 | `max_process_log_bytes` | 4 MiB | 每个后台进程 stdout 与 stderr 各自的环形日志缓冲上限。 |
-| `max_process_log_return_chars` | 20,000 | `process_logs` 单次返回给模型的最大字符数。 |
+| `max_process_log_return_chars` | 20,000 | `bash(action="logs")` 单次返回给模型的最大字符数。 |
 | `process_startup_probe_seconds` | 0.2 | 启动后台进程后用于识别立即退出的短检查窗口。 |
 
 输出读取必须并行消费 stdout 与 stderr，防止任一管道填满造成子进程死锁。每个流使用受限缓冲：保留可诊断的头部和尾部，超出部分丢弃并返回截断标记；不能先积累整个输出再截断。
@@ -194,15 +195,15 @@ Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚�
 | `BASH_TIMEOUT` | 到达 timeout，进程组已经进入终止流程。 | 是 |
 | `BASH_EXECUTION_FAILED` | 未分类的受控执行 I/O 失败。 | 视情况 |
 
-### 5.2 Process 输入与结果
+### 5.2 Bash 后台进程 action 输入与结果
 
-| operation | 必填字段 | 行为 |
+| action | 必填字段 | 行为 |
 | --- | --- | --- |
-| `process_start` | `command` | 在当前工作目录异步启动进程并立即返回。 |
-| `process_status` | `process_id` | 返回当前 Session 进程的状态、PID、退出码与时间。 |
-| `process_logs` | `process_id` | 从开始或 cursor 返回新增日志；可选 `limit` 受本地上限约束。 |
-| `process_wait` | `process_id` | 可选 `timeout`，最多等待 `max_bash_timeout_seconds`；返回最新状态。 |
-| `process_stop` | `process_id` | 终止当前 Session 所有的目标进程组；幂等。 |
+| `start` | `command` | 在当前工作目录异步启动进程并立即返回。 |
+| `status` | `process_id` | 返回当前 Session 进程的状态、PID、退出码与时间。 |
+| `logs` | `process_id` | 从开始或 cursor 返回新增日志；可选 `limit` 受本地上限约束。 |
+| `wait` | `process_id` | 可选 `timeout`，最多等待 `max_bash_timeout_seconds`；返回最新状态。 |
+| `stop` | `process_id` | 终止当前 Session 所有的目标进程组；幂等。 |
 
 状态为：`starting`、`running`、`exited`、`failed`、`stopped`。未知 ID 或其他 Session 的 ID 统一返回 `PROCESS_NOT_FOUND`，避免通过错误差异探测其他 Session 进程。
 
@@ -326,48 +327,47 @@ Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚�
 
 ### 阶段 4：提供 Process Tool 与日志 cursor
 
-**状态：已完成。** 已提供五个静态 Tool：`process_start`、`process_status`、`process_logs`、`process_wait`、`process_stop`；日志 cursor 绑定 `process_id`，过期时返回 `LOG_CURSOR_EXPIRED`。
+**状态：已完成，后续已收口到 Bash action。** 后台进程能力由 `bash(action="start/status/logs/wait/stop")` 提供；日志 cursor 绑定 `process_id`，过期时返回 `LOG_CURSOR_EXPIRED`。
 
 **目的**：提供 Agent 可调用、可恢复、不会无限阻塞的后台服务接口。
 
 **改动**：
 
-1. 新增 `tools/process_start.py`、`process_status.py`、`process_logs.py`、`process_wait.py`、`process_stop.py`，分别实现独立的参数解析器和 JSON Schema。
-2. 实现 `process_start/process_status/process_logs/process_wait/process_stop`；`process_start` 使用后台模式，不继承 Bash 前台 timeout 语义；`process_wait` 仍必须有限等待。
+1. 将持续进程操作收口为 `bash` 的严格 action，并通过一个参数解析器校验每种 action 的字段组合。
+2. 将实现归入 `tools/shell/process.py`；`start` 使用后台模式，不继承前台 timeout 语义；`wait` 仍必须有限等待。
 3. `logs` 使用不透明 cursor，返回新增日志、`next_cursor`、截断和 cursor 过期状态。日志被环形缓冲淘汰后返回 `LOG_CURSOR_EXPIRED`，不静默跳到错误位置。
 4. `stop` 对已退出和已停止进程保持幂等，避免 Agent 重试引发错误。
-5. 更新 Tool Catalog 和 Agent 工具配置校验，允许 Profile 显式启用所需的 `process_*` 工具。
+5. 更新 Tool Catalog 和 Agent 工具配置校验，只允许 Profile 公开启用 `bash`；旧 `process_*` 名称不保留兼容入口。
 6. 通过 Tool 结果编码和 Context 持久化路径验证 process 结果可恢复地反馈给模型；不持久化活进程控制句柄。
 
 **主要文件**：
 
-- 新增：`code/agent/tools/process_start.py`
-- 新增：`code/agent/tools/process_status.py`
-- 新增：`code/agent/tools/process_logs.py`
-- 新增：`code/agent/tools/process_wait.py`
-- 新增：`code/agent/tools/process_stop.py`
-- 修改：`code/agent/tools/catalog.py`（如果辅助模块发现规则需要排除）
+- 修改：`code/agent/tools/bash.py`
+- 新增：`code/agent/tools/shell/process.py`
+- 新增：`code/agent/tools/shell/execution.py`
+- 修改：`code/agent/tools/types.py`、`code/agent/tools/tools.py`（动态权限解析与已解析权限固化）
+- 修改：`code/agent/tools/catalog.py`（辅助包不导出 `REGISTER`）
 - 修改：`code/agent/session/ExecutionContext.py`
-- 新增：`tests/tools/test_process_tool.py`
+- 新增：`tests/tools/test_bash_process_actions.py`
 - 修改：`tests/test_tool_catalog.py`
 - 必要时修改：`tests/test_tool_result_contract.py`
 
 **验收**：
 
-- [ ] `process_start` 立即返回 `process_id`，不会占用 Agent Loop。
-- [ ] `process_logs` 能使用 cursor 无重复续读，且输出受本地上限保护。
-- [ ] `process_wait` 有最大 timeout；`process_stop` 终止进程组且幂等。
+- [x] `bash(action="start")` 立即返回 `process_id`，不会占用 Agent Loop。
+- [x] `bash(action="logs")` 能使用 cursor 无重复续读，且输出受本地上限保护。
+- [x] `bash(action="wait/stop")` 有最大 timeout，并终止进程组且幂等。
 - [ ] `tail -f` 不再是官方建议的持续日志读取路径。
 
 ### 阶段 5：Session 权限与生命周期集成
 
-**状态：已完成。** 已新增 `PROCESS_INSPECT` 与 `PROCESS_STOP` 权限动作；`process_start` 使用 `BASH_EXECUTE`，检查/日志/等待使用 `PROCESS_INSPECT`，停止使用 `PROCESS_STOP`。状态和日志仅能访问当前 Session 内存记录，未知或跨 Session ID 统一返回 `PROCESS_NOT_FOUND`。
+**状态：已完成。** 已新增 `PROCESS_INSPECT` 与 `PROCESS_STOP` 权限动作；`bash(action="execute/start")` 使用 `BASH_EXECUTE`，检查/日志/等待使用 `PROCESS_INSPECT`，停止使用 `PROCESS_STOP`。状态和日志仅能访问当前 Session 内存记录，未知或跨 Session ID 统一返回 `PROCESS_NOT_FOUND`。
 
 **目的**：让持续进程遵从 Session 权限模式，且不扩大其他 Session 的能力范围。
 
 **改动**：
 
-1. 在 `PermissionAction` 增加 `PROCESS_INSPECT`、`PROCESS_STOP`；`process_start` 复用 `BASH_EXECUTE`。
+1. 在 `PermissionAction` 增加 `PROCESS_INSPECT`、`PROCESS_STOP`；`bash(action="start")` 复用 `BASH_EXECUTE`。
 2. 更新 `ModePolicy`：`PROCESS_INSPECT` 与 `PROCESS_STOP` 默认允许，但 manager 必须先验证进程属于当前 Session；`BASH_EXECUTE` 保持 plan deny、build ask、yolo allow。
 3. 更新 Runtime 权限事件和前端/CLI 文案：后台启动显示“启动后台进程”，不能伪装为文件目录授权。
 4. 更新 `SessionExecution.close()` 的实际调用方；应用退出必须执行统一清理并限制终止等待时间。
@@ -401,13 +401,13 @@ Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚�
 
 ### 阶段 6：文档收口与明确非目标
 
-**状态：已完成。** Tool 描述和计划均明确 Bash 只处理有限前台命令，持续服务使用 `process_*`；没有 OS 级沙箱，当前实现不宣称能够精确限制任意 Shell 命令的文件或网络访问。
+**状态：已完成。** Tool 描述和计划均明确前台与持续服务都通过 Bash 的显式 action 调用；没有 OS 级沙箱，当前实现不宣称能够精确限制任意 Shell 命令的文件或网络访问。
 
 **目的**：让模型、用户和后续开发者理解何时使用 Bash、何时使用 Process，避免重新引入无限前台命令。
 
 **改动**：
 
-1. 更新 Bash 和 Process Tool 描述、方法注释与系统提示词（如有工具使用指引），明确前台/后台边界。
+1. 更新 Bash Tool 描述、内部 Shell 方法注释与系统提示词（如有工具使用指引），明确前台/后台 action 边界。
 2. 在本计划记录最终错误码、默认限制、环境变量策略、Session 生命周期和跨进程限制。
 3. 搜索并移除旧描述中的“timeout 不填即无限执行”以及建议 `tail -f` 的文本。
 4. 将本计划状态和验收项更新为完成，并记录最终测试结果。
@@ -415,11 +415,8 @@ Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚�
 **主要文件**：
 
 - 修改：`code/agent/tools/bash.py`
-- 修改：`code/agent/tools/process_start.py`
-- 修改：`code/agent/tools/process_status.py`
-- 修改：`code/agent/tools/process_logs.py`
-- 修改：`code/agent/tools/process_wait.py`
-- 修改：`code/agent/tools/process_stop.py`
+- 修改：`code/agent/tools/shell/process.py`
+- 修改：`code/agent/tools/shell/execution.py`
 - 修改：本计划文档
 - 必要时修改：`code/agent/runtime/prompt_builder.py`
 
@@ -479,7 +476,7 @@ Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚�
 - [x] Bash stdout/stderr 的内存占用与模型返回内容都有本地硬上限。
 - [x] timeout、启动失败、工作目录失效和编码问题均返回稳定错误码。
 - [x] 超时和 stop 能处理目标进程组/进程树，而非只终止 Shell 父进程。
-- [x] `process_*` 能启动、查询、分页读取日志、有限等待和停止 Session 所属进程。
+- [x] `bash` 的后台 action 能启动、查询、分页读取日志、有限等待和停止 Session 所属进程。
 - [x] 持续服务不会阻塞 Agent Loop，也不会因取消当前消息被误停止。
 - [x] Session 关闭时清理后台进程；应用重启不恢复旧 PID。应用宿主若持有 SessionExecution，应在退出时调用 `close()`。
 - [x] 权限模式和 Session 授权规则覆盖 Bash/Process Start；状态、日志和停止不能跨 Session。
