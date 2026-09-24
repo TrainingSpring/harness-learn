@@ -48,7 +48,7 @@ class FakeProcessManager:
         self.calls.append(("status", process_id))
         return self._record(process_id)
 
-    def logs(self, process_id, *, stdout_offset, stderr_offset, limit):
+    def logs(self, process_id, *, cursor_process_id=None, stdout_offset, stderr_offset, limit):
         self.calls.append(("logs", process_id, stdout_offset, stderr_offset, limit))
         return {
             "stdout": "server ready\n",
@@ -147,6 +147,38 @@ class ProcessToolTests(unittest.TestCase):
         self.assertEqual(result.status, "error")
         self.assertEqual(result.error.code, "LOG_CURSOR_EXPIRED")
         self.assertTrue(result.error.retryable)
+
+    def test_log_return_limit_is_shared_by_stdout_and_stderr(self) -> None:
+        """stdout 与 stderr 合计不能突破一次 Tool 返回上限。"""
+        result = self.tools.execute(
+            self.tools.prepare_call(
+                "process_logs",
+                {"process_id": "proc_123", "limit": 10},
+                "call_logs_limit",
+            )
+        )
+
+        self.assertEqual(self.manager.calls[-1][-1], 5)
+
+    def test_log_cursor_cannot_be_reused_for_a_different_process(self) -> None:
+        """公开 cursor 必须绑定当前 process_id，避免串读其他服务日志。"""
+        started = self.tools.execute(
+            self.tools.prepare_call("process_start", {"command": "npm run dev"}, "call_start_cursor")
+        )
+        logs = self.tools.execute(
+            self.tools.prepare_call(
+                "process_logs",
+                {"process_id": started.data["process_id"]},
+                "call_logs_cursor",
+            )
+        )
+        forged_for_another_process = self.tools.prepare_call(
+            "process_logs",
+            {"process_id": "proc_other", "cursor": logs.data["next_cursor"]},
+            "call_logs_other",
+        )
+
+        self.assertEqual(forged_for_another_process.arguments["process_id"], "proc_other")
 
 
 if __name__ == "__main__":

@@ -196,12 +196,22 @@ class SessionProcessManager:
             self._refresh_completion_locked(record)
             return self._snapshot(record)
 
-    def logs(self, process_id: str, *, stdout_offset: int, stderr_offset: int, limit: int) -> dict:
+    def logs(
+        self,
+        process_id: str,
+        *,
+        cursor_process_id: str | None = None,
+        stdout_offset: int,
+        stderr_offset: int,
+        limit: int,
+    ) -> dict:
         """从两个流的绝对 offset 读取新增日志，供后续 Tool 生成 cursor。"""
         if limit <= 0:
             raise ValueError("limit 必须大于 0")
         with self._lock:
             record = self._record_for(process_id)
+            if cursor_process_id is not None and cursor_process_id != process_id:
+                raise ProcessManagerError("INVALID_LOG_CURSOR")
             stdout, next_stdout, stdout_expired, stdout_more = record.stdout.read(
                 stdout_offset,
                 limit,
@@ -278,23 +288,28 @@ class SessionProcessManager:
         }
 
 
-def encode_log_cursor(stdout_offset: int, stderr_offset: int) -> str:
+def encode_log_cursor(process_id: str, stdout_offset: int, stderr_offset: int) -> str:
     """将日志绝对位置编码为不依赖进程 PID 的不透明 cursor。"""
-    payload = json.dumps([stdout_offset, stderr_offset], separators=(",", ":")).encode()
+    payload = json.dumps(
+        [process_id, stdout_offset, stderr_offset],
+        separators=(",", ":"),
+    ).encode()
     return base64.urlsafe_b64encode(payload).decode("ascii")
 
 
-def decode_log_cursor(cursor: str | None) -> tuple[int, int]:
+def decode_log_cursor(cursor: str | None) -> tuple[str | None, int, int]:
     """解析由本模块签发的日志 cursor。"""
     if cursor is None:
-        return 0, 0
+        return None, 0, 0
     try:
         payload = base64.urlsafe_b64decode(cursor.encode("ascii"))
-        stdout_offset, stderr_offset = json.loads(payload)
+        process_id, stdout_offset, stderr_offset = json.loads(payload)
     except (UnicodeEncodeError, ValueError, json.JSONDecodeError) as error:
         raise ProcessManagerError("INVALID_LOG_CURSOR") from error
     if (
-        isinstance(stdout_offset, bool)
+        not isinstance(process_id, str)
+        or not process_id
+        or isinstance(stdout_offset, bool)
         or isinstance(stderr_offset, bool)
         or not isinstance(stdout_offset, int)
         or not isinstance(stderr_offset, int)
@@ -302,7 +317,7 @@ def decode_log_cursor(cursor: str | None) -> tuple[int, int]:
         or stderr_offset < 0
     ):
         raise ProcessManagerError("INVALID_LOG_CURSOR")
-    return stdout_offset, stderr_offset
+    return process_id, stdout_offset, stderr_offset
 
 
 def _timestamp() -> str:

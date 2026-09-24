@@ -249,6 +249,25 @@ class RuntimePermissionTests(unittest.TestCase):
         ))
         self.assertEqual(len(self.executions), 1)
 
+    def test_process_inspection_and_stop_do_not_pause_for_permission(self):
+        """后台进程状态操作不应产生新的外部副作用授权弹窗。"""
+        for action, name in (
+            (PermissionAction.PROCESS_INSPECT, "process_status"),
+            (PermissionAction.PROCESS_STOP, "process_stop"),
+        ):
+            with self.subTest(action=action):
+                request = self.tools.build_permission_request(
+                    Tool(
+                        {"name": name},
+                        lambda _ctx: ToolResult.success(),
+                        PermissionRequirement(action, None),
+                    ),
+                    name,
+                    {"process_id": "proc_1"},
+                    f"call_{name}",
+                )
+                self.assertEqual(self.permission.check(request), PermissionDecision.ALLOW)
+
 
 if __name__ == "__main__":
     unittest.main()

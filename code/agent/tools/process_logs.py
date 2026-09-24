@@ -36,10 +36,11 @@ def process_logs(
     if actual_limit > ctx.max_process_log_return_chars:
         return ToolResult.failure("INVALID_ARGUMENTS", "limit 超过本地字符上限", retryable=True)
     try:
-        stdout_offset, stderr_offset = decode_log_cursor(cursor)
+        cursor_process_id, stdout_offset, stderr_offset = decode_log_cursor(cursor)
         stream_limit = max(1, actual_limit // 2)
         logs = require_process_manager(ctx).logs(
             process_id,
+            cursor_process_id=cursor_process_id,
             stdout_offset=stdout_offset,
             stderr_offset=stderr_offset,
             limit=stream_limit,
@@ -50,13 +51,24 @@ def process_logs(
                 "请求的日志 cursor 已被环形缓冲淘汰，请从头重新读取",
                 retryable=True,
             )
+        stdout = logs["stdout"]
+        stderr = logs["stderr"]
+        remaining = actual_limit
+        stdout = stdout[:remaining]
+        remaining -= len(stdout)
+        stderr = stderr[:remaining]
+        truncated = logs["truncated"] or len(stdout) < len(logs["stdout"]) or len(stderr) < len(logs["stderr"])
         return ToolResult.success(
             {
                 "process_id": process_id,
-                "stdout": logs["stdout"],
-                "stderr": logs["stderr"],
-                "next_cursor": encode_log_cursor(logs["stdout_offset"], logs["stderr_offset"]),
-                "truncated": logs["truncated"],
+                "stdout": stdout,
+                "stderr": stderr,
+                "next_cursor": encode_log_cursor(
+                    process_id,
+                    logs["stdout_offset"],
+                    logs["stderr_offset"],
+                ),
+                "truncated": truncated,
                 "cursor_expired": False,
             }
         )

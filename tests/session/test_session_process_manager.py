@@ -90,6 +90,20 @@ class SessionProcessManagerTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, "PROCESS_NOT_FOUND")
 
+    def test_stopped_process_cursor_is_bound_to_its_process_id(self) -> None:
+        """不同后台服务不能互换日志 cursor。"""
+        first = self.manager.start("first", cwd=self.workspace.name)
+        with self.assertRaises(ProcessManagerError) as raised:
+            self.manager.logs(
+                first["process_id"],
+                cursor_process_id="proc_other",
+                stdout_offset=0,
+                stderr_offset=0,
+                limit=100,
+            )
+
+        self.assertEqual(raised.exception.code, "INVALID_LOG_CURSOR")
+
     def test_close_stops_all_processes_without_requiring_runtime_cancel(self) -> None:
         """Session 关闭必须清理服务，但 Runtime 取消不参与该生命周期。"""
         self.manager.start("npm run dev", cwd=self.workspace.name)
@@ -97,6 +111,24 @@ class SessionProcessManagerTests(unittest.TestCase):
         self.manager.stop_all()
 
         self.assertEqual(self.terminated, [12345])
+
+    def test_wait_returns_running_state_after_a_finite_wait(self) -> None:
+        """等待不会把持续服务变成无限阻塞。"""
+        started = self.manager.start("npm run dev", cwd=self.workspace.name)
+
+        result = self.manager.wait(started["process_id"], timeout_seconds=0.001)
+
+        self.assertEqual(result["state"], "running")
+
+    def test_stop_all_does_not_relabel_an_already_exited_process(self) -> None:
+        """自然退出记录不能被 Session 清理流程覆写为用户停止。"""
+        self.executor.process.returncode = 0
+        self.executor.process._finished.set()
+        started = self.manager.start("one-shot", cwd=self.workspace.name)
+
+        self.manager.stop_all()
+
+        self.assertEqual(self.manager.status(started["process_id"])["state"], "exited")
 
 
 if __name__ == "__main__":
