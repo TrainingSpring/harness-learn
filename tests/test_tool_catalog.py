@@ -34,7 +34,19 @@ class ToolCatalogTests(unittest.TestCase):
         """工具列表应发现当前代码中的有效 REGISTER。"""
         names = {metadata.name for metadata in self.catalog.list_available()}
 
-        self.assertTrue({"read", "write", "edit", "bash"}.issubset(names))
+        self.assertTrue(
+            {
+                "read",
+                "write",
+                "edit",
+                "bash",
+                "process_start",
+                "process_status",
+                "process_logs",
+                "process_wait",
+                "process_stop",
+            }.issubset(names)
+        )
         self.assertNotIn("types", names)
 
     def test_validate_names_rejects_unknown_name(self):

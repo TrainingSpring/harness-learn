@@ -55,7 +55,7 @@ class _RingLogBuffer:
                 del self._data[:overflow]
                 self._start_offset += overflow
 
-    def read(self, offset: int, limit: int) -> tuple[bytes, int, bool]:
+    def read(self, offset: int, limit: int) -> tuple[bytes, int, bool, bool]:
         with self._lock:
             expired = offset < self._start_offset
             if expired:
@@ -66,6 +66,7 @@ class _RingLogBuffer:
                 bytes(self._data[offset - self._start_offset : end_offset - self._start_offset]),
                 end_offset,
                 expired,
+                end_offset < self._end_offset,
             )
 
 
@@ -178,20 +179,44 @@ class SessionProcessManager:
             except ProcessManagerError:
                 continue
 
+    def wait(self, process_id: str, *, timeout_seconds: float) -> dict:
+        """最多等待指定秒数；时间到达时返回仍在运行的当前快照。"""
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds 必须大于 0")
+        with self._lock:
+            record = self._record_for(process_id)
+            self._refresh_completion_locked(record)
+            if record.state is not ProcessState.RUNNING:
+                return self._snapshot(record)
+        try:
+            record.process.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            pass
+        with self._lock:
+            self._refresh_completion_locked(record)
+            return self._snapshot(record)
+
     def logs(self, process_id: str, *, stdout_offset: int, stderr_offset: int, limit: int) -> dict:
         """从两个流的绝对 offset 读取新增日志，供后续 Tool 生成 cursor。"""
         if limit <= 0:
             raise ValueError("limit 必须大于 0")
         with self._lock:
             record = self._record_for(process_id)
-            stdout, next_stdout, stdout_expired = record.stdout.read(stdout_offset, limit)
-            stderr, next_stderr, stderr_expired = record.stderr.read(stderr_offset, limit)
+            stdout, next_stdout, stdout_expired, stdout_more = record.stdout.read(
+                stdout_offset,
+                limit,
+            )
+            stderr, next_stderr, stderr_expired, stderr_more = record.stderr.read(
+                stderr_offset,
+                limit,
+            )
             return {
                 "stdout": decode_output(stdout),
                 "stderr": decode_output(stderr),
                 "stdout_offset": next_stdout,
                 "stderr_offset": next_stderr,
                 "cursor_expired": stdout_expired or stderr_expired,
+                "truncated": stdout_more or stderr_more,
             }
 
     def _record_for(self, process_id: str) -> _ProcessRecord:

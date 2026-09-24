@@ -165,6 +165,17 @@ class PermissionPolicyTests(unittest.TestCase):
             PermissionDecision.DENY,
         )
 
+    def test_process_inspection_and_stop_are_allowed_in_every_mode(self):
+        """这些动作只能作用于 Session 自己的内存记录，不读取外部资源。"""
+        policy = ModePolicy(None)
+        for mode in PermissionMode:
+            for action in (PermissionAction.PROCESS_INSPECT, PermissionAction.PROCESS_STOP):
+                with self.subTest(mode=mode, action=action):
+                    self.assertEqual(
+                        policy.decide(mode, self._request(action, None)),
+                        PermissionDecision.ALLOW,
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

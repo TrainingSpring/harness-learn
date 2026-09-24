@@ -19,6 +19,8 @@ class PermissionAction(StrEnum):
     FILE_READ = "filesystem.read"
     FILE_WRITE = "filesystem.write"
     BASH_EXECUTE = "bash.execute"
+    PROCESS_INSPECT = "process.inspect"
+    PROCESS_STOP = "process.stop"
 
 
 class PermissionDecision(StrEnum):

@@ -223,6 +223,11 @@ class ModePolicy:
         bash 的 resource 为 None，因此直接使用动作表，不会伪造项目内外
         归属。
         """
+        if request.action in {
+            PermissionAction.PROCESS_INSPECT,
+            PermissionAction.PROCESS_STOP,
+        }:
+            return PermissionDecision.ALLOW
         if self._project_path is None:
             return PermissionDecision.DENY
         if request.resource is not None and not _is_path_within(
