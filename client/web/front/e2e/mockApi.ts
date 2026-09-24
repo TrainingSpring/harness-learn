@@ -31,8 +31,8 @@ const session = {
   createdAt: "2026-09-12T08:00:00Z",
   updatedAt: "2026-09-12T08:00:00Z",
   permissionMode: "plan",
-  projectPath: null,
-  isProjectLocked: false,
+  workspacePath: null,
+  isWorkspaceLocked: false,
 };
 
 const list = <T,>(items: T[]) => ({ items, pagination: { limit: 100, offset: 0, hasMore: false } });
@@ -104,25 +104,30 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
     if (path === `/api/agents/${agent.id}`) return json(route, { ...agent, llmProfileId: "llm_LOCAL01" });
     if (path === "/api/sessions" && method === "GET") return json(route, list(hasSession ? [session] : []));
     if (path === "/api/sessions" && method === "POST") {
-      const requestBody = request.postDataJSON() as { permissionMode?: string; projectPath?: string | null };
+      const requestBody = request.postDataJSON() as { permissionMode?: string; workspacePath?: string | null };
       session.permissionMode = requestBody.permissionMode ?? "plan";
-      session.projectPath = requestBody.projectPath ?? null;
+      session.workspacePath = requestBody.workspacePath ?? null;
       hasSession = true;
       return json(route, session, 201);
     }
     if (path === `/api/sessions/${session.id}`) return json(route, { ...session, messages });
-    if (path === "/api/sessions/projects" && method === "GET") return json(route, { path: ".", name: "harness-learn", directories: [{ path: "code", name: "code" }, { path: "client", name: "client" }] });
+    if (path === "/api/sessions/projects" && method === "GET") {
+      const requestedPath = new URL(request.url()).searchParams.get("path");
+      if (requestedPath === "/") return json(route, { path: "/", name: "/", parentPath: null, directories: [{ path: "/workspace", name: "workspace" }] });
+      if (requestedPath === "/workspace/client") return json(route, { path: requestedPath, name: "client", parentPath: "/workspace", directories: [] });
+      return json(route, { path: "/workspace", name: "workspace", parentPath: "/", directories: [{ path: "/workspace/code", name: "code" }, { path: "/workspace/client", name: "client" }] });
+    }
     if (path === `/api/sessions/${session.id}/permission-mode` && method === "PATCH") {
       session.permissionMode = (request.postDataJSON() as { permissionMode: string }).permissionMode;
       return json(route, session);
     }
-    if (path === `/api/sessions/${session.id}/project` && method === "PATCH") {
-      session.projectPath = (request.postDataJSON() as { projectPath: string | null }).projectPath;
+    if (path === `/api/sessions/${session.id}/workspace` && method === "PATCH") {
+      session.workspacePath = (request.postDataJSON() as { workspacePath: string | null }).workspacePath;
       return json(route, session);
     }
     if (path === `/api/sessions/${session.id}/messages` && method === "GET") return json(route, { items: messages });
     if (path === `/api/sessions/${session.id}/messages` && method === "POST") {
-      session.isProjectLocked = true;
+      session.isWorkspaceLocked = true;
       messages.push(contextItem("item_USER000001", 1, "USER_MESSAGE", { text: options.permission ? "写入说明" : "请检查权限模块" }));
       if (options.permission) {
         messages.push(contextItem("item_CALL000001", 2, "FUNCTION_CALL", { name: "write", arguments: '{"target_path":"README.md"}' }, "call_WRITE01"));

@@ -65,16 +65,17 @@ class SessionPermissionRuleRepositoryTests(unittest.TestCase):
 
         self.assertEqual(self.repository.list_for_session(other.id), [])
 
-    def test_file_rule_must_stay_inside_selected_project(self):
-        with self.assertRaises(ValueError):
-            self.repository.save(
-                PermissionRule(
-                    action=PermissionAction.FILE_READ,
-                    resource="/outside/project.txt",
-                    decision=PermissionDecision.ALLOW,
-                    session_id=self.session.id,
-                )
-            )
+    def test_external_file_rule_is_persisted_and_rehydrated(self):
+        rule = PermissionRule(
+            action=PermissionAction.FILE_READ,
+            resource="/outside/project.txt",
+            decision=PermissionDecision.ALLOW,
+            session_id=self.session.id,
+        )
+
+        self.repository.save(rule)
+
+        self.assertEqual(self.repository.list_for_session(self.session.id), [rule])
 
 
 if __name__ == "__main__":

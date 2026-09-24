@@ -112,8 +112,8 @@ class PermissionPolicyTests(unittest.TestCase):
             PermissionDecision.DENY,
         )
 
-    def test_build_mode_requires_confirmation_for_side_effects_and_external_reads(self):
-        """BUILD 允许项目内读取，副作用和项目外访问都要求确认。"""
+    def test_build_mode_allows_workspace_access_and_asks_for_external_access(self):
+        """BUILD 默认允许工作目录内读写，只对目录外访问确认。"""
         policy = ModePolicy("/workspace")
 
         self.assertEqual(
@@ -128,7 +128,7 @@ class PermissionPolicyTests(unittest.TestCase):
                 PermissionMode.BUILD,
                 self._request(PermissionAction.FILE_WRITE),
             ),
-            PermissionDecision.ASK,
+            PermissionDecision.ALLOW,
         )
         self.assertEqual(
             policy.decide(
@@ -138,8 +138,8 @@ class PermissionPolicyTests(unittest.TestCase):
             PermissionDecision.ASK,
         )
 
-    def test_yolo_mode_requires_confirmation_for_external_actions(self):
-        """YOLO 只决定普通资源默认值，硬安全和保护策略由 Manager 先处理。"""
+    def test_yolo_mode_allows_external_files_by_default(self):
+        """YOLO 默认允许工作目录外文件访问。"""
         policy = ModePolicy("/workspace")
 
         self.assertEqual(
@@ -147,7 +147,7 @@ class PermissionPolicyTests(unittest.TestCase):
                 PermissionMode.YOLO,
                 self._request(PermissionAction.FILE_WRITE, "/outside/file.txt"),
             ),
-            PermissionDecision.ASK,
+            PermissionDecision.ALLOW,
         )
         self.assertEqual(
             policy.decide(

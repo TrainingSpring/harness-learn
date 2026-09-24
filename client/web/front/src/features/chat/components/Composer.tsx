@@ -10,16 +10,16 @@ interface ComposerProps {
   onStop: () => void;
   placeholder?: string;
   autoFocus?: boolean;
-  projectPath?: string | null;
-  isProjectLocked?: boolean;
+  workspacePath?: string | null;
+  isWorkspaceLocked?: boolean;
   permissionMode?: PermissionMode;
-  onProjectChange?: (path: string | null) => void;
+  onWorkspaceChange?: (path: string | null) => void;
   onPermissionModeChange?: (mode: PermissionMode) => void;
   showProjectSelection?: boolean;
 }
 
 /** 对话输入器，处理自动增高、中文输入法组合和 Enter 发送语义。 */
-export function Composer({ onSend, isRunning, onStop, placeholder = "输入消息…", autoFocus = false, projectPath = null, isProjectLocked = false, permissionMode = "plan", onProjectChange = () => undefined, onPermissionModeChange = () => undefined, showProjectSelection = true }: ComposerProps) {
+export function Composer({ onSend, isRunning, onStop, placeholder = "输入消息…", autoFocus = false, workspacePath = null, isWorkspaceLocked = false, permissionMode = "plan", onWorkspaceChange = () => undefined, onPermissionModeChange = () => undefined, showProjectSelection = true }: ComposerProps) {
   const [value, setValue] = useState("");
   const composing = useRef(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
@@ -49,9 +49,9 @@ export function Composer({ onSend, isRunning, onStop, placeholder = "输入消�
   return (
     <div className="composer">
       <div className="composer__toolbar">
-        {showProjectSelection && <button type="button" className="composer__project" aria-label={isProjectLocked ? "项目目录已锁定" : "选择项目目录"} disabled={isRunning || isProjectLocked} onClick={() => setShowProjectPicker(true)} title={isProjectLocked ? "项目目录已锁定" : "选择项目目录"}>
-          {isProjectLocked ? <Lock size={15} /> : <Folder size={15} />}
-          <span>{projectPath ?? "空项目"}</span>
+        {showProjectSelection && <button type="button" className="composer__project" aria-label={isWorkspaceLocked ? "工作目录已锁定" : "选择工作目录"} disabled={isRunning || isWorkspaceLocked} onClick={() => setShowProjectPicker(true)} title={isWorkspaceLocked ? "工作目录已锁定" : "选择工作目录"}>
+          {isWorkspaceLocked ? <Lock size={15} /> : <Folder size={15} />}
+          <span>{workspacePath ?? "空工作区"}</span>
         </button>}
         <label className="composer__mode" title="会话权限模式">
           <span className="sr-only">权限模式</span>
@@ -81,7 +81,7 @@ export function Composer({ onSend, isRunning, onStop, placeholder = "输入消�
       ) : (
         <IconButton label="发送消息" className="composer__submit" disabled={!value.trim()} onClick={submit}><ArrowUp size={18} /></IconButton>
       )}
-      {showProjectPicker && <ProjectPicker selectedPath={projectPath} onSelect={onProjectChange} onClose={() => setShowProjectPicker(false)} />}
+      {showProjectPicker && <ProjectPicker selectedPath={workspacePath} onSelect={onWorkspaceChange} onClose={() => setShowProjectPicker(false)} />}
     </div>
   );
 }

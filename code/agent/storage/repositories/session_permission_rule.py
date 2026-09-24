@@ -100,11 +100,11 @@ class SessionPermissionRuleRepository:
             raise ValueError("权限规则资源必须是绝对路径")
         normalized = os.path.normpath(os.path.abspath(resource))
         try:
-            if os.path.commonpath([normalized, project_path]) != project_path:
-                raise ValueError("权限规则资源必须位于 Session 项目目录内")
-        except ValueError as error:
-            raise ValueError("权限规则资源必须位于 Session 项目目录内") from error
-        return "path", os.path.relpath(normalized, project_path)
+            if os.path.commonpath([normalized, project_path]) == project_path:
+                return "path", os.path.relpath(normalized, project_path)
+        except ValueError:
+            pass
+        return "absolute_path", normalized
 
     @staticmethod
     def _from_row(row: sqlite3.Row, project_path: str | None) -> PermissionRule:
@@ -126,6 +126,11 @@ class SessionPermissionRuleRepository:
                     raise StorageFormatError("Session 权限规则路径越出项目目录")
             except ValueError as error:
                 raise StorageFormatError("Session 权限规则路径越出项目目录") from error
+        elif kind == "absolute_path":
+            value = row["resource_value"]
+            if not isinstance(value, str) or not os.path.isabs(value):
+                raise StorageFormatError("Session 权限规则绝对路径无效")
+            resource = os.path.normpath(os.path.abspath(value))
         else:
             raise StorageFormatError("Session 权限规则资源无效")
         return PermissionRule(

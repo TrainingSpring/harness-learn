@@ -10,7 +10,7 @@ test("三种目标视口无控制台错误、水平溢出或元素重叠", async
 
   const cases = [
     { width: 1440, height: 900, path: "/agents", name: "visual-1440x900.png", readyText: "选择适合当前任务的角色" },
-    { width: 1024, height: 768, path: "/new?agentId=agent_ENGINEER01", name: "visual-1024x768.png", readyText: "与 工程师 对话" },
+    { width: 1024, height: 768, path: "/new?agentId=agent_ENGINEER01", name: "visual-1024x768.png", readyText: "配置会话" },
     { width: 390, height: 844, path: "/settings/appearance", name: "visual-390x844.png", readyText: "选择工作区的显示主题。" },
   ];
 

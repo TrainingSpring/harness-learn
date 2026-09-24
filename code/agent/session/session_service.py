@@ -150,7 +150,7 @@ class SessionExecution:
                 if item.type != "message":
                     continue
                 text = self._message_text(item)
-                if text:
+                if text.strip():
                     self.context_service.append_agent_message(agent_id, text)
             self._persist_function_protocol_items(agent_id)
         self.context_service.save_context(self.context)
@@ -199,9 +199,12 @@ class SessionExecution:
         if not isinstance(item.content, list):
             return ""
         return "".join(
-            part["text"]
+            part.get("text") if isinstance(part, dict) else getattr(part, "text", "")
             for part in item.content
-            if isinstance(part, dict) and isinstance(part.get("text"), str)
+            if isinstance(
+                part.get("text") if isinstance(part, dict) else getattr(part, "text", None),
+                str,
+            )
         )
 
 

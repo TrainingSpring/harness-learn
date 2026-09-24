@@ -47,31 +47,39 @@ class PermissionManagerTests(unittest.TestCase):
             session_id=session_id or self.session_id,
         )
 
-    def test_build_mode_falls_back_to_ask_for_unruled_write(self) -> None:
-        self.assertEqual(self.manager.check(self._request()), PermissionDecision.ASK)
+    def test_build_mode_allows_unruled_workspace_write(self) -> None:
+        self.assertEqual(self.manager.check(self._request()), PermissionDecision.ALLOW)
+
+    def test_build_mode_asks_for_unruled_external_write(self) -> None:
+        self.assertEqual(
+            self.manager.check(self._request(resource="/outside/file.txt")),
+            PermissionDecision.ASK,
+        )
 
     def test_once_decision_does_not_create_a_reusable_rule(self) -> None:
-        request = self._request(call_id="call_123")
+        request = self._request(resource="/outside/file.txt", call_id="call_123")
 
         self.assertIsNone(
             self.manager.grant(
                 request,
                 scope=PermissionScope.ONCE,
-                resource="/workspace/src",
+                resource="/outside",
             )
         )
         self.assertEqual(self.manager.check(request), PermissionDecision.ASK)
 
     def test_session_rule_matches_later_calls_in_the_same_session(self) -> None:
-        request = self._request()
+        request = self._request(resource="/outside/src/app.py")
         self.manager.grant(
             request,
             scope=PermissionScope.SESSION,
-            resource="/workspace/src",
+            resource="/outside/src",
         )
 
         self.assertEqual(
-            self.manager.check(self._request(call_id="call_002")),
+            self.manager.check(
+                self._request(resource="/outside/src/other.py", call_id="call_002")
+            ),
             PermissionDecision.ALLOW,
         )
 
@@ -83,52 +91,52 @@ class PermissionManagerTests(unittest.TestCase):
         self.assertNotIn("AGENT", PermissionScope.__members__)
 
     def test_deeper_rule_overrides_broader_rule(self) -> None:
-        request = self._request(resource="/workspace/src/.env")
+        request = self._request(resource="/outside/src/.env")
         self.manager.grant(
             request,
             scope=PermissionScope.SESSION,
-            resource="/workspace/src",
+            resource="/outside/src",
         )
         self.manager.deny(
             request,
             scope=PermissionScope.SESSION,
-            resource="/workspace/src/.env",
+            resource="/outside/src/.env",
         )
 
         self.assertEqual(self.manager.check(request), PermissionDecision.DENY)
         self.assertEqual(
-            self.manager.check(self._request(resource="/workspace/src/app.py")),
+            self.manager.check(self._request(resource="/outside/src/app.py")),
             PermissionDecision.ALLOW,
         )
 
     def test_path_matching_respects_directory_boundaries(self) -> None:
-        request = self._request()
+        request = self._request(resource="/outside/src/file.py")
         self.manager.grant(
             request,
             scope=PermissionScope.SESSION,
-            resource="/workspace/src",
+            resource="/outside/src",
         )
 
         self.assertEqual(
-            self.manager.check(self._request(resource="/workspace/src/module.py")),
+            self.manager.check(self._request(resource="/outside/src/module.py")),
             PermissionDecision.ALLOW,
         )
         self.assertEqual(
-            self.manager.check(self._request(resource="/workspace/src-other/module.py")),
+            self.manager.check(self._request(resource="/outside/src-other/module.py")),
             PermissionDecision.ASK,
         )
 
     def test_latest_rule_replaces_same_action_and_resource_slot(self) -> None:
-        request = self._request()
+        request = self._request(resource="/outside/src/file.py")
         self.manager.grant(
             request,
             scope=PermissionScope.SESSION,
-            resource="/workspace/src",
+            resource="/outside/src",
         )
         self.manager.deny(
             request,
             scope=PermissionScope.SESSION,
-            resource="/workspace/src",
+            resource="/outside/src",
         )
 
         self.assertEqual(self.manager.check(request), PermissionDecision.DENY)
@@ -150,7 +158,7 @@ class PermissionManagerTests(unittest.TestCase):
 
         self.assertEqual(manager.check(request), PermissionDecision.DENY)
 
-    def test_protected_resource_overrides_explicit_yolo_allow_rule(self) -> None:
+    def test_yolo_allows_protected_resource_outside_forced_blacklist(self) -> None:
         manager = PermissionManager(
             mode=PermissionMode.YOLO,
             session_id=self.session_id,
@@ -165,7 +173,40 @@ class PermissionManagerTests(unittest.TestCase):
             resource="/system",
         )
 
-        self.assertEqual(manager.check(request), PermissionDecision.ASK)
+        self.assertEqual(manager.check(request), PermissionDecision.ALLOW)
+
+    def test_session_deny_takes_precedence_over_protected_resource_confirmation(self) -> None:
+        request = self._request(resource="/system/config")
+        self.manager.deny(
+            request,
+            scope=PermissionScope.SESSION,
+            resource="/system",
+        )
+
+        self.assertEqual(self.manager.check(request), PermissionDecision.DENY)
+
+    def test_plan_workspace_boundary_cannot_be_overridden_by_session_allow(self) -> None:
+        manager = PermissionManager(
+            mode=PermissionMode.PLAN,
+            session_id=self.session_id,
+            project_path="/workspace",
+            protected_resource_policy=ProtectedResourcePolicy(["/system"]),
+        )
+        request = self._request(action=PermissionAction.FILE_READ, resource="/outside/x")
+        manager.grant(
+            request,
+            scope=PermissionScope.SESSION,
+            resource="/outside",
+        )
+
+        self.assertEqual(manager.check(request), PermissionDecision.DENY)
+        write_request = self._request(resource="/workspace/src/file.py")
+        manager.grant(
+            write_request,
+            scope=PermissionScope.SESSION,
+            resource="/workspace/src",
+        )
+        self.assertEqual(manager.check(write_request), PermissionDecision.DENY)
 
 
 if __name__ == "__main__":

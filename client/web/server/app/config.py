@@ -9,7 +9,7 @@ class WebServerSettings(BaseModel):
     """描述一个本地 Web Server 实例的固定启动参数。
 
     Attributes:
-        workspace: Agent、工具和状态数据库共同使用的项目目录。
+        workspace: Agent、工具和状态数据库共同使用的服务进程 workspace。
         host: HTTP 监听地址，默认只允许本机访问。
         port: HTTP 监听端口。
         frontend_dist: 可选的前端生产构建目录。
@@ -36,4 +36,3 @@ class WebServerSettings(BaseModel):
     def normalize_frontend_dist(cls, value: Path | None) -> Path | None:
         """规范化可选前端构建目录；存在性在挂载静态资源时检查。"""
         return None if value is None else value.expanduser().resolve()
-

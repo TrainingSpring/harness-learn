@@ -36,6 +36,8 @@ it("拒绝不携带可扩大权限的范围", async () => {
     />,
   );
 
+  expect(screen.getByText("此处确认的是整条终端命令。本会话允许或不再询问会影响后续所有终端命令。")).toBeInTheDocument();
+
   await userEvent.click(screen.getByRole("button", { name: "拒绝" }));
   expect(onDecision).toHaveBeenCalledWith("deny", "once");
 });

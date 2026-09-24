@@ -50,6 +50,14 @@ class PromptBuilderTests(unittest.TestCase):
         self.assertIn("read", prompt)
         self.assertNotIn("当前权限模式", prompt)
 
+    def test_build_mode_tells_agent_to_request_external_access_through_tools(self):
+        """Build 不能让 Agent 因旧历史自行断言工作目录外不可访问。"""
+        prompt = PromptBuilder().build(self.profile, permission_mode="build")
+
+        self.assertIn("工作目录外", prompt)
+        self.assertIn("发起工具调用", prompt)
+        self.assertIn("不要根据历史消息自行断言没有权限", prompt)
+
     def test_build_rejects_empty_profile_description(self):
         """关键 Agent 描述为空时不能生成无意义指令。"""
         self.profile.description = ""

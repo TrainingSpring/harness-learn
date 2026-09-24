@@ -219,7 +219,7 @@ class ModePolicy:
         Returns:
             该模式对此类普通请求的默认 allow、deny 或 ask 决定。
 
-        项目外资源先于动作表处理：PLAN 拒绝，BUILD 和 YOLO 都要求确认。
+        项目外资源先于动作表处理：PLAN 拒绝，BUILD 要求确认，YOLO 允许。
         bash 的 resource 为 None，因此直接使用动作表，不会伪造项目内外
         归属。
         """
@@ -231,7 +231,7 @@ class ModePolicy:
             return {
                 PermissionMode.PLAN: PermissionDecision.DENY,
                 PermissionMode.BUILD: PermissionDecision.ASK,
-                PermissionMode.YOLO: PermissionDecision.ASK,
+                PermissionMode.YOLO: PermissionDecision.ALLOW,
             }[mode]
 
         decisions = {
@@ -242,7 +242,7 @@ class ModePolicy:
             },
             PermissionMode.BUILD: {
                 PermissionAction.FILE_READ: PermissionDecision.ALLOW,
-                PermissionAction.FILE_WRITE: PermissionDecision.ASK,
+                PermissionAction.FILE_WRITE: PermissionDecision.ALLOW,
                 PermissionAction.BASH_EXECUTE: PermissionDecision.ASK,
             },
             PermissionMode.YOLO: {

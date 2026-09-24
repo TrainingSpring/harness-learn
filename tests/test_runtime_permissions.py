@@ -82,7 +82,7 @@ class RuntimePermissionTests(unittest.TestCase):
         return ToolResult.success({"written": arguments["target_path"]})
 
     @staticmethod
-    def _function_call(call_id, name="write", arguments='{"target_path":"src/app.py"}'):
+    def _function_call(call_id, name="write", arguments='{"target_path":"../outside.txt"}'):
         """构造 Runtime 使用的 Responses 输出项。"""
         return LLMResponseOutputItem(
             type="function_call",
@@ -137,7 +137,7 @@ class RuntimePermissionTests(unittest.TestCase):
         ))
 
         self.assertEqual(len(self.executions), 1)
-        self.assertEqual(self.executions[0]["target_path"], "src/app.py")
+        self.assertEqual(self.executions[0]["target_path"], "/outside.txt")
         self.assertEqual(runtime.state, RuntimeState.IDLE)
         self.assertEqual(llm.call_count, 2)
         self.assertEqual(

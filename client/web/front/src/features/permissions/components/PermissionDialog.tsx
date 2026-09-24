@@ -31,7 +31,7 @@ export function PermissionDialog({ request, isSubmitting, onDecision }: Permissi
           <div><dt>权限动作</dt><dd>{request.action}</dd></div>
           <div><dt>目标资源</dt><dd><code>{request.resource ?? "无特定资源"}</code></dd></div>
         </dl>
-        {request.toolName === "bash" && <p className="form-hint">本会话允许或不再询问会影响后续终端命令。</p>}
+        {request.toolName === "bash" && <p className="form-hint">此处确认的是整条终端命令。本会话允许或不再询问会影响后续所有终端命令。</p>}
         <div className="permission-dialog__actions">
           <Button variant="primary" disabled={isSubmitting} onClick={() => onDecision("allow", "once")}>仅本次允许</Button>
           {canPersist && <Button variant="primary" disabled={isSubmitting} onClick={() => onDecision("allow", "session")}>本会话允许</Button>}

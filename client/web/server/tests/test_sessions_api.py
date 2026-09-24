@@ -29,12 +29,12 @@ def test_create_direct_session_binds_selected_agent(client) -> None:
     assert payload["lastMessage"] is None
     assert "participantId" not in payload
     assert payload["permissionMode"] == "plan"
-    assert payload["projectPath"] is None
-    assert payload["isProjectLocked"] is False
+    assert payload["workspacePath"] is None
+    assert payload["isWorkspaceLocked"] is False
 
 
-def test_session_settings_are_session_scoped_and_project_is_workspace_relative(client) -> None:
-    """权限模式与项目目录应写入 Session，并且项目 API 不接收绝对路径。"""
+def test_session_settings_are_session_scoped_and_workspace_is_relative(client) -> None:
+    """权限模式与工作目录应写入 Session，并支持本机绝对路径。"""
     project = client.app.state.services.database.workspace / "demo"
     project.mkdir()
     created = client.post(
@@ -47,17 +47,20 @@ def test_session_settings_are_session_scoped_and_project_is_workspace_relative(c
         json={"permissionMode": "yolo"},
     )
     project_response = client.patch(
-        f"/api/sessions/{created['id']}/project",
-        json={"projectPath": "demo"},
+        f"/api/sessions/{created['id']}/workspace",
+        json={"workspacePath": "demo"},
     )
 
     assert mode.status_code == project_response.status_code == 200
     assert mode.json()["permissionMode"] == "yolo"
-    assert project_response.json()["projectPath"] == "demo"
-    assert client.get("/api/sessions/projects?path=.").json()["directories"] == [{"path": "demo", "name": "demo"}]
+    assert project_response.json()["workspacePath"] == str(project)
+    assert project_response.json()["isWorkspaceLocked"] is False
+    listing = client.get("/api/sessions/projects?path=.").json()
+    assert listing["directories"] == [{"path": str(project), "name": "demo"}]
+    assert listing["parentPath"] is not None
     rejected = client.patch(
-        f"/api/sessions/{created['id']}/project",
-        json={"projectPath": "../outside"},
+        f"/api/sessions/{created['id']}/workspace",
+        json={"workspacePath": "../outside"},
     )
     assert rejected.status_code == 422
     assert rejected.json()["error"]["code"] == "INVALID_PROJECT_PATH"
@@ -74,26 +77,42 @@ def test_project_directory_list_excludes_symlinks_outside_workspace(client, tmp_
     response = client.get("/api/sessions/projects?path=.")
 
     assert response.status_code == 200
-    assert response.json()["directories"] == [{"path": "inside", "name": "inside"}]
+    assert response.json()["directories"] == [{"path": str(workspace / "inside"), "name": "inside"}]
 
     external_response = client.get(f"/api/sessions/projects?path={external_directory}")
     assert external_response.status_code == 200
     assert external_response.json()["path"] == str(external_directory)
 
+    created = _create_session(client)
+    rejected = client.patch(
+        f"/api/sessions/{created['id']}/workspace",
+        json={"workspacePath": str(workspace / "outside-link")},
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["error"]["code"] == "INVALID_PROJECT_PATH"
 
-def test_external_project_directory_can_be_selected(client, tmp_path) -> None:
-    """本地 Web 客户端可以把 workspace 外的本机目录设置为 Session 项目。"""
+
+def test_workspace_root_has_no_parent(client) -> None:
+    """文件系统根目录没有上级目录，供跨平台选择器停止返回。"""
+    response = client.get("/api/sessions/projects", params={"path": "/"})
+
+    assert response.status_code == 200
+    assert response.json()["parentPath"] is None
+
+
+def test_external_workspace_directory_can_be_selected(client, tmp_path) -> None:
+    """本地 Web 客户端可以选择服务主机上的任意真实工作目录。"""
     external_directory = tmp_path.parent / "external-project-selection"
     external_directory.mkdir()
     created = _create_session(client)
 
     response = client.patch(
-        f"/api/sessions/{created['id']}/project",
-        json={"projectPath": str(external_directory)},
+        f"/api/sessions/{created['id']}/workspace",
+        json={"workspacePath": str(external_directory)},
     )
 
     assert response.status_code == 200
-    assert response.json()["projectPath"] == str(external_directory)
+    assert response.json()["workspacePath"] == str(external_directory)
 
 
 def test_active_run_rejects_session_setting_changes(client) -> None:
@@ -107,8 +126,8 @@ def test_active_run_rejects_session_setting_changes(client) -> None:
             json={"permissionMode": "yolo"},
         )
         project = client.patch(
-            f"/api/sessions/{created['id']}/project",
-            json={"projectPath": None},
+            f"/api/sessions/{created['id']}/workspace",
+            json={"workspacePath": None},
         )
     finally:
         registry.remove(active.run_id)
@@ -130,10 +149,10 @@ def test_project_is_locked_after_first_user_message(client) -> None:
 
     detail = client.get(f"/api/sessions/{created['id']}")
     response = client.patch(
-        f"/api/sessions/{created['id']}/project",
-        json={"projectPath": None},
+        f"/api/sessions/{created['id']}/workspace",
+        json={"workspacePath": None},
     )
-    assert detail.json()["isProjectLocked"] is True
+    assert detail.json()["isWorkspaceLocked"] is True
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "PROJECT_LOCKED"
 

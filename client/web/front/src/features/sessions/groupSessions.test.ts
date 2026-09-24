@@ -15,8 +15,8 @@ it("将会话按今天、昨天和更早分组", () => {
     createdAt: updatedAt,
       updatedAt,
       permissionMode: "plan",
-      projectPath: null,
-      isProjectLocked: false,
+      workspacePath: null,
+      isWorkspaceLocked: false,
   });
 
   const groups = groupSessionsByDate([

@@ -3,6 +3,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "code" / "agent"))
@@ -77,12 +78,21 @@ class ToolPreparationTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.error.code, "INVALID_ARGUMENTS")
 
-    def test_prepare_call_rejects_path_escaping_the_session_project(self):
-        """项目外目标不能进入权限模式或实际工具执行。"""
-        with self.assertRaises(ToolCallPreparationError) as raised:
-            self.tools.prepare_call("read", {"target_path": "../secret.txt"}, "call_004")
+    def test_prepare_call_builds_permission_request_for_external_path(self):
+        """越出工作目录的目标应交由 PermissionManager 按模式决定。"""
+        call = self.tools.prepare_call(
+            "read", {"target_path": "../secret.txt"}, "call_004"
+        )
 
-        self.assertEqual(raised.exception.error.code, "PROJECT_PATH_ESCAPE")
+        self.assertEqual(call.permission_request.resource, "/secret.txt")
+        self.assertEqual(call.arguments["target_path"], "../secret.txt")
+
+    def test_prepare_call_keeps_absolute_path_outside_workspace(self):
+        call = self.tools.prepare_call(
+            "read", {"target_path": "/outside/secret.txt"}, "call_008"
+        )
+
+        self.assertEqual(call.permission_request.resource, "/outside/secret.txt")
 
     def test_prepare_call_rejects_file_tools_without_a_project(self):
         """空项目仍可聊天，但文件工具必须返回稳定错误。"""
@@ -114,6 +124,20 @@ class ToolPreparationTests(unittest.TestCase):
         call = self.tools.prepare_call("bash", {"command": "pwd"}, "call_006")
 
         self.assertIsNone(self.tools.default_grant_resource(call.permission_request))
+
+    def test_execute_fails_closed_if_symlink_target_changes_after_preparation(self):
+        call = self.tools.prepare_call(
+            "read", {"target_path": "src/app.py"}, "call_007"
+        )
+
+        with patch.object(
+            self.tools,
+            "_resolve_path",
+            return_value="/workspace/changed.py",
+        ):
+            result = self.tools.execute(call)
+
+        self.assertEqual(result.error.code, "PERMISSION_TARGET_CHANGED")
 
 
 if __name__ == "__main__":

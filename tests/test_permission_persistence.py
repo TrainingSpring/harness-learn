@@ -40,6 +40,7 @@ class PermissionPersistenceTests(unittest.TestCase):
             self.session.id,
             str(self.project),
         )
+        self.sessions.update_permission_mode(self.session.id, PermissionMode.BUILD.value)
 
     def tearDown(self) -> None:
         self.database.close()
@@ -59,7 +60,7 @@ class PermissionPersistenceTests(unittest.TestCase):
     def _request(self, session_id: str, call_id: str = "call_001") -> PermissionRequest:
         return PermissionRequest(
             action=PermissionAction.FILE_WRITE,
-            resource=str(self.project / "src" / "app.py"),
+            resource="/outside/src/app.py",
             tool_name="write",
             call_id=call_id,
             session_id=session_id,
@@ -70,7 +71,7 @@ class PermissionPersistenceTests(unittest.TestCase):
         self._manager(self.session.id).grant(
             request,
             scope=PermissionScope.SESSION,
-            resource=str(self.project / "src"),
+            resource="/outside/src",
         )
 
         recreated = self._manager(self.session.id)
@@ -84,7 +85,7 @@ class PermissionPersistenceTests(unittest.TestCase):
         self._manager(self.session.id).deny(
             request,
             scope=PermissionScope.SESSION,
-            resource=str(self.project / "src"),
+            resource="/outside/src",
         )
         other = self.sessions.create("DIRECT")
         self.sessions.update_project_path_before_first_message(other.id, str(self.project))

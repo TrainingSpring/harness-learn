@@ -55,12 +55,23 @@ class PermissionManager:
         hard_decision = self._hard_safety_policy.check(request, command=command)
         if hard_decision is not None:
             return hard_decision
-        if self._protected_resource_policy.requires_confirmation(request):
-            return PermissionDecision.ASK
+
+        mode_decision = self._mode_policy.decide(self._mode, request)
+        if self._mode is PermissionMode.PLAN and mode_decision is PermissionDecision.DENY:
+            return PermissionDecision.DENY
+
         rule = self._find_matching_rule(request)
+        if rule is not None and rule.decision is PermissionDecision.DENY:
+            return PermissionDecision.DENY
+
+        if (
+            self._mode is not PermissionMode.YOLO
+            and self._protected_resource_policy.requires_confirmation(request)
+        ):
+            return PermissionDecision.ASK
         if rule is not None:
             return rule.decision
-        return self._mode_policy.decide(self._mode, request)
+        return mode_decision
 
     def grant(
         self,

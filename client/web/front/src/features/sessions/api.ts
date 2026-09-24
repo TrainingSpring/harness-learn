@@ -1,5 +1,5 @@
 import { apiClient } from "../../api/client";
-import type { ContextItemResponse, CreateDirectSessionRequest, ListResponse, PermissionMode, ProjectDirectoryResponse, SessionDetail, SessionSummary } from "../../api/types";
+import type { ContextItemResponse, CreateDirectSessionRequest, ListResponse, PermissionMode, SessionDetail, SessionSummary, WorkspaceDirectoryResponse } from "../../api/types";
 
 interface ContextItemList {
   items: ContextItemResponse[];
@@ -25,10 +25,10 @@ export function updateSessionPermissionMode(sessionId: string, permissionMode: P
   return apiClient.patch<{ permissionMode: PermissionMode }, SessionSummary>(`/api/sessions/${encodeURIComponent(sessionId)}/permission-mode`, { permissionMode });
 }
 
-export function updateSessionProject(sessionId: string, projectPath: string | null): Promise<SessionSummary> {
-  return apiClient.patch<{ projectPath: string | null }, SessionSummary>(`/api/sessions/${encodeURIComponent(sessionId)}/project`, { projectPath });
+export function updateSessionWorkspace(sessionId: string, workspacePath: string | null): Promise<SessionSummary> {
+  return apiClient.patch<{ workspacePath: string | null }, SessionSummary>(`/api/sessions/${encodeURIComponent(sessionId)}/workspace`, { workspacePath });
 }
 
-export function listProjectDirectories(path = "."): Promise<ProjectDirectoryResponse> {
+export function listWorkspaceDirectories(path = "."): Promise<WorkspaceDirectoryResponse> {
   return apiClient.get(`/api/sessions/projects?path=${encodeURIComponent(path)}`);
 }

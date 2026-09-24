@@ -15,8 +15,8 @@ it("分组展示历史并标记当前会话", () => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     permissionMode: "plan",
-    projectPath: null,
-    isProjectLocked: false,
+    workspacePath: null,
+    isWorkspaceLocked: false,
   }];
 
   render(

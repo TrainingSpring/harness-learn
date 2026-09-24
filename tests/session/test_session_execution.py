@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
@@ -35,6 +36,7 @@ class FakeRuntime:
         self.contexts = []
         self.wait_for_permission = False
         self.cancel_calls = 0
+        self.output_content = None
 
     def cancel(self):
         """记录 Session 只取消当前成员 Runtime 的调用。"""
@@ -82,7 +84,7 @@ class FakeRuntime:
                 LLMResponseOutputItem(
                     type="message",
                     id=f"msg_{self.agent_id[-4:]}",
-                    content=text,
+                    content=self.output_content if self.output_content is not None else text,
                     name=None,
                     arguments=None,
                     call_id=None,
@@ -217,6 +219,38 @@ class SessionExecutionTests(unittest.TestCase):
         )
         runtime = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
         self.assertEqual(runtime.contexts, [execution.context])
+
+    def test_direct_send_persists_agent_message_from_sdk_content_object(self):
+        """模型 SDK 的输出文本对象也必须进入可刷新历史。"""
+        execution = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        runtime = self.sessions.runtimes[(execution.session.id, "agent_1V3ASAXQ2A")]
+        runtime.output_content = [SimpleNamespace(text="SDK 对象输出")]
+
+        list(execution.send("请回答"))
+
+        persisted = ContextService(
+            ContextItemRepository(self.database), execution.session.id
+        ).load_visible("agent_1V3ASAXQ2A")
+        self.assertEqual(
+            [(item.kind, item.payload) for item in persisted],
+            [
+                ("USER_MESSAGE", {"text": "请回答"}),
+                ("AGENT_MESSAGE", {"text": "SDK 对象输出"}),
+            ],
+        )
+
+    def test_direct_send_skips_blank_sdk_output_in_history(self):
+        """空白模型输出不能让持久化失败或产生无意义的聊天气泡。"""
+        execution = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        runtime = self.sessions.runtimes[(execution.session.id, "agent_1V3ASAXQ2A")]
+        runtime.output_content = [SimpleNamespace(text=" ")]
+
+        list(execution.send("请回答"))
+
+        persisted = ContextService(
+            ContextItemRepository(self.database), execution.session.id
+        ).load_visible("agent_1V3ASAXQ2A")
+        self.assertEqual([item.kind for item in persisted], ["USER_MESSAGE"])
 
     def test_group_runs_members_in_order_with_one_shared_context(self):
         execution = self.sessions.create_group_session(

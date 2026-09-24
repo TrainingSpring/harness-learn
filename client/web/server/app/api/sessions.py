@@ -17,10 +17,10 @@ from ..schemas.session import (
     SessionAgentSummary,
     SessionDetail,
     SessionSummary,
-    ProjectDirectory,
-    ProjectDirectoryResponse,
+    WorkspaceDirectory,
+    WorkspaceDirectoryResponse,
     UpdatePermissionModeRequest,
-    UpdateProjectRequest,
+    UpdateWorkspaceRequest,
 )
 
 
@@ -45,8 +45,7 @@ def _context_item(item: ContextItem) -> ContextItemResponse:
 def _summary(
     item: DirectSessionSummary,
     *,
-    workspace: Path,
-    is_project_locked: bool,
+    is_workspace_locked: bool,
 ) -> SessionSummary:
     """把 DIRECT 聚合查询结果转换为会话摘要 DTO。"""
     session = item.session
@@ -61,43 +60,43 @@ def _summary(
         created_at=session.created_at,
         updated_at=session.updated_at,
         permission_mode=session.permission_mode,
-        project_path=_display_project_path(workspace, session.project_path),
-        is_project_locked=is_project_locked,
+        workspace_path=_display_workspace_path(session.project_path),
+        is_workspace_locked=is_workspace_locked,
     )
 
 
-def _display_project_path(workspace: Path, project_path: str | None) -> str | None:
-    """把项目路径转换成客户端可继续浏览的相对或绝对路径。"""
+def _display_workspace_path(project_path: str | None) -> str | None:
+    """把 Session 工作目录作为完整本机路径返回给客户端。"""
     if project_path is None:
         return None
-    path = Path(project_path)
-    try:
-        relative = path.relative_to(workspace.resolve())
-    except ValueError:
-        return path.as_posix()
-    return "." if str(relative) == "." else relative.as_posix()
+    return str(Path(project_path).resolve())
 
 
-def _resolve_project_path(workspace: Path, value: str | None) -> str | None:
+def _resolve_workspace_path(workspace: Path, value: str | None) -> str | None:
     """将相对或绝对本机目录解析成数据库使用的绝对路径。"""
     if value is None:
         return None
     if not isinstance(value, str) or not value.strip():
-        raise ValueError("项目目录不能为空或必须为 None")
+        raise ValueError("工作目录不能为空或必须为 None")
     candidate = Path(value)
+    if candidate.is_symlink():
+        raise ValueError("工作目录不能是软链接")
     if candidate.is_absolute():
         resolved = candidate.resolve()
     else:
         if ".." in candidate.parts:
-            raise ValueError("相对项目目录不能包含 ..")
-        resolved = (workspace / candidate).resolve()
+            raise ValueError("相对工作目录不能包含 ..")
+        candidate = workspace / candidate
+        if candidate.is_symlink():
+            raise ValueError("工作目录不能是软链接")
+        resolved = candidate.resolve()
     if not resolved.is_dir():
-        raise ValueError("项目目录不存在或不是目录")
+        raise ValueError("工作目录不存在或不是目录")
     return str(resolved)
 
 
-def _is_project_locked(services: ApplicationServices, session_id: str) -> bool:
-    """首条用户消息写入时间线后锁定项目选择。"""
+def _is_workspace_locked(services: ApplicationServices, session_id: str) -> bool:
+    """首条用户消息写入时间线后锁定工作目录选择。"""
     return any(
         item.kind == "USER_MESSAGE"
         for item in services.context_items.list_after(session_id, 0)
@@ -125,29 +124,29 @@ async def create_session(
     services: ApplicationServices = Depends(get_services),
 ) -> SessionSummary:
     """创建绑定一个启用 Agent 的固定 DIRECT 会话。"""
-    project_path: str | None = None
-    if request.project_path is not None:
+    workspace_path: str | None = None
+    if request.workspace_path is not None:
         try:
-            project_path = _resolve_project_path(
+            workspace_path = _resolve_workspace_path(
                 services.database.workspace,
-                request.project_path,
+                request.workspace_path,
             )
         except ValueError as error:
-            raise ApiError(422, "INVALID_PROJECT_PATH", "项目目录无效") from error
+            raise ApiError(422, "INVALID_PROJECT_PATH", "工作目录无效") from error
     try:
         execution = session_service.create_direct_session(
             request.agent_id,
             request.title,
             request.permission_mode,
         )
-        if project_path is not None:
+        if workspace_path is not None:
             try:
                 session_service.sessions.update_project_path_before_first_message(
                     execution.session.id,
-                    project_path,
+                    workspace_path,
                 )
             except ValueError as error:
-                raise ApiError(422, "INVALID_PROJECT_PATH", "项目目录无效") from error
+                raise ApiError(422, "INVALID_PROJECT_PATH", "工作目录无效") from error
     except ValueError as error:
         raise ApiError(
             422,
@@ -160,8 +159,7 @@ async def create_session(
         raise ApiError(500, "SESSION_CREATE_FAILED", "会话创建失败")
     return _summary(
         detail,
-        workspace=services.database.workspace,
-        is_project_locked=_is_project_locked(services, detail.session.id),
+        is_workspace_locked=_is_workspace_locked(services, detail.session.id),
     )
 
 
@@ -178,8 +176,7 @@ async def list_sessions(
         items=[
             _summary(
                 item,
-                workspace=services.database.workspace,
-                is_project_locked=_is_project_locked(services, item.session.id),
+                is_workspace_locked=_is_workspace_locked(services, item.session.id),
             )
             for item in items[:limit]
         ],
@@ -187,38 +184,29 @@ async def list_sessions(
     )
 
 
-@router.get("/projects", response_model=ProjectDirectoryResponse)
-async def list_project_directories(
+@router.get("/projects", response_model=WorkspaceDirectoryResponse)
+async def list_workspace_directories(
     path: str = Query(default=".", max_length=2000),
     services: ApplicationServices = Depends(get_services),
-) -> ProjectDirectoryResponse:
-    """列出当前本机目录及其直接子目录。"""
+) -> WorkspaceDirectoryResponse:
+    """列出当前本机工作目录及其直接子目录。"""
     try:
-        resolved = _resolve_project_path(services.database.workspace, path)
+        resolved = _resolve_workspace_path(services.database.workspace, path)
     except ValueError as error:
-        raise ApiError(422, "INVALID_PROJECT_PATH", "项目目录无效") from error
+        raise ApiError(422, "INVALID_PROJECT_PATH", "工作目录无效") from error
     directory = Path(resolved or services.database.workspace)
-    children: list[ProjectDirectory] = []
+    children: list[WorkspaceDirectory] = []
     for child in sorted(directory.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
             continue
-        relative_path = _relative_path(services.database.workspace, child)
-        children.append(ProjectDirectory(path=relative_path, name=child.name))
-    return ProjectDirectoryResponse(
-        path=_relative_path(services.database.workspace, directory),
+        children.append(WorkspaceDirectory(path=str(child.resolve()), name=child.name))
+    parent = directory.parent if directory.parent != directory else None
+    return WorkspaceDirectoryResponse(
+        path=str(directory.resolve()),
         name=directory.name,
+        parent_path=None if parent is None else str(parent.resolve()),
         directories=children,
     )
-
-
-def _relative_path(workspace: Path, path: Path) -> str:
-    """返回 workspace 内的相对路径，否则返回可继续浏览的绝对路径。"""
-    resolved = path.resolve()
-    try:
-        relative = resolved.relative_to(workspace.resolve())
-    except ValueError:
-        return resolved.as_posix()
-    return "." if str(relative) == "." else relative.as_posix()
 
 
 @router.get("/{session_id}", response_model=SessionDetail)
@@ -232,8 +220,7 @@ async def get_session(
     return SessionDetail(
         **_summary(
             summary,
-            workspace=services.database.workspace,
-            is_project_locked=_is_project_locked(services, session_id),
+            is_workspace_locked=_is_workspace_locked(services, session_id),
         ).model_dump(),
         messages=[_context_item(item) for item in messages],
     )
@@ -261,38 +248,36 @@ async def update_permission_mode(
         raise ApiError(404, "SESSION_NOT_FOUND", "Session 不存在")
     return _summary(
         refreshed,
-        workspace=services.database.workspace,
-        is_project_locked=_is_project_locked(services, session_id),
+        is_workspace_locked=_is_workspace_locked(services, session_id),
     )
 
 
-@router.patch("/{session_id}/project", response_model=SessionSummary)
-async def update_project(
+@router.patch("/{session_id}/workspace", response_model=SessionSummary)
+async def update_workspace(
     session_id: str,
-    request: UpdateProjectRequest,
+    request: UpdateWorkspaceRequest,
     services: ApplicationServices = Depends(get_services),
 ) -> SessionSummary:
-    """在首条用户消息前设置 Session 的 workspace 项目目录。"""
+    """在首条用户消息前设置 Session 的工作目录。"""
     detail = _find_direct(services, session_id)
     if services.run_registry.get_for_session(session_id) is not None:
         raise ApiError(409, "RUN_ALREADY_ACTIVE", "当前会话已有运行中的请求")
-    if _is_project_locked(services, session_id):
-        raise ApiError(409, "PROJECT_LOCKED", "首条消息发送后不能更改项目目录")
+    if _is_workspace_locked(services, session_id):
+        raise ApiError(409, "PROJECT_LOCKED", "首条消息发送后不能更改工作目录")
     try:
-        absolute_path = _resolve_project_path(services.database.workspace, request.project_path)
+        absolute_path = _resolve_workspace_path(services.database.workspace, request.workspace_path)
         services.session_service.sessions.update_project_path_before_first_message(
             session_id,
             absolute_path,
         )
     except ValueError as error:
-        raise ApiError(422, "INVALID_PROJECT_PATH", "项目目录无效") from error
+        raise ApiError(422, "INVALID_PROJECT_PATH", "工作目录无效") from error
     refreshed = services.session_queries.get_direct_detail(session_id)
     if refreshed is None:
         raise ApiError(404, "SESSION_NOT_FOUND", "Session 不存在")
     return _summary(
         refreshed,
-        workspace=services.database.workspace,
-        is_project_locked=_is_project_locked(services, session_id),
+        is_workspace_locked=_is_workspace_locked(services, session_id),
     )
 
 

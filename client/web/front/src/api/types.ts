@@ -75,8 +75,8 @@ export interface SessionSummary {
   createdAt: string;
   updatedAt: string;
   permissionMode: PermissionMode;
-  projectPath: string | null;
-  isProjectLocked: boolean;
+  workspacePath: string | null;
+  isWorkspaceLocked: boolean;
 }
 
 export type PermissionMode = "plan" | "build" | "yolo";
@@ -86,18 +86,19 @@ export interface CreateDirectSessionRequest {
   agentId: string;
   title?: string | null;
   permissionMode?: PermissionMode;
-  projectPath?: string | null;
+  workspacePath?: string | null;
 }
 
-export interface ProjectDirectory {
+export interface WorkspaceDirectory {
   path: string;
   name: string;
 }
 
-export interface ProjectDirectoryResponse {
+export interface WorkspaceDirectoryResponse {
   path: string;
   name: string;
-  directories: ProjectDirectory[];
+  parentPath: string | null;
+  directories: WorkspaceDirectory[];
 }
 
 export type ContextItemKind =

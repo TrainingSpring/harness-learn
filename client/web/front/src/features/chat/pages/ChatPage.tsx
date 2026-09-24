@@ -6,7 +6,7 @@ import { EmptyState } from "../../../components/EmptyState";
 import { ErrorState } from "../../../components/ErrorState";
 import { Skeleton } from "../../../components/Skeleton";
 import { PermissionDialog } from "../../permissions/components/PermissionDialog";
-import { getSession, listMessages, updateSessionPermissionMode, updateSessionProject } from "../../sessions/api";
+import { getSession, listMessages, updateSessionPermissionMode, updateSessionWorkspace } from "../../sessions/api";
 import { ChatHeader } from "../components/ChatHeader";
 import { Composer } from "../components/Composer";
 import { MessageList } from "../components/MessageList";
@@ -28,8 +28,8 @@ export function ChatPage() {
     mutationFn: (permissionMode: "plan" | "build" | "yolo") => updateSessionPermissionMode(sessionId, permissionMode),
     onSuccess: (updated) => { queryClient.setQueryData(["session", sessionId], (current: typeof updated | undefined) => current ? { ...current, ...updated } : updated); },
   });
-  const updateProject = useMutation({
-    mutationFn: (projectPath: string | null) => updateSessionProject(sessionId, projectPath),
+  const updateWorkspace = useMutation({
+    mutationFn: (workspacePath: string | null) => updateSessionWorkspace(sessionId, workspacePath),
     onSuccess: (updated) => { queryClient.setQueryData(["session", sessionId], (current: typeof updated | undefined) => current ? { ...current, ...updated } : updated); },
   });
 
@@ -67,10 +67,10 @@ export function ChatPage() {
           isRunning={run.status !== "idle"}
           onStop={() => { void run.stop(); }}
           onSend={(text) => { void send(text); }}
-          projectPath={session.data.projectPath}
-          isProjectLocked={session.data.isProjectLocked}
+          workspacePath={session.data.workspacePath}
+          isWorkspaceLocked={session.data.isWorkspaceLocked}
           permissionMode={session.data.permissionMode}
-          onProjectChange={(path) => { updateProject.mutate(path); }}
+          onWorkspaceChange={(path) => { updateWorkspace.mutate(path); }}
           onPermissionModeChange={(mode) => { updateMode.mutate(mode); }}
         />
       </footer>
