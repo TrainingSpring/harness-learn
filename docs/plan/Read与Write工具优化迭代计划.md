@@ -452,7 +452,7 @@ Cursor 不是权限凭据。每次续读仍必须按 `target_path` 重新执行�
 
 - 修改：`code/agent/tools/read.py`
 - 修改：`code/agent/tools/write.py`
-- 可新增：`code/agent/tools/file_version.py`
+- 可新增：`code/agent/tools/files/version.py`
 - 修改：`tests/tools/test_read_tool.py`
 - 修改：`tests/tools/test_write_tool.py`
 
@@ -586,7 +586,7 @@ Cursor 不是权限凭据。每次续读仍必须按 `target_path` 重新执行�
 - `write` 只创建或完整替换文本文件，`content` 为必填字符串；目标目录返回 `TARGET_IS_DIRECTORY`，不再按路径末尾分隔符创建目录。
 - 写入前以 UTF-8 字节数执行 `max_write_bytes` 硬限制，随后自动创建父目录。
 - 写入通过同目录临时文件、`flush`、`fsync` 和 `os.replace()` 完成；失败清理临时文件且不截断原文件，并尽量保留原基本权限位。
-- `read` 与 `write` 共用 `tools/file_version.py` 的不透明文件版本 token。`expected_version` 会在临时文件创建前和 `os.replace()` 前复核；目标变化、出现或消失均返回 `FILE_CHANGED`。
+- `read` 与 `write` 共用 `tools/files/version.py` 的不透明文件版本 token。`expected_version` 会在临时文件创建前和 `os.replace()` 前复核；目标变化、出现或消失均返回 `FILE_CHANGED`。
 
 ### 已验证
 

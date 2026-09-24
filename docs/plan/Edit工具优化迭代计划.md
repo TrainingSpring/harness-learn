@@ -95,8 +95,8 @@ Tools.prepare_call 解析参数并检查 Session 权限
 当前 `write` 已实现临时文件和版本复检。`edit` 若复制这段逻辑会使两个 Tool 的安全边界逐渐分叉。因此抽取一个内部文件提交模块，例如：
 
 ```text
-tools/file_version.py       # 保持版本 token 定义
-tools/file_mutation.py      # 新增：按路径提交协调、原子替换、版本复检、权限位保留
+tools/files/version.py       # 保持版本 token 定义
+tools/files/mutation.py      # 新增：按路径提交协调、原子替换、版本复检、权限位保留
 tools/write.py              # 组装完整 content，调用共享提交模块
 tools/edit.py               # 组装编辑后的 content，调用共享提交模块
 ```
@@ -263,7 +263,7 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **改动**：
 
-1. 新增内部模块 `code/agent/tools/file_mutation.py`。
+1. 新增内部模块 `code/agent/tools/files/mutation.py`。
 2. 从 `write.py` 提取：既有文件版本读取、基本权限位保留、同目录临时文件写入、`flush`、`fsync`、替换前版本复检、`os.replace` 和临时文件清理。
 3. 共享模块接收路径、期望版本和已编码 bytes；不处理 Tool 参数、不生成 `ToolResult`。
 4. `write` 迁移到共享模块，保持已有输入/输出契约和测试结果不变。
@@ -271,7 +271,7 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **主要文件**：
 
-- 新增：`code/agent/tools/file_mutation.py`
+- 新增：`code/agent/tools/files/mutation.py`
 - 修改：`code/agent/tools/write.py`
 - 修改：`code/agent/tools/edit.py`
 - 修改：`tests/tools/test_write_tool.py`
@@ -297,7 +297,7 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **主要文件**：
 
-- 修改：`code/agent/tools/file_mutation.py`
+- 修改：`code/agent/tools/files/mutation.py`
 - 修改：`code/agent/session/ExecutionContext.py`
 - 修改：`tests/tools/test_write_tool.py`
 - 修改：`tests/tools/test_edit_tool.py`
@@ -403,7 +403,7 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 ### 阶段 3-4：共享原子提交与进程内协调
 
-已新增 `code/agent/tools/file_mutation.py`，并将 `write`、`edit` 统一到该模块：
+已新增 `code/agent/tools/files/mutation.py`，并将 `write`、`edit` 统一到该模块：
 
 1. 提交使用同目录临时文件、`flush`、`fsync`、替换前版本复检、`os.replace` 和临时文件清理；既有文件的基本权限位会被保留。
 2. 锁以真实绝对路径为键，只覆盖最终版本检查、临时文件写入和原子替换。它不覆盖模型调用、权限请求和 Edit 的内存文本变换。

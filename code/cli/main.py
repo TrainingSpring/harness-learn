@@ -24,7 +24,7 @@ from runtime.runtime_events import PermissionRequiredEvent
 from session.ExecutionContext import ExecutionContext
 from storage.ids import generate_id
 from storage.types import AgentProfile
-from tools.catalog import ToolCatalog
+from tools.registry.catalog import ToolCatalog
 from tools.tools import Tools
 
 def print_help():

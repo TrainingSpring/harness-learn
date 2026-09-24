@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "code" / "agent"))
 
-from tools.catalog import ToolCatalog  # noqa: E402
+from tools.registry.catalog import ToolCatalog  # noqa: E402
 from tools.types import Tool  # noqa: E402
 
 

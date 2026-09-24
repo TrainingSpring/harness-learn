@@ -6,7 +6,7 @@ from runtime.prompt_builder import PromptBuilder
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
-from tools.catalog import ToolCatalog
+from tools.registry.catalog import ToolCatalog
 
 
 class AgentFactory:

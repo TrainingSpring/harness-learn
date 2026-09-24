@@ -5,8 +5,8 @@ from typing import Any
 
 from permission.types import PermissionAction, PermissionRequirement
 from session.ExecutionContext import ExecutionContext
-from tools.file_mutation import FileMutationError, commit_file
-from tools.file_version import file_version
+from tools.files.mutation import FileMutationError, commit_file
+from tools.files.version import file_version
 from tools.types import Tool, ToolResult, handle_path
 
 

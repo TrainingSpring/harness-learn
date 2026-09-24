@@ -4,7 +4,7 @@ from base64 import b64encode
 
 from permission.types import PermissionRequirement
 from session.ExecutionContext import ExecutionContext
-from tools.catalog import ToolCatalog
+from tools.registry.catalog import ToolCatalog
 from permission.types import PermissionRequest
 from tools.types import (
     Attachment,

@@ -7,7 +7,7 @@ from typing import Any
 
 from permission.types import PermissionAction, PermissionRequirement
 from session.ExecutionContext import ExecutionContext
-from tools.file_version import file_version
+from tools.files.version import file_version
 from tools.types import Attachment, Tool, ToolResult, handle_path
 
 

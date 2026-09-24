@@ -27,7 +27,7 @@ from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session_query import SessionQueryRepository
-from tools.catalog import ToolCatalog
+from tools.registry.catalog import ToolCatalog
 
 
 def create_app(settings: WebServerSettings) -> FastAPI:

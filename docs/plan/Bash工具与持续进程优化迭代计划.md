@@ -346,7 +346,7 @@ Shell 不是可靠的文件路径声明语言。命令可能经由变量、脚�
 - 新增：`code/agent/tools/shell/process.py`
 - 新增：`code/agent/tools/shell/execution.py`
 - 修改：`code/agent/tools/types.py`、`code/agent/tools/tools.py`（动态权限解析与已解析权限固化）
-- 修改：`code/agent/tools/catalog.py`（辅助包不导出 `REGISTER`）
+- 修改：`code/agent/tools/registry/catalog.py`（辅助包不导出 `REGISTER`）
 - 修改：`code/agent/session/ExecutionContext.py`
 - 新增：`tests/tools/test_bash_process_actions.py`
 - 修改：`tests/test_tool_catalog.py`

@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Iterator
 
-from tools.file_version import file_version
+from .version import file_version
 
 
 class FileMutationError(OSError):

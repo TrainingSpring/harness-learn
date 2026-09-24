@@ -14,8 +14,8 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 from session.ExecutionContext import ExecutionContext  # noqa: E402
 from tools.edit import REGISTER as EDIT_TOOL  # noqa: E402
 from tools.edit import edit  # noqa: E402
-from tools.file_version import file_version  # noqa: E402
-from tools.file_mutation import acquire_file_mutation_lock  # noqa: E402
+from tools.files.version import file_version  # noqa: E402
+from tools.files.mutation import acquire_file_mutation_lock  # noqa: E402
 from tools.read import read  # noqa: E402
 from tools.tools import Tools  # noqa: E402
 from tools.types import ToolCallPreparationError  # noqa: E402
@@ -267,7 +267,7 @@ class EditToolTests(unittest.TestCase):
         target = self.root / "source.txt"
         target.write_text("before", encoding="utf-8")
 
-        with patch("tools.file_mutation.os.replace", side_effect=OSError("failed")):
+        with patch("tools.files.mutation.os.replace", side_effect=OSError("failed")):
             result = edit(
                 self.ctx,
                 "source.txt",

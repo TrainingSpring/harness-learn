@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from types import ModuleType
 
-from .types import Tool
+from ..types import Tool
 
 
 @dataclass(frozen=True)
