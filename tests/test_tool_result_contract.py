@@ -180,7 +180,7 @@ class ToolResultContractTests(unittest.TestCase):
             self.assertIsInstance(result, ToolResult)
 
         self.assertEqual(read_result.data["content"], "before")
-        self.assertEqual(write_result.data["operation"], "write_file")
+        self.assertEqual(write_result.data["operation"], "created")
         self.assertEqual(edit_result.data["operation"], "edit_file")
         self.assertEqual(bash_result.status, "ok")
         self.assertEqual(bash_result.data["exit_code"], 1)
@@ -195,7 +195,7 @@ class ToolResultContractTests(unittest.TestCase):
     def test_read_returns_image_attachment_without_responses_fields(self):
         with tempfile.TemporaryDirectory() as workspace:
             path = Path(workspace) / "image.png"
-            path.write_bytes(b"image-bytes")
+            path.write_bytes(b"\x89PNG\r\n\x1a\n")
 
             result = read(ExecutionContext(workspace, "agent-test", "session-test"), "image.png")
 
@@ -203,7 +203,7 @@ class ToolResultContractTests(unittest.TestCase):
         self.assertEqual(result.data["type"], "image")
         self.assertEqual(result.attachments[0].media_type, "image/png")
         self.assertEqual(result.attachments[0].source_kind, "bytes")
-        self.assertEqual(result.attachments[0].source, b"image-bytes")
+        self.assertEqual(result.attachments[0].source, b"\x89PNG\r\n\x1a\n")
 
     def test_tool_result_enforces_success_and_error_invariants(self):
         with self.assertRaises(ValueError):

@@ -41,7 +41,7 @@ def _call(call_id):
         id=f"fc_{call_id}",
         content=None,
         name="write",
-        arguments='{"target_path":"src/app.py"}',
+        arguments='{"target_path":"/outside/src/app.py"}',
         call_id=call_id,
         status="completed",
     )
@@ -110,7 +110,7 @@ def test_permission_resume_writes_tool_output_to_the_passed_context():
         ),
     ))
 
-    assert executions == [{"target_path": "src/app.py"}]
+    assert executions == [{"target_path": "/outside/src/app.py"}]
     assert context_a.messages[-1]["type"] == "function_call_output"
     assert context_b.messages == []
 

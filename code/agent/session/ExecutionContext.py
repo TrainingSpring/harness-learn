@@ -12,12 +12,20 @@ class ExecutionContext:
         agent_id: 稳定的逻辑 Agent 标识，用于执行记录，不参与授权归属。
         session_id: 当前交互会话标识。
         max_tool_call_length: 单次工具文本输出允许返回给模型的最大字符数。
+        max_read_lines: 单次文本读取允许返回的最大行片段数。
+        max_directory_entries: 单次目录读取允许返回的最大条目数。
+        max_image_bytes: 单张图片允许读入内存的最大字节数。
+        max_write_bytes: 单次文本文件允许写入的最大 UTF-8 字节数。
     """
 
     project_path: str | None
     agent_id: str
     session_id: str
     max_tool_call_length: int = 20_000
+    max_read_lines: int = 1_000
+    max_directory_entries: int = 500
+    max_image_bytes: int = 10 * 1024 * 1024
+    max_write_bytes: int = 2 * 1024 * 1024
 
     def __post_init__(self) -> None:
         """尽早拒绝缺少身份或非法项目目录的执行上下文。"""
@@ -29,3 +37,11 @@ class ExecutionContext:
             raise ValueError("session_id 不能为空")
         if self.max_tool_call_length <= 0:
             raise ValueError("max_tool_call_length 必须大于 0")
+        if self.max_read_lines <= 0:
+            raise ValueError("max_read_lines 必须大于 0")
+        if self.max_directory_entries <= 0:
+            raise ValueError("max_directory_entries 必须大于 0")
+        if self.max_image_bytes <= 0:
+            raise ValueError("max_image_bytes 必须大于 0")
+        if self.max_write_bytes <= 0:
+            raise ValueError("max_write_bytes 必须大于 0")

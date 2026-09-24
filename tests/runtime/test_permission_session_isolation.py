@@ -42,7 +42,7 @@ class PermissionLLM:
                     id=f"fc_{self.call_id}",
                     content=None,
                     name="write",
-                    arguments='{"target_path":"src/app.py"}',
+                    arguments='{"target_path":"/outside/src/app.py"}',
                     call_id=self.call_id,
                     status="completed",
                 )

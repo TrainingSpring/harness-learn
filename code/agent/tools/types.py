@@ -110,10 +110,13 @@ class Tool:
         function: 实际执行函数，签名为 ``function(ctx, **arguments)``，且
             必须返回 ToolResult。
         permission: 工具静态声明的权限需求；它不是用户已授予的规则。
+        argument_parser: 可选的参数解析器。它在权限请求构造前运行，必须
+            返回经过校验和规范化的新参数对象。
     """
     schema: dict
     function: Callable[..., ToolResult]
     permission: PermissionRequirement
+    argument_parser: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
 
 @dataclass(frozen=True)
@@ -136,11 +139,9 @@ class PreparedToolCall:
 
 
 def handle_path(ctx: ExecutionContext, target_path: str) -> str:
-    """
-    处理路径,
-    如果是相对路径，则返回绝对路径，否则返回原路径
-    :param ctx: ExecutionContext
-    :param target_path: 目标路径
+    """以工作目录为基准解析路径并返回真实绝对路径。
+
+    工作目录决定相对路径的起点，但是否允许访问目标由权限策略决定。
     """
     if ctx.project_path is None:
         raise ValueError("PROJECT_NOT_SELECTED")
@@ -149,13 +150,4 @@ def handle_path(ctx: ExecutionContext, target_path: str) -> str:
         if os.name == "nt" and path.startswith("/"):
             path = path[1:]
         path = os.path.join(ctx.project_path, path)
-    resolved = os.path.normpath(os.path.abspath(path))
-    project = os.path.normpath(os.path.abspath(ctx.project_path))
-    try:
-        if os.path.commonpath([resolved, project]) != project:
-            raise ValueError("PROJECT_PATH_ESCAPE")
-    except ValueError as error:
-        if str(error) == "PROJECT_PATH_ESCAPE":
-            raise
-        raise ValueError("PROJECT_PATH_ESCAPE") from error
-    return resolved
+    return os.path.realpath(os.path.abspath(path))

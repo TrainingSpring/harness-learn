@@ -102,6 +102,10 @@ class Tools:
             )
 
         try:
+            if tool.argument_parser is not None:
+                args = tool.argument_parser(dict(args))
+                if not isinstance(args, dict):
+                    raise TypeError("工具参数解析器必须返回对象")
             request = self.build_permission_request(tool, name, args, call_id)
         except ValueError as error:
             code = str(error)
@@ -139,9 +143,7 @@ class Tools:
             raw_resource = arguments[resource_from]
             if not isinstance(raw_resource, str) or not raw_resource:
                 raise TypeError(f"权限资源参数 {resource_from} 必须是非空字符串")
-            resource = os.path.normpath(
-                os.path.abspath(self._resolve_path(raw_resource))
-            )
+            resource = self._resolve_path(raw_resource)
 
         return PermissionRequest(
             action=tool.permission.action,
@@ -161,7 +163,17 @@ class Tools:
             工具返回的 ToolResult，或由执行异常转换出的失败结果。
         """
         try:
-            result = call.tool.function(self.ctx, **call.arguments)
+            arguments = dict(call.arguments)
+            resource_from = call.tool.permission.resource_from
+            if resource_from is not None:
+                current_target = self._resolve_path(arguments[resource_from])
+                if current_target != call.permission_request.resource:
+                    return ToolResult.failure(
+                        "PERMISSION_TARGET_CHANGED",
+                        "权限确认后目标路径发生变化，请重新发起工具调用",
+                    )
+                arguments[resource_from] = call.permission_request.resource
+            result = call.tool.function(self.ctx, **arguments)
         except Exception as error:
             return ToolResult.failure("TOOL_EXECUTION_FAILED", str(error))
 
