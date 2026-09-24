@@ -1,13 +1,11 @@
 """原子创建或完整替换 UTF-8 文本文件的 Tool。"""
 
 import os
-import stat
-import tempfile
 from typing import Any
 
 from permission.types import PermissionAction, PermissionRequirement
 from session.ExecutionContext import ExecutionContext
-from tools.file_version import file_version
+from tools.file_mutation import FileMutationError, _UNSET, commit_file
 from tools.types import Tool, ToolResult, handle_path
 
 
@@ -82,46 +80,51 @@ def write(
             details={"path": target_path},
         )
 
-    temporary_path: str | None = None
     try:
-        initial_version = _existing_file_version(target_path)
-        original_mode = _existing_file_mode(target_path)
-        if "expected_version" in arguments and initial_version != arguments["expected_version"]:
+        mutation = commit_file(
+            target_path,
+            encoded_content,
+            expected_version=(
+                arguments["expected_version"]
+                if "expected_version" in arguments
+                else _UNSET
+            ),
+            lock_timeout_seconds=ctx.file_mutation_lock_timeout_seconds,
+        )
+        return ToolResult.success(
+            {
+                "operation": mutation["operation"],
+                "path": target_path,
+                "bytes_written": len(encoded_content),
+                "version": mutation["version"],
+                "precondition_checked": "expected_version" in arguments,
+            }
+        )
+    except FileMutationError as error:
+        if error.code == "FILE_CHANGED":
             return ToolResult.failure(
                 "FILE_CHANGED",
                 "目标文件已变化，请重新读取后再写入",
                 retryable=True,
                 details={"path": target_path},
             )
-        descriptor, temporary_path = tempfile.mkstemp(
-            prefix=f".{os.path.basename(target_path)}.",
-            suffix=".tmp",
-            dir=parent_dir,
-        )
-        if original_mode is not None:
-            os.chmod(temporary_path, original_mode)
-        with os.fdopen(descriptor, "wb") as file:
-            file.write(encoded_content)
-            file.flush()
-            os.fsync(file.fileno())
-
-        if _existing_file_version(target_path) != initial_version:
+        if error.code == "TARGET_IS_DIRECTORY":
             return ToolResult.failure(
-                "FILE_CHANGED",
-                "目标文件在写入过程中发生变化，请重新读取后再写入",
+                "TARGET_IS_DIRECTORY",
+                "目标路径是目录，不能写入文件",
+                details={"path": target_path},
+            )
+        if error.code == "FILE_BUSY":
+            return ToolResult.failure(
+                "FILE_BUSY",
+                "目标文件正在被另一项提交处理，请稍后重试",
                 retryable=True,
                 details={"path": target_path},
             )
-        os.replace(temporary_path, target_path)
-        temporary_path = None
-        return ToolResult.success(
-            {
-                "operation": "replaced" if initial_version is not None else "created",
-                "path": target_path,
-                "bytes_written": len(encoded_content),
-                "version": file_version(target_path),
-                "precondition_checked": "expected_version" in arguments,
-            }
+        return ToolResult.failure(
+            "WRITE_FILE_FAILED",
+            "文件写入或原子替换失败",
+            details={"path": target_path},
         )
     except OSError:
         return ToolResult.failure(
@@ -129,28 +132,6 @@ def write(
             "文件写入或原子替换失败",
             details={"path": target_path},
         )
-    finally:
-        if temporary_path is not None:
-            try:
-                os.unlink(temporary_path)
-            except FileNotFoundError:
-                pass
-
-
-def _existing_file_version(path: str) -> str | None:
-    """返回普通文件的版本；不存在时用 None 表示创建前状态。"""
-    try:
-        return file_version(path)
-    except FileNotFoundError:
-        return None
-
-
-def _existing_file_mode(path: str) -> int | None:
-    """保留既有普通文件的基本权限位；新建文件使用系统默认权限。"""
-    try:
-        return stat.S_IMODE(os.stat(path).st_mode)
-    except FileNotFoundError:
-        return None
 
 
 REGISTER = Tool(

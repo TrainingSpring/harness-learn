@@ -16,6 +16,9 @@ class ExecutionContext:
         max_directory_entries: 单次目录读取允许返回的最大条目数。
         max_image_bytes: 单张图片允许读入内存的最大字节数。
         max_write_bytes: 单次文本文件允许写入的最大 UTF-8 字节数。
+        max_edit_source_bytes: Edit 完整读取源文本时允许的最大字节数。
+        max_edit_operations: 单次 Edit 调用允许的最大替换条数。
+        file_mutation_lock_timeout_seconds: 等待同进程文件提交锁的最长秒数。
     """
 
     project_path: str | None
@@ -26,6 +29,9 @@ class ExecutionContext:
     max_directory_entries: int = 500
     max_image_bytes: int = 10 * 1024 * 1024
     max_write_bytes: int = 2 * 1024 * 1024
+    max_edit_source_bytes: int = 2 * 1024 * 1024
+    max_edit_operations: int = 100
+    file_mutation_lock_timeout_seconds: float = 5.0
 
     def __post_init__(self) -> None:
         """尽早拒绝缺少身份或非法项目目录的执行上下文。"""
@@ -45,3 +51,9 @@ class ExecutionContext:
             raise ValueError("max_image_bytes 必须大于 0")
         if self.max_write_bytes <= 0:
             raise ValueError("max_write_bytes 必须大于 0")
+        if self.max_edit_source_bytes <= 0:
+            raise ValueError("max_edit_source_bytes 必须大于 0")
+        if self.max_edit_operations <= 0:
+            raise ValueError("max_edit_operations 必须大于 0")
+        if self.file_mutation_lock_timeout_seconds <= 0:
+            raise ValueError("file_mutation_lock_timeout_seconds 必须大于 0")

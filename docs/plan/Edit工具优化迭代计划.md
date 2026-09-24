@@ -2,7 +2,7 @@
 
 ## 1. 计划状态
 
-- 当前状态：待开发。
+- 当前状态：已完成（2026-09-24）。
 - 适用范围：`edit` Tool、与其共享的文件版本/原子提交能力、`write` 对同文件并发提交的协同，以及相关 Tool、Runtime、权限测试。
 - 不包含：`read` 的分页契约变更、`bash`/`MCP` 的重构、自动三方合并、跨进程分布式锁和 Web UI 改动。
 
@@ -206,8 +206,8 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **验收**：
 
-- [ ] 新测试在旧 `edit` 上稳定失败。
-- [ ] 测试只使用临时目录，不访问真实工作目录。
+- [x] 新测试在旧 `edit` 上稳定失败。
+- [x] 测试只使用临时目录，不访问真实工作目录。
 
 ### 阶段 1：建立严格参数边界
 
@@ -229,9 +229,9 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **验收**：
 
-- [ ] 非法参数在权限弹窗前返回 `INVALID_ARGUMENTS`。
-- [ ] 合法空 `new_text` 被保留为删除语义，不被转成缺失值。
-- [ ] `expected_version` 缺失不能进入执行层。
+- [x] 非法参数在权限弹窗前返回 `INVALID_ARGUMENTS`。
+- [x] 合法空 `new_text` 被保留为删除语义，不被转成缺失值。
+- [x] `expected_version` 缺失不能进入执行层。
 
 ### 阶段 2：实现受限文本变换
 
@@ -253,9 +253,9 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **验收**：
 
-- [ ] 所有编辑成功前，原文件字节内容保持不变。
-- [ ] 唯一替换、全量替换、删除、顺序依赖和失败回滚均有测试。
-- [ ] 原文件编码、BOM 和换行不会被无关地改变。
+- [x] 所有编辑成功前，原文件字节内容保持不变。
+- [x] 唯一替换、全量替换、删除、顺序依赖和失败回滚均有测试。
+- [x] 原文件编码、BOM 和换行不会被无关地改变。
 
 ### 阶段 3：抽取共享安全提交路径
 
@@ -279,9 +279,9 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **验收**：
 
-- [ ] `write` 现有原子替换、版本冲突和权限位测试全部通过。
-- [ ] `edit` 在 `os.replace()` 失败时原文件不变，临时文件被清理。
-- [ ] `read` 返回的版本可直接传给 `edit`。
+- [x] `write` 现有原子替换、版本冲突和权限位测试全部通过。
+- [x] `edit` 在 `os.replace()` 失败时原文件不变，临时文件被清理。
+- [x] `read` 返回的版本可直接传给 `edit`。
 
 ### 阶段 4：加入同进程文件提交协调
 
@@ -304,15 +304,15 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **验收**：
 
-- [ ] 两个同版本、同路径提交中，最多一个成功；另一个返回 `FILE_CHANGED`。
-- [ ] 对不同路径的提交不会互相阻塞。
-- [ ] 锁超时返回 `FILE_BUSY`，并且没有自旋等待。
+- [x] 两个同版本、同路径提交中，最多一个成功；另一个返回 `FILE_CHANGED`。
+- [x] 对不同路径的提交不会互相阻塞。
+- [x] 锁超时返回 `FILE_BUSY`，并且没有自旋等待。
 
 ### 检查点 A：文件修改安全性
 
-- [ ] `read/write/edit` 的版本 token、冲突码和原子替换测试通过。
-- [ ] 同一进程多 Agent 冲突测试通过。
-- [ ] 现有 Session 权限测试和 Tool 结果编码测试通过。
+- [x] `read/write/edit` 的版本 token、冲突码和原子替换测试通过。
+- [x] 同一进程多 Agent 冲突测试通过。
+- [x] 现有 Session 权限测试和 Tool 结果编码测试通过。
 
 ### 阶段 5：Runtime 集成与文档收口
 
@@ -335,9 +335,9 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 **验收**：
 
-- [ ] Tool Schema、本地解析器和 Tool 描述只表达最终契约。
-- [ ] `prepare_call -> PermissionManager -> execute -> encode_result` 可处理 Edit 的成功、冲突和失败。
-- [ ] 完整测试通过。
+- [x] Tool Schema、本地解析器和 Tool 描述只表达最终契约。
+- [x] `prepare_call -> PermissionManager -> execute -> encode_result` 可处理 Edit 的成功、冲突和失败。
+- [x] 完整测试通过。
 
 ## 8. 测试矩阵
 
@@ -380,11 +380,39 @@ tools/edit.py               # 组装编辑后的 content，调用共享提交模
 
 ## 10. 完成定义
 
-- [ ] `edit` 参数在权限检查前通过严格本地解析。
-- [ ] `edit` 必须使用 `read` 返回的 `expected_version`。
-- [ ] 所有 edits 成功验证前，原文件绝不被修改。
-- [ ] `edit` 与 `write` 使用共享的版本校验和原子提交路径。
-- [ ] 同一进程的多个 Agent 对同一路径提交不会互相静默覆盖。
-- [ ] 匹配错误不返回完整源文本或底层异常。
-- [ ] 大文件、编码、临时写入失败和并发冲突均有自动化测试。
-- [ ] 全量测试与 `git diff --check` 通过。
+- [x] `edit` 参数在权限检查前通过严格本地解析。
+- [x] `edit` 必须使用 `read` 返回的 `expected_version`。
+- [x] 所有 edits 成功验证前，原文件绝不被修改。
+- [x] `edit` 与 `write` 使用共享的版本校验和原子提交路径。
+- [x] 同一进程的多个 Agent 对同一路径提交不会互相静默覆盖。
+- [x] 匹配错误不返回完整源文本或底层异常。
+- [x] 大文件、编码、临时写入失败和并发冲突均有自动化测试。
+- [x] 全量测试与 `git diff --check` 通过。
+
+## 11. 实施记录
+
+### 阶段 0-2：Edit 契约与受限文本变换
+
+已新增 `tests/tools/test_edit_tool.py`，并完成以下行为：
+
+1. `edit` 注册严格的 `parse_edit_arguments()`；`target_path`、`expected_version`、非空 `edits`、每条 `old_text` 和 `new_text` 都是必填契约。未知字段、空文本、错误布尔类型均在 `Tools.prepare_call()` 的权限请求前返回 `INVALID_ARGUMENTS`。
+2. `ExecutionContext` 新增 `max_edit_source_bytes=2 MiB`、`max_edit_operations=100`；编辑后内容继续使用既有 `max_write_bytes=2 MiB` 上限。
+3. `edit` 仅接受既有普通 UTF-8 文本文件，拒绝目录、文件不存在、NUL 和非 UTF-8 内容；保留 UTF-8 BOM、CRLF 和未替换区域的原始字节形式。
+4. 编辑在内存中按数组顺序应用。唯一替换、全量替换、删除、后续编辑依赖前一编辑均已覆盖；任一条不适用时返回 `EDIT_TEXT_NOT_FOUND` 或 `EDIT_TEXT_AMBIGUOUS`，且原文件保持不变。
+5. `expected_version` 是强制前置条件；`read` 返回的 `version` 可直接传入 `edit`。版本过期时返回 `FILE_CHANGED`，不做自动合并或隐式重试。
+
+### 阶段 3-4：共享原子提交与进程内协调
+
+已新增 `code/agent/tools/file_mutation.py`，并将 `write`、`edit` 统一到该模块：
+
+1. 提交使用同目录临时文件、`flush`、`fsync`、替换前版本复检、`os.replace` 和临时文件清理；既有文件的基本权限位会被保留。
+2. 锁以真实绝对路径为键，只覆盖最终版本检查、临时文件写入和原子替换。它不覆盖模型调用、权限请求和 Edit 的内存文本变换。
+3. 锁使用标准库阻塞锁与 `file_mutation_lock_timeout_seconds=5` 秒上限；超时返回可重试的 `FILE_BUSY`，路径条目会在没有等待者和持有者后清理。
+4. 同一 Python 服务进程内，两个基于同版本的 `edit`，或同版本的 `write/edit` 交叉提交，最多只有一个成功；另一个返回 `FILE_CHANGED`。
+5. 该机制不承诺跨进程、多个桌面实例或外部编辑器的排他锁；在这些场景仍以替换前的版本复检降低冲突风险。
+
+### 阶段 5：验证结果
+
+- 针对 Edit、Write、结果契约和参数解析的测试：`37 passed`。
+- 完整测试：`pytest -q`，`263 passed`。
+- 已执行 `python -m compileall -q code/agent/tools code/agent/session` 和 `git diff --check`，均通过。

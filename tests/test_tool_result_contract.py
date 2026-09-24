@@ -164,6 +164,7 @@ class ToolResultContractTests(unittest.TestCase):
             edit_result = edit(
                 ctx,
                 "source.txt",
+                read_result.data["version"],
                 [{"old_text": "before", "new_text": "after"}],
             )
 
@@ -181,7 +182,7 @@ class ToolResultContractTests(unittest.TestCase):
 
         self.assertEqual(read_result.data["content"], "before")
         self.assertEqual(write_result.data["operation"], "created")
-        self.assertEqual(edit_result.data["operation"], "edit_file")
+        self.assertEqual(edit_result.data["operation"], "edited")
         self.assertEqual(bash_result.status, "ok")
         self.assertEqual(bash_result.data["exit_code"], 1)
 
