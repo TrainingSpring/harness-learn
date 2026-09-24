@@ -168,14 +168,17 @@ class ToolResultContractTests(unittest.TestCase):
                 [{"old_text": "before", "new_text": "after"}],
             )
 
-            completed = subprocess.CompletedProcess(
-                args=["test"],
-                returncode=1,
-                stdout=b"stdout",
-                stderr=b"stderr",
-            )
-            with patch("tools.bash.subprocess.run", return_value=completed):
-                bash_result = bash(ctx, "test")
+            class ShellExecutor:
+                def run(self, _command, **_arguments):
+                    return {
+                        "exit_code": 1,
+                        "stdout": "stdout",
+                        "stderr": "stderr",
+                        "stdout_truncated": False,
+                        "stderr_truncated": False,
+                    }
+
+            bash_result = bash(ctx, "test", executor=ShellExecutor())
 
         for result in (read_result, write_result, edit_result, bash_result):
             self.assertIsInstance(result, ToolResult)

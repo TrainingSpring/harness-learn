@@ -19,6 +19,10 @@ class ExecutionContext:
         max_edit_source_bytes: Edit 完整读取源文本时允许的最大字节数。
         max_edit_operations: 单次 Edit 调用允许的最大替换条数。
         file_mutation_lock_timeout_seconds: 等待同进程文件提交锁的最长秒数。
+        max_bash_command_chars: 单次前台 Shell 命令最大字符数。
+        default_bash_timeout_seconds: 前台 Shell 命令未指定 timeout 时的默认秒数。
+        max_bash_timeout_seconds: 前台 Shell 命令允许请求的最大秒数。
+        max_bash_output_bytes: 单次前台命令每个输出流的本地字节上限。
     """
 
     project_path: str | None
@@ -32,6 +36,10 @@ class ExecutionContext:
     max_edit_source_bytes: int = 2 * 1024 * 1024
     max_edit_operations: int = 100
     file_mutation_lock_timeout_seconds: float = 5.0
+    max_bash_command_chars: int = 8_000
+    default_bash_timeout_seconds: float = 30.0
+    max_bash_timeout_seconds: float = 600.0
+    max_bash_output_bytes: int = 256 * 1024
 
     def __post_init__(self) -> None:
         """尽早拒绝缺少身份或非法项目目录的执行上下文。"""
@@ -57,3 +65,13 @@ class ExecutionContext:
             raise ValueError("max_edit_operations 必须大于 0")
         if self.file_mutation_lock_timeout_seconds <= 0:
             raise ValueError("file_mutation_lock_timeout_seconds 必须大于 0")
+        if self.max_bash_command_chars <= 0:
+            raise ValueError("max_bash_command_chars 必须大于 0")
+        if self.default_bash_timeout_seconds <= 0:
+            raise ValueError("default_bash_timeout_seconds 必须大于 0")
+        if self.max_bash_timeout_seconds <= 0:
+            raise ValueError("max_bash_timeout_seconds 必须大于 0")
+        if self.default_bash_timeout_seconds > self.max_bash_timeout_seconds:
+            raise ValueError("default_bash_timeout_seconds 不能超过 max_bash_timeout_seconds")
+        if self.max_bash_output_bytes <= 0:
+            raise ValueError("max_bash_output_bytes 必须大于 0")
