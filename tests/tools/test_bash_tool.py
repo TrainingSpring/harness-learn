@@ -73,7 +73,7 @@ class BashToolTests(unittest.TestCase):
         """省略 timeout 仍必须使用本地默认值，并保留原始命令。"""
         executor = FakeShellExecutor()
 
-        result = bash(self.ctx, "git status", executor=executor)
+        result = bash(self.ctx, action="execute", command="git status", executor=executor)
 
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.data["command"], "git status")
@@ -95,7 +95,13 @@ class BashToolTests(unittest.TestCase):
             }
         )
 
-        result = bash(self.ctx, "pytest", timeout=12, executor=executor)
+        result = bash(
+            self.ctx,
+            action="execute",
+            command="pytest",
+            timeout=12,
+            executor=executor,
+        )
 
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.data["exit_code"], 2)
@@ -107,7 +113,7 @@ class BashToolTests(unittest.TestCase):
         ctx = ExecutionContext(missing, "agent_1", "session_1")
         executor = FakeShellExecutor()
 
-        result = bash(ctx, "pwd", executor=executor)
+        result = bash(ctx, action="execute", command="pwd", executor=executor)
 
         self.assertEqual(result.status, "error")
         self.assertEqual(result.error.code, "WORKSPACE_NOT_FOUND")

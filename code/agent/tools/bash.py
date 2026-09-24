@@ -5,6 +5,11 @@ from typing import Any, Protocol
 
 from permission.types import PermissionAction, PermissionRequirement
 from session.ExecutionContext import ExecutionContext
+from tools.process_logs import process_logs
+from tools.process_start import process_start
+from tools.process_status import process_status
+from tools.process_stop import process_stop
+from tools.process_wait import process_wait
 from tools.shell_execution import ShellExecutionError, ShellExecutor, platform_shell_name
 from tools.types import Tool, ToolResult
 
@@ -23,47 +28,97 @@ class ForegroundShellExecutor(Protocol):
 
 
 def parse_bash_arguments(arguments: dict[str, Any]) -> dict[str, Any]:
-    """校验模型命令参数，禁止无限前台执行和宽松类型转换。"""
-    allowed = {"command", "timeout"}
+    """校验 Bash 动作及其严格的参数组合。"""
+    action = arguments.get("action")
+    action_fields = {
+        "execute": {"action", "command", "timeout"},
+        "start": {"action", "command"},
+        "status": {"action", "process_id"},
+        "logs": {"action", "process_id", "cursor", "limit"},
+        "wait": {"action", "process_id", "timeout"},
+        "stop": {"action", "process_id"},
+    }
+    if action not in action_fields:
+        raise ValueError("action 必须是 execute、start、status、logs、wait 或 stop")
+
+    allowed = action_fields[action]
     unknown = set(arguments) - allowed
     if unknown:
         raise ValueError(f"bash 不支持参数: {', '.join(sorted(unknown))}")
 
-    command = arguments.get("command")
-    if not isinstance(command, str) or not command.strip():
-        raise ValueError("command 必须是非空字符串")
+    parsed = {"action": action}
+    if action in {"execute", "start"}:
+        command = arguments.get("command")
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError("command 必须是非空字符串")
+        parsed["command"] = command
+    else:
+        process_id = arguments.get("process_id")
+        if not isinstance(process_id, str) or not process_id.strip():
+            raise ValueError("process_id 必须是非空字符串")
+        parsed["process_id"] = process_id
 
-    parsed = {"command": command}
     if "timeout" in arguments:
         timeout = arguments["timeout"]
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
             raise ValueError("timeout 必须是正数")
         parsed["timeout"] = float(timeout)
+    if "cursor" in arguments:
+        cursor = arguments["cursor"]
+        if not isinstance(cursor, str) or not cursor:
+            raise ValueError("cursor 必须是非空字符串")
+        parsed["cursor"] = cursor
+    if "limit" in arguments:
+        limit = arguments["limit"]
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+            raise ValueError("limit 必须是正整数")
+        parsed["limit"] = limit
     return parsed
+
+
+def bash_permission_requirement(arguments: dict[str, Any]) -> PermissionRequirement:
+    """为当前 Bash action 返回准确的权限动作。"""
+    action = arguments["action"]
+    if action in {"execute", "start"}:
+        return PermissionRequirement(PermissionAction.BASH_EXECUTE, None)
+    if action in {"status", "logs", "wait"}:
+        return PermissionRequirement(PermissionAction.PROCESS_INSPECT, None)
+    if action == "stop":
+        return PermissionRequirement(PermissionAction.PROCESS_STOP, None)
+    raise ValueError(f"未知的 bash action: {action}")
 
 
 def bash(
     ctx: ExecutionContext,
-    command: str,
+    action: str,
+    command: str | None = None,
+    process_id: str | None = None,
     timeout: float | None = None,
+    cursor: str | None = None,
+    limit: int | None = None,
     *,
     executor: ForegroundShellExecutor | None = None,
 ) -> ToolResult:
-    """运行一个有限时长的前台 Shell 命令。
-
-    持续服务、worker 和日志监听必须使用 ``process_start`` 及相关 Process
-    Tool；Bash 不支持无限等待。命令在当前 Session 工作目录执行，且只继承
-    Shell 必需的最小环境变量集合。
-    """
+    """执行前台命令或管理当前 Session 的后台 Shell 进程。"""
     try:
-        arguments = parse_bash_arguments(
-            {
-                "command": command,
-                **({"timeout": timeout} if timeout is not None else {}),
-            }
-        )
+        raw_arguments = {"action": action}
+        for name, value in (("command", command), ("process_id", process_id), ("timeout", timeout), ("cursor", cursor), ("limit", limit)):
+            if value is not None:
+                raw_arguments[name] = value
+        arguments = parse_bash_arguments(raw_arguments)
     except (TypeError, ValueError) as error:
         return ToolResult.failure("INVALID_ARGUMENTS", str(error), retryable=True)
+
+    if arguments["action"] == "start":
+        return process_start(ctx, arguments["command"])
+    if arguments["action"] == "status":
+        return process_status(ctx, arguments["process_id"])
+    if arguments["action"] == "logs":
+        return process_logs(ctx, arguments["process_id"], arguments.get("cursor"), arguments.get("limit"))
+    if arguments["action"] == "wait":
+        return process_wait(ctx, arguments["process_id"], arguments.get("timeout"))
+    if arguments["action"] == "stop":
+        return process_stop(ctx, arguments["process_id"])
 
     if len(arguments["command"]) > ctx.max_bash_command_chars:
         return ToolResult.failure(
@@ -133,25 +188,34 @@ REGISTER = Tool(
     {
         "type": "function",
         "name": "bash",
-        "description": "执行一次性、有限时长的前台 Bash 或 PowerShell 命令。持续服务、worker 和持续日志请使用 process_* 工具。",
+        "description": "执行前台 Shell 命令，或启动、检查、读取日志、等待和停止当前 Session 的后台进程。",
         "parameters": {
             "type": "object",
             "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["execute", "start", "status", "logs", "wait", "stop"],
+                    "description": "execute 运行前台命令；其余 action 管理当前 Session 的后台进程",
+                },
                 "command": {
                     "type": "string",
-                    "description": "要在当前工作目录执行的前台 Shell 命令",
+                    "description": "execute 或 start 时要在当前工作目录运行的 Shell 命令",
                 },
+                "process_id": {"type": "string", "description": "start 返回的后台进程 ID"},
                 "timeout": {
                     "type": "number",
                     "exclusiveMinimum": 0,
                     "description": "可选 timeout 秒数；省略时使用本地默认值",
                 },
+                "cursor": {"type": "string", "description": "logs 上次返回的 next_cursor"},
+                "limit": {"type": "integer", "minimum": 1, "description": "logs 单次返回字符上限"},
             },
-            "required": ["command"],
+            "required": ["action"],
             "additionalProperties": False,
         },
     },
     bash,
     PermissionRequirement(PermissionAction.BASH_EXECUTE, None),
     argument_parser=parse_bash_arguments,
+    permission_resolver=bash_permission_requirement,
 )

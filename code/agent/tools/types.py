@@ -109,14 +109,26 @@ class Tool:
         schema: 传给模型的工具 JSON Schema。
         function: 实际执行函数，签名为 ``function(ctx, **arguments)``，且
             必须返回 ToolResult。
-        permission: 工具静态声明的权限需求；它不是用户已授予的规则。
+        permission: 工具默认声明的权限需求；它不是用户已授予的规则。
         argument_parser: 可选的参数解析器。它在权限请求构造前运行，必须
             返回经过校验和规范化的新参数对象。
+        permission_resolver: 可选的动态权限解析器。对于一个 Tool 内含多个
+            受控动作的情形，它根据已校验参数返回本次调用的权限需求。
     """
     schema: dict
     function: Callable[..., ToolResult]
     permission: PermissionRequirement
     argument_parser: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    permission_resolver: Callable[[dict[str, Any]], PermissionRequirement] | None = None
+
+    def resolve_permission(self, arguments: dict[str, Any]) -> PermissionRequirement:
+        """返回当前已校验参数对应的权限需求。"""
+        if self.permission_resolver is None:
+            return self.permission
+        requirement = self.permission_resolver(arguments)
+        if not isinstance(requirement, PermissionRequirement):
+            raise TypeError("权限解析器必须返回 PermissionRequirement")
+        return requirement
 
 
 @dataclass(frozen=True)
@@ -128,6 +140,7 @@ class PreparedToolCall:
         tool_name: 已注册工具名称。
         tool: 已解析出的 Tool 定义。
         arguments: 只解析一次后的 JSON 对象参数。
+        permission: 根据已解析参数得到的权限需求；执行阶段必须复用它。
         permission_request: 根据工具声明和参数生成的实际权限请求。
     """
 
@@ -135,6 +148,7 @@ class PreparedToolCall:
     tool_name: str
     tool: Tool
     arguments: dict[str, Any]
+    permission: PermissionRequirement
     permission_request: PermissionRequest
 
 

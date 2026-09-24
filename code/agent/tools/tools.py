@@ -2,6 +2,7 @@ import json
 import os
 from base64 import b64encode
 
+from permission.types import PermissionRequirement
 from session.ExecutionContext import ExecutionContext
 from tools.catalog import ToolCatalog
 from permission.types import PermissionRequest
@@ -106,7 +107,14 @@ class Tools:
                 args = tool.argument_parser(dict(args))
                 if not isinstance(args, dict):
                     raise TypeError("工具参数解析器必须返回对象")
-            request = self.build_permission_request(tool, name, args, call_id)
+            requirement = tool.resolve_permission(args)
+            request = self.build_permission_request(
+                tool,
+                name,
+                args,
+                call_id,
+                requirement=requirement,
+            )
         except ValueError as error:
             code = str(error)
             if code not in {"PROJECT_NOT_SELECTED", "PROJECT_PATH_ESCAPE"}:
@@ -117,7 +125,7 @@ class Tools:
                 ToolError("INVALID_ARGUMENTS", str(error))
             ) from error
 
-        return PreparedToolCall(call_id, name, tool, args, request)
+        return PreparedToolCall(call_id, name, tool, args, requirement, request)
 
     def build_permission_request(
         self,
@@ -125,6 +133,8 @@ class Tools:
         tool_name: str,
         arguments: dict,
         call_id: str,
+        *,
+        requirement: PermissionRequirement | None = None,
     ) -> PermissionRequest:
         """根据工具权限声明和已解析参数构造真实权限请求。
 
@@ -137,8 +147,9 @@ class Tools:
         Returns:
             带规范化资源与执行身份的 PermissionRequest。
         """
+        resolved_requirement = requirement or tool.resolve_permission(arguments)
         resource = None
-        resource_from = tool.permission.resource_from
+        resource_from = resolved_requirement.resource_from
         if resource_from is not None:
             raw_resource = arguments[resource_from]
             if not isinstance(raw_resource, str) or not raw_resource:
@@ -146,7 +157,7 @@ class Tools:
             resource = self._resolve_path(raw_resource)
 
         return PermissionRequest(
-            action=tool.permission.action,
+            action=resolved_requirement.action,
             resource=resource,
             tool_name=tool_name,
             call_id=call_id,
@@ -164,7 +175,7 @@ class Tools:
         """
         try:
             arguments = dict(call.arguments)
-            resource_from = call.tool.permission.resource_from
+            resource_from = call.permission.resource_from
             if resource_from is not None:
                 current_target = self._resolve_path(arguments[resource_from])
                 if current_target != call.permission_request.resource:

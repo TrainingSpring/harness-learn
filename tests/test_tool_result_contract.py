@@ -178,7 +178,12 @@ class ToolResultContractTests(unittest.TestCase):
                         "stderr_truncated": False,
                     }
 
-            bash_result = bash(ctx, "test", executor=ShellExecutor())
+            bash_result = bash(
+                ctx,
+                action="execute",
+                command="test",
+                executor=ShellExecutor(),
+            )
 
         for result in (read_result, write_result, edit_result, bash_result):
             self.assertIsInstance(result, ToolResult)

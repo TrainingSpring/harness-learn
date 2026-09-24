@@ -56,7 +56,7 @@ class ToolPreparationTests(unittest.TestCase):
         """bash 使用动作授权，不能把 command 文本误当成文件路径。"""
         call = self.tools.prepare_call(
             "bash",
-            {"command": "rm -rf build"},
+            {"action": "execute", "command": "rm -rf build"},
             "call_002",
         )
 
@@ -121,7 +121,9 @@ class ToolPreparationTests(unittest.TestCase):
 
     def test_default_grant_resource_for_bash_is_none(self):
         """bash 没有可靠的单一资源根，默认授权范围保持为 None。"""
-        call = self.tools.prepare_call("bash", {"command": "pwd"}, "call_006")
+        call = self.tools.prepare_call(
+            "bash", {"action": "execute", "command": "pwd"}, "call_006"
+        )
 
         self.assertIsNone(self.tools.default_grant_resource(call.permission_request))
 
