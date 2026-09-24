@@ -6,6 +6,7 @@ import signal
 import subprocess
 import threading
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import BinaryIO
 
 
@@ -182,19 +183,30 @@ def _start_readers(
 ) -> tuple[threading.Thread, threading.Thread]:
     if process.stdout is None or process.stderr is None:
         raise ShellExecutionError("BASH_START_FAILED")
+    return start_process_stream_readers(process, stdout_buffer.append, stderr_buffer.append)
+
+
+def start_process_stream_readers(
+    process: subprocess.Popen[bytes],
+    stdout_consumer: Callable[[bytes], None],
+    stderr_consumer: Callable[[bytes], None],
+) -> tuple[threading.Thread, threading.Thread]:
+    """并行消费进程输出，供前台执行和 Session 后台进程共用。"""
+    if process.stdout is None or process.stderr is None:
+        raise ShellExecutionError("BASH_START_FAILED")
     readers = (
-        threading.Thread(target=_consume_stream, args=(process.stdout, stdout_buffer), daemon=True),
-        threading.Thread(target=_consume_stream, args=(process.stderr, stderr_buffer), daemon=True),
+        threading.Thread(target=_consume_stream, args=(process.stdout, stdout_consumer), daemon=True),
+        threading.Thread(target=_consume_stream, args=(process.stderr, stderr_consumer), daemon=True),
     )
     for reader in readers:
         reader.start()
     return readers
 
 
-def _consume_stream(stream: BinaryIO, buffer: BoundedByteBuffer) -> None:
+def _consume_stream(stream: BinaryIO, consumer: Callable[[bytes], None]) -> None:
     try:
         while chunk := stream.read(64 * 1024):
-            buffer.append(chunk)
+            consumer(chunk)
     finally:
         stream.close()
 

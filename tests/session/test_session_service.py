@@ -122,7 +122,7 @@ class SessionServiceTests(unittest.TestCase):
         self.assertEqual((session_count, member_count), (0, 0))
 
     def test_group_runtimes_share_one_session_permission_manager(self):
-        """群聊成员各有 Runtime，但必须使用同一份会话权限策略。"""
+        """群聊成员各有 Runtime，但必须共享会话级协作对象。"""
         execution = self.service.create_group_session(
             ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
         )
@@ -130,6 +130,8 @@ class SessionServiceTests(unittest.TestCase):
 
         self.assertIs(runtimes[0].permission, runtimes[1].permission)
         self.assertEqual(runtimes[0].permission._session_id, execution.session.id)
+        self.assertIs(runtimes[0].ctx.process_manager, execution.process_manager)
+        self.assertIs(runtimes[1].ctx.process_manager, execution.process_manager)
 
     def test_settings_refresh_runtime_environment_before_first_message(self):
         """项目与模式属于 Session，更新后必须重建 Runtime 环境。"""
@@ -147,6 +149,7 @@ class SessionServiceTests(unittest.TestCase):
         self.assertEqual(execution.session.permission_mode, "yolo")
         self.assertEqual(runtime.ctx.project_path, str(project))
         self.assertEqual(runtime.permission._mode.value, "yolo")
+        self.assertIs(runtime.ctx.process_manager, execution.process_manager)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,13 @@
 """工具调用期间共享、不可变的执行环境。"""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Protocol
+
+
+class SessionProcessManagerProtocol(Protocol):
+    """工具访问的最小 Session 进程协作接口，避免上下文反向依赖实现。"""
+
+    def stop_all(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -23,6 +30,10 @@ class ExecutionContext:
         default_bash_timeout_seconds: 前台 Shell 命令未指定 timeout 时的默认秒数。
         max_bash_timeout_seconds: 前台 Shell 命令允许请求的最大秒数。
         max_bash_output_bytes: 单次前台命令每个输出流的本地字节上限。
+        process_manager: 当前打开 Session 的非持久化后台进程管理器。
+        max_process_log_bytes: 每个后台进程单个输出流的环形日志上限。
+        max_process_log_return_chars: 单次日志 Tool 返回给模型的最大字符数。
+        process_startup_probe_seconds: 启动后台进程后的短暂状态检查秒数。
     """
 
     project_path: str | None
@@ -40,6 +51,14 @@ class ExecutionContext:
     default_bash_timeout_seconds: float = 30.0
     max_bash_timeout_seconds: float = 600.0
     max_bash_output_bytes: int = 256 * 1024
+    process_manager: SessionProcessManagerProtocol | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
+    max_process_log_bytes: int = 4 * 1024 * 1024
+    max_process_log_return_chars: int = 20_000
+    process_startup_probe_seconds: float = 0.2
 
     def __post_init__(self) -> None:
         """尽早拒绝缺少身份或非法项目目录的执行上下文。"""
@@ -75,3 +94,9 @@ class ExecutionContext:
             raise ValueError("default_bash_timeout_seconds 不能超过 max_bash_timeout_seconds")
         if self.max_bash_output_bytes <= 0:
             raise ValueError("max_bash_output_bytes 必须大于 0")
+        if self.max_process_log_bytes <= 0:
+            raise ValueError("max_process_log_bytes 必须大于 0")
+        if self.max_process_log_return_chars <= 0:
+            raise ValueError("max_process_log_return_chars 必须大于 0")
+        if self.process_startup_probe_seconds <= 0:
+            raise ValueError("process_startup_probe_seconds 必须大于 0")

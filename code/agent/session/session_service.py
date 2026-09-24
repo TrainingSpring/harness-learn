@@ -24,6 +24,7 @@ from storage.types import Session, SessionAgent
 from tools.tools import Tools
 
 from .ExecutionContext import ExecutionContext
+from .session_process_manager import SessionProcessManager
 
 
 class SessionExecution:
@@ -39,6 +40,7 @@ class SessionExecution:
         members: tuple[SessionAgent, ...],
         runtimes: dict[str, Runtime],
         refresh_runtimes: Callable[[Session], dict[str, Runtime]],
+        process_manager: SessionProcessManager,
     ) -> None:
         self.session = session
         self.context = context
@@ -47,6 +49,8 @@ class SessionExecution:
         self.members = members
         self.runtimes = runtimes
         self._refresh_runtimes = refresh_runtimes
+        self.process_manager = process_manager
+        self._closed = False
         self._active_member_index: int | None = None
         self._current_member_index: int | None = None
         self._recorded_output_call_ids = {
@@ -57,6 +61,7 @@ class SessionExecution:
 
     def send(self, message: str) -> Generator[RuntimeEvent, None, None]:
         """持久化用户消息并执行当前 Session 的一轮成员调度。"""
+        self._require_open()
         if self._active_member_index is not None:
             raise ValueError("Session 当前正在等待权限确认，不能发送新消息")
         self.context_service.append_user_message(message)
@@ -69,6 +74,7 @@ class SessionExecution:
         response: PermissionResponse,
     ) -> Generator[RuntimeEvent, None, None]:
         """恢复等待权限的成员 Runtime，并继续后续成员。"""
+        self._require_open()
         if self._active_member_index is None:
             raise ValueError("Session 当前没有等待处理的权限请求")
         member_index = self._active_member_index
@@ -89,6 +95,14 @@ class SessionExecution:
         self._active_member_index = None
         self.context_service.save_context(self.context)
 
+    def close(self) -> None:
+        """关闭打开态 Session，并清理其全部非持久化后台进程。"""
+        if self._closed:
+            return
+        self.cancel()
+        self.process_manager.stop_all()
+        self._closed = True
+
     def set_project_path(self, project_path: str | None) -> None:
         """在首条用户消息前更新当前 Session 的项目目录。"""
         self._require_idle_for_settings()
@@ -108,8 +122,13 @@ class SessionExecution:
         self.runtimes = self._refresh_runtimes(self.session)
 
     def _require_idle_for_settings(self) -> None:
+        self._require_open()
         if self._active_member_index is not None or self._current_member_index is not None:
             raise ValueError("Session 正在运行，不能修改会话设置")
+
+    def _require_open(self) -> None:
+        if self._closed:
+            raise ValueError("Session 已关闭")
 
     def _drive_from(
         self,
@@ -284,8 +303,9 @@ class SessionService:
         )
         context_service = ContextService(ContextItemRepository(self.database), session.id)
         context_service.restore_context(context, members[0].agent_id)
+        process_manager = SessionProcessManager(session.id)
         def create_runtimes(current_session: Session) -> dict[str, Runtime]:
-            return self._create_runtimes(current_session, members, agents)
+            return self._create_runtimes(current_session, members, agents, process_manager)
 
         runtimes = create_runtimes(session)
         return SessionExecution(
@@ -296,6 +316,7 @@ class SessionService:
             members=members,
             runtimes=runtimes,
             refresh_runtimes=create_runtimes,
+            process_manager=process_manager,
         )
 
     def _create_runtimes(
@@ -303,6 +324,7 @@ class SessionService:
         session: Session,
         members: tuple[SessionAgent, ...],
         agents: dict[str, Agent],
+        process_manager: SessionProcessManager,
     ) -> dict[str, Runtime]:
         """为一个 Session 生成共享权限、独立执行状态的成员 Runtime。"""
         permission = PermissionManager(
@@ -318,6 +340,7 @@ class SessionService:
                 permission,
                 session.permission_mode,
                 session.project_path,
+                process_manager,
             )
             for member in members
         }
@@ -329,11 +352,17 @@ class SessionService:
         permission: PermissionManager,
         permission_mode: str,
         project_path: str | None,
+        process_manager: SessionProcessManager,
     ) -> Runtime:
         """为固定成员构造独立的 Agent Runtime 能力环境。"""
         if member.agent_id != agent.agent_id:
             raise ValueError("SessionAgent 与 Agent 身份不一致")
-        ctx = ExecutionContext(project_path, agent.agent_id, member.session_id)
+        ctx = ExecutionContext(
+            project_path,
+            agent.agent_id,
+            member.session_id,
+            process_manager=process_manager,
+        )
         llm = LLM(
             agent.llm_config.base_url,
             agent.llm_config.api_key,

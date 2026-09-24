@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
 from context.context import Context  # noqa: E402
 from session.session_service import SessionExecution  # noqa: E402
+from session.session_process_manager import SessionProcessManager  # noqa: E402
 from storage.context_service import ContextService  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402
@@ -83,6 +84,7 @@ def test_runtime_failure_persists_new_protocol_items_and_current_context():
                 members=(member,),
                 runtimes={member.agent_id: FailingRuntime()},
                 refresh_runtimes=lambda _session: {member.agent_id: FailingRuntime()},
+                process_manager=SessionProcessManager(session.id),
             )
 
             with pytest.raises(RuntimeError, match="provider unavailable"):

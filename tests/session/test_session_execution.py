@@ -95,6 +95,16 @@ class FakeRuntime:
         )
 
 
+class FakeProcessManager:
+    """记录 Session 关闭是否清理后台进程。"""
+
+    def __init__(self) -> None:
+        self.stop_all_calls = 0
+
+    def stop_all(self) -> None:
+        self.stop_all_calls += 1
+
+
 class FakeSessionService(SessionService):
     """以受控 Runtime 替换 Service 内部装配，隔离模型调用。"""
 
@@ -321,6 +331,8 @@ class SessionExecutionTests(unittest.TestCase):
         first = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
         second = self.sessions.runtimes[(session.id, "agent_9U3M7BKP2C")]
         first.wait_for_permission = True
+        process_manager = FakeProcessManager()
+        execution.process_manager = process_manager
 
         paused = list(execution.send("读取后取消"))
         saved_before_cancel = execution.context.export()
@@ -329,6 +341,7 @@ class SessionExecutionTests(unittest.TestCase):
 
         self.assertEqual(first.cancel_calls, 1)
         self.assertEqual(second.cancel_calls, 0)
+        self.assertEqual(process_manager.stop_all_calls, 0)
         self.assertEqual(
             ContextService(
                 ContextItemRepository(self.database), session.id
@@ -343,6 +356,19 @@ class SessionExecutionTests(unittest.TestCase):
                     scope=PermissionScope.ONCE,
                 )
             ))
+
+    def test_close_cleans_up_session_processes_once_and_rejects_future_messages(self):
+        """会话关闭是后台服务的唯一自动清理边界。"""
+        execution = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
+        process_manager = FakeProcessManager()
+        execution.process_manager = process_manager
+
+        execution.close()
+        execution.close()
+
+        self.assertEqual(process_manager.stop_all_calls, 1)
+        with self.assertRaisesRegex(ValueError, "Session 已关闭"):
+            list(execution.send("关闭后不能发送"))
 
 
 if __name__ == "__main__":
