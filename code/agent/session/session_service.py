@@ -82,7 +82,7 @@ class SessionExecution:
         self._active_member_index = None
         yield from self._drive_from(
             member_index,
-            runtime.resolve_permission(self.context, response),
+            runtime.resolve_permission(response),
         )
 
     def cancel(self) -> None:
@@ -142,7 +142,7 @@ class SessionExecution:
             events = (
                 current_events
                 if index == member_index and current_events
-                else runtime.run(self.context)
+                else runtime.run()
             )
             self._current_member_index = index
             try:
@@ -305,7 +305,13 @@ class SessionService:
         context_service.restore_context(context, members[0].agent_id)
         process_manager = SessionProcessManager(session.id)
         def create_runtimes(current_session: Session) -> dict[str, Runtime]:
-            return self._create_runtimes(current_session, members, agents, process_manager)
+            return self._create_runtimes(
+                current_session,
+                members,
+                agents,
+                process_manager,
+                context,
+            )
 
         runtimes = create_runtimes(session)
         return SessionExecution(
@@ -325,6 +331,7 @@ class SessionService:
         members: tuple[SessionAgent, ...],
         agents: dict[str, Agent],
         process_manager: SessionProcessManager,
+        context: Context,
     ) -> dict[str, Runtime]:
         """为一个 Session 生成共享权限、独立执行状态的成员 Runtime。"""
         permission = PermissionManager(
@@ -341,6 +348,7 @@ class SessionService:
                 session.permission_mode,
                 session.project_path,
                 process_manager,
+                context,
             )
             for member in members
         }
@@ -353,6 +361,7 @@ class SessionService:
         permission_mode: str,
         project_path: str | None,
         process_manager: SessionProcessManager,
+        context: Context,
     ) -> Runtime:
         """为固定成员构造独立的 Agent Runtime 能力环境。"""
         if member.agent_id != agent.agent_id:
@@ -371,7 +380,7 @@ class SessionService:
         )
         tools = Tools(ctx)
         tools.batch_register(list(agent.tool_definitions))
-        return Runtime(llm, tools, ctx, permission)
+        return Runtime(llm, tools, ctx, permission, context)
 
     def _require_enabled_agents(self, agent_ids: list[str]) -> None:
         """确认新 Session 选择的所有 Agent 均存在且已启用。"""

@@ -73,11 +73,18 @@ class AgentTests(unittest.TestCase):
         second = second_execution.runtimes["agent_1V3ASAXQ2A"]
 
         self.assertIsNot(first, second)
-        self.assertEqual(first.ctx.agent_id, second.ctx.agent_id)
-        self.assertNotEqual(first.ctx.session_id, second.ctx.session_id)
+        self.assertEqual(
+            first.execution_context.agent_id,
+            second.execution_context.agent_id,
+        )
+        self.assertNotEqual(
+            first.execution_context.session_id,
+            second.execution_context.session_id,
+        )
         self.assertIsNot(first.tools, second.tools)
-        self.assertFalse(hasattr(first, "context"))
-        self.assertFalse(hasattr(second, "context"))
+        self.assertIs(first.context, first_execution.context)
+        self.assertIs(second.context, second_execution.context)
+        self.assertIsNot(first.context, second.context)
 
     def test_agent_contains_frozen_tool_definitions(self):
         """Agent 应冻结已验证的工具定义，避免每个 Session 重复发现模块。"""

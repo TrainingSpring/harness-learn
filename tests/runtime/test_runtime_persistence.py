@@ -62,9 +62,10 @@ class RuntimePersistenceTests(unittest.TestCase):
                 project_path=ctx.project_path,
                 protected_resource_policy=ProtectedResourcePolicy(["/system"]),
             ),
+            context,
         )
 
-        list(runtime.run(context))
+        list(runtime.run())
 
         self.assertEqual(context.messages[0]["content"], "请完成任务")
         self.assertEqual(context.messages[1]["content"], "已完成")

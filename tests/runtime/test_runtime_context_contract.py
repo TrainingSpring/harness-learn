@@ -29,7 +29,7 @@ class RecordingLLM:
         yield LLMResponse(type="done", data=[], is_stop=True)
 
 
-def _runtime(llm):
+def _runtime(llm, context):
     execution_context = ExecutionContext("/workspace", "agent_TEST00001", "session_TEST01")
     tools = Tools(execution_context)
     permission = PermissionManager(
@@ -37,49 +37,49 @@ def _runtime(llm):
         session_id=execution_context.session_id,
         project_path=execution_context.project_path,
     )
-    return Runtime(llm, tools, execution_context, permission)
+    return Runtime(llm, tools, execution_context, permission, context)
 
 
-def test_runtime_does_not_store_context_or_context_service():
-    runtime = _runtime(RecordingLLM())
+def test_runtime_stores_its_context_but_not_context_service():
+    context = Context(RecordingLLM(), session_id="session_TEST01")
+    runtime = _runtime(RecordingLLM(), context)
 
-    assert not hasattr(runtime, "context")
+    assert runtime.context is context
     assert not hasattr(runtime, "context_service")
 
 
 def test_runtime_uses_context_model_input_without_legacy_get_msg():
     """Runtime 必须通过正式的 to_model_input 接口读取调用方 Context。"""
     llm = RecordingLLM()
-    runtime = _runtime(llm)
     context = Context(RecordingLLM(), session_id="session_TEST01")
+    runtime = _runtime(llm, context)
     context.append_user_message("当前会话")
 
-    list(runtime.run(context))
+    list(runtime.run())
 
     assert llm.inputs[0][-1]["content"] == "当前会话"
     assert not hasattr(context, "get_msg")
 
 
-def test_run_reads_only_the_context_passed_by_the_caller():
+def test_run_reads_its_bound_context():
     llm = RecordingLLM()
-    runtime = _runtime(llm)
     context_a = Context(RecordingLLM(), session_id="session_TEST01")
-    context_b = Context(RecordingLLM(), session_id="session_TEST02")
     context_a.append_user_message("会话 A")
-    context_b.append_user_message("会话 B")
+    runtime = _runtime(llm, context_a)
 
-    list(runtime.run(context_a))
+    list(runtime.run())
 
     assert llm.inputs[0][-1]["content"] == "会话 A"
-    assert all(item.get("content") != "会话 B" for item in llm.inputs[0])
 
-    list(runtime.run(context_b))
+def test_runtime_rejects_a_context_from_another_session():
+    execution_context = ExecutionContext("/workspace", "agent_TEST00001", "session_TEST01")
+    tools = Tools(execution_context)
+    permission = PermissionManager(
+        mode=PermissionMode.BUILD,
+        session_id=execution_context.session_id,
+        project_path=execution_context.project_path,
+    )
+    context = Context(RecordingLLM(), session_id="session_TEST02")
 
-    assert llm.inputs[1][-1]["content"] == "会话 B"
-
-
-def test_run_requires_a_context_instance():
-    runtime = _runtime(RecordingLLM())
-
-    with pytest.raises(TypeError, match="context"):
-        list(runtime.run("用户消息"))
+    with pytest.raises(ValueError, match="session_id"):
+        Runtime(RecordingLLM(), tools, execution_context, permission, context)

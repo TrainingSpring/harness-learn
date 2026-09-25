@@ -32,8 +32,11 @@ class SummarizerLLM:
 class FailingRuntime:
     """模拟在写入 function call 后抛出内部异常的 Runtime。"""
 
-    def run(self, context):
-        context.append_function_call(
+    def __init__(self, context: Context) -> None:
+        self.context = context
+
+    def run(self):
+        self.context.append_function_call(
             "agent_1V3ASAXQ2A",
             call_id="call_FAILURE001",
             name="read",
@@ -82,8 +85,8 @@ def test_runtime_failure_persists_new_protocol_items_and_current_context():
                 context_service=context_service,
                 session_repository=SessionRepository(database),
                 members=(member,),
-                runtimes={member.agent_id: FailingRuntime()},
-                refresh_runtimes=lambda _session: {member.agent_id: FailingRuntime()},
+                runtimes={member.agent_id: FailingRuntime(context)},
+                refresh_runtimes=lambda _session: {member.agent_id: FailingRuntime(context)},
                 process_manager=SessionProcessManager(session.id),
             )
 

@@ -41,21 +41,28 @@ class Runtime:
         self,
         llm: LLM,
         tools: Tools,
-        ctx: ExecutionContext,
+        execution_context: ExecutionContext,
         permission: PermissionManager,
+        context: Context,
     ) -> None:
         """创建运行时协调器。
 
         Args:
             llm: LLM 调用适配器。
             tools: 当前 Agent 已注册的工具集。
-            ctx: 工具共享的执行环境和身份信息。
+            execution_context: 工具共享的执行环境和身份信息。
             permission: 当前 Session 的共享权限管理器。
+            context: 当前 Agent 绑定的模型上下文。
         """
+        if not isinstance(context, Context):
+            raise TypeError("context 必须是 Context")
+        if context.session_id != execution_context.session_id:
+            raise ValueError("context.session_id 与 execution_context.session_id 必须一致")
         self.llm = llm
         self.tools = tools
         self.permission = permission
-        self.ctx = ctx
+        self.execution_context = execution_context
+        self.context = context
         self._state = RuntimeState.IDLE
         self._cancelled = False
         self._pending_permission: PendingToolCall | None = None
@@ -69,7 +76,7 @@ class Runtime:
                         "type": "input_text",
                         "text": (
                             f"当前系统环境：{'windows' if os.name == 'nt' else 'linux'},"
-                            f"项目目录{ctx.project_path or '未选择'}"
+                            f"项目目录{execution_context.project_path or '未选择'}"
                         ),
                     }
                 ],
@@ -81,21 +88,15 @@ class Runtime:
         """返回当前运行状态，供宿主判断是否需要展示权限交互。"""
         return self._state
 
-    def call_llm(self, context: Context) -> Generator[LLMResponse, None, None]:
-        """使用调用方提供的 Context 和工具 schema 请求一次 LLM 流。"""
+    def call_llm(self) -> Generator[LLMResponse, None, None]:
+        """使用绑定 Context 和工具 schema 请求一次 LLM 流。"""
         return self.llm.call_responses_stream(
-            context.to_model_input(self.sys_message),
+            self.context.to_model_input(self.sys_message),
             self.tools.list,
         )
 
-    def run(
-        self,
-        context: Context,
-    ) -> Generator[RuntimeEvent, None, None]:
-        """使用调用方提供的 Context 开始一次 Agent Loop。
-
-        Args:
-            context: 当前 Session 持有的模型上下文；Runtime 不保存它。
+    def run(self) -> Generator[RuntimeEvent, None, None]:
+        """使用绑定 Context 开始一次 Agent Loop。
 
         Yields:
             LLM 流事件，或在工具权限需要确认时产生的
@@ -104,12 +105,11 @@ class Runtime:
         Runtime 在 WAITING_PERMISSION 或 RUNNING 状态再次接收新消息会
         抛错，防止一个 pending 工具调用被另一条消息覆盖。
         """
-        self._validate_context(context)
         if self._state is not RuntimeState.IDLE:
             raise ValueError(f"Runtime 当前状态为 {self._state.value}，不能开始新消息")
         self._cancelled = False
         self._state = RuntimeState.RUNNING
-        yield from self._run_llm_loop(context)
+        yield from self._run_llm_loop()
 
     def cancel(self) -> None:
         """取消当前运行，丢弃未执行的工具调用和权限暂停状态。"""
@@ -118,16 +118,13 @@ class Runtime:
         self._tool_queue.clear()
         self._state = RuntimeState.IDLE
 
-    def _run_llm_loop(
-        self,
-        context: Context,
-    ) -> Generator[RuntimeEvent, None, None]:
+    def _run_llm_loop(self) -> Generator[RuntimeEvent, None, None]:
         """持续请求 LLM，直到结束或遇到需要用户确认的工具调用。"""
         while True:
             if self._cancelled:
                 self._state = RuntimeState.IDLE
                 return
-            for response in self.call_llm(context):
+            for response in self.call_llm():
                 if self._cancelled:
                     self._state = RuntimeState.IDLE
                     return
@@ -135,8 +132,8 @@ class Runtime:
                     yield response
                     continue
 
-                self._record_response_items(context, response)
-                permission_event = self._drain_tool_queue(context)
+                self._record_response_items(response)
+                permission_event = self._drain_tool_queue()
                 if permission_event is not None:
                     self._state = RuntimeState.WAITING_PERMISSION
                     yield permission_event
@@ -147,11 +144,7 @@ class Runtime:
                     yield response
                     return
 
-    def _record_response_items(
-        self,
-        context: Context,
-        response: LLMResponse,
-    ) -> None:
+    def _record_response_items(self, response: LLMResponse) -> None:
         """记录 LLM 输出，并将 function_call 转为待处理队列。
 
         Args:
@@ -163,8 +156,8 @@ class Runtime:
         usage = response.usage
         for item in response.data or []:
             if item.type == "message":
-                context.append_agent_message(
-                    self.ctx.agent_id,
+                self.context.append_agent_message(
+                    self.execution_context.agent_id,
                     self._message_text(item),
                     usage=usage,
                 )
@@ -172,7 +165,7 @@ class Runtime:
             if item.type != "function_call":
                 continue
 
-            context.append_function_call(self.ctx.agent_id, item=item)
+            self.context.append_function_call(self.execution_context.agent_id, item=item)
             try:
                 call = self.tools.prepare_call(
                     item.name,
@@ -181,7 +174,6 @@ class Runtime:
                 )
             except ToolCallPreparationError as error:
                 self._append_tool_result(
-                    context,
                     item.call_id,
                     ToolResult.failure(
                         error.error.code,
@@ -192,7 +184,7 @@ class Runtime:
                 continue
             self._tool_queue.append(call)
 
-    def _drain_tool_queue(self, context: Context) -> PermissionRequiredEvent | None:
+    def _drain_tool_queue(self) -> PermissionRequiredEvent | None:
         """按 FIFO 顺序预检并执行队列中的工具调用。
 
         Returns:
@@ -209,11 +201,10 @@ class Runtime:
                 command=command,
             )
             if decision is PermissionDecision.ALLOW:
-                self._append_tool_result(context, call.call_id, self.tools.execute(call))
+                self._append_tool_result(call.call_id, self.tools.execute(call))
                 continue
             if decision is PermissionDecision.DENY:
                 self._append_tool_result(
-                    context,
                     call.call_id,
                     self._permission_denied_result(call.permission_request),
                 )
@@ -228,7 +219,6 @@ class Runtime:
 
     def resolve_permission(
         self,
-        context: Context,
         response: PermissionResponse,
     ) -> Generator[RuntimeEvent, None, None]:
         """处理用户确认并从 pending 工具调用处继续执行。
@@ -240,13 +230,11 @@ class Runtime:
             当前队列产生的下一个权限事件，或恢复后的 LLM 流事件。
 
         Raises:
-            TypeError: context 不是 Context 实例。
             ValueError: Runtime 没有等待权限，或 call_id 与 pending 调用不符。
 
         清除 pending 状态发生在确认校验和规则写入之后；错误确认不会改变
         Runtime 状态，也不会触发工具执行。
         """
-        self._validate_context(context)
         if self._state is not RuntimeState.WAITING_PERMISSION:
             raise ValueError("Runtime 当前没有等待处理的权限请求")
         pending = self._pending_permission
@@ -272,37 +260,30 @@ class Runtime:
 
         self._pending_permission = None
         self._state = RuntimeState.RUNNING
-        self._append_tool_result(context, pending.call.call_id, result)
+        self._append_tool_result(pending.call.call_id, result)
 
-        permission_event = self._drain_tool_queue(context)
+        permission_event = self._drain_tool_queue()
         if permission_event is not None:
             self._state = RuntimeState.WAITING_PERMISSION
             yield permission_event
             return
-        yield from self._run_llm_loop(context)
+        yield from self._run_llm_loop()
 
     def _append_tool_result(
         self,
-        context: Context,
         call_id: str,
         result: ToolResult,
     ) -> None:
         """将 ToolResult 统一编码后追加为 function_call_output。"""
         encoded_output = self.tools.encode_result(result)
-        context.append_function_call_output(
-            self.ctx.agent_id,
+        self.context.append_function_call_output(
+            self.execution_context.agent_id,
             {
                 "type": "function_call_output",
                 "call_id": call_id,
                 "output": encoded_output,
             },
         )
-
-    @staticmethod
-    def _validate_context(context: Context) -> None:
-        """验证调用方传入的是 Session 的 Context。"""
-        if not isinstance(context, Context):
-            raise TypeError("context 必须是 Context")
 
     @staticmethod
     def _message_text(item: LLMResponseOutputItem) -> str:

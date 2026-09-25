@@ -62,6 +62,7 @@ def _waiting_runtime(session_id: str, call_id: str) -> tuple[Runtime, Context]:
             PermissionRequirement(PermissionAction.FILE_WRITE, "target_path"),
         )
     )
+    context = Context(PermissionLLM(call_id), session_id=session_id)
     runtime = Runtime(
         PermissionLLM(call_id),
         tools,
@@ -71,8 +72,9 @@ def _waiting_runtime(session_id: str, call_id: str) -> tuple[Runtime, Context]:
             session_id=execution_context.session_id,
             project_path=execution_context.project_path,
         ),
+        context,
     )
-    return runtime, Context(PermissionLLM(call_id), session_id=session_id)
+    return runtime, context
 
 
 def test_permission_confirmation_cannot_cross_session_runtime():
@@ -80,14 +82,13 @@ def test_permission_confirmation_cannot_cross_session_runtime():
     runtime_a, context_a = _waiting_runtime("session_TEST07", "call_A")
     runtime_b, context_b = _waiting_runtime("session_TEST08", "call_B")
 
-    first = list(runtime_a.run(context_a))
-    second = list(runtime_b.run(context_b))
+    first = list(runtime_a.run())
+    second = list(runtime_b.run())
     assert isinstance(first[0], PermissionRequiredEvent)
     assert isinstance(second[0], PermissionRequiredEvent)
 
     with pytest.raises(ValueError, match="call_id"):
         list(runtime_b.resolve_permission(
-            context_b,
             PermissionResponse(
                 call_id="call_A",
                 decision=PermissionDecision.ALLOW,

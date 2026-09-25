@@ -58,14 +58,14 @@ def test_running_runtime_rejects_a_second_run_until_the_first_finishes():
         session_id=execution_context.session_id,
         project_path=execution_context.project_path,
     )
-    runtime = Runtime(llm, tools, execution_context, permission)
     context = Context(PermissionLLM([]), session_id=execution_context.session_id)
-    events = runtime.run(context)
+    runtime = Runtime(llm, tools, execution_context, permission, context)
+    events = runtime.run()
 
     next(events)
     assert runtime.state is RuntimeState.RUNNING
     with pytest.raises(ValueError, match="不能开始新消息"):
-        list(runtime.run(context))
+        list(runtime.run())
 
 
 def test_permission_resume_writes_tool_output_to_the_passed_context():
@@ -94,15 +94,14 @@ def test_permission_resume_writes_tool_output_to_the_passed_context():
         project_path=execution_context.project_path,
         protected_resource_policy=ProtectedResourcePolicy(["/system"]),
     )
-    runtime = Runtime(llm, tools, execution_context, permission)
     context_a = Context(PermissionLLM([]), session_id=execution_context.session_id)
     context_b = Context(PermissionLLM([]), session_id="session_TEST05")
+    runtime = Runtime(llm, tools, execution_context, permission, context_a)
 
-    events = list(runtime.run(context_a))
+    events = list(runtime.run())
     assert isinstance(events[0], PermissionRequiredEvent)
 
     list(runtime.resolve_permission(
-        context_a,
         PermissionResponse(
             call_id="call_001",
             decision=PermissionDecision.ALLOW,
@@ -136,10 +135,10 @@ def test_cancel_clears_pending_permission_and_returns_runtime_to_idle():
             session_id=execution_context.session_id,
             project_path=execution_context.project_path,
         ),
+        context := Context(PermissionLLM([]), session_id=execution_context.session_id),
     )
-    context = Context(PermissionLLM([]), session_id=execution_context.session_id)
 
-    events = list(runtime.run(context))
+    events = list(runtime.run())
     assert isinstance(events[0], PermissionRequiredEvent)
 
     runtime.cancel()
@@ -147,7 +146,6 @@ def test_cancel_clears_pending_permission_and_returns_runtime_to_idle():
     assert runtime.state is RuntimeState.IDLE
     with pytest.raises(ValueError, match="没有等待处理的权限请求"):
         list(runtime.resolve_permission(
-            context,
             PermissionResponse(
                 call_id="call_003",
                 decision=PermissionDecision.ALLOW,

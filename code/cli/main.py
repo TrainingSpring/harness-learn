@@ -180,14 +180,13 @@ def read_permission_response(event: PermissionRequiredEvent) -> PermissionRespon
         )
 
 
-def run_agent_events(events, runtime, context):
+def run_agent_events(events, runtime):
     """消费 Agent 事件，并在权限事件处交互后继续消费恢复流。
 
     Args:
-        events: ``runtime.run(context)`` 或 ``runtime.resolve_permission(context)``
+        events: ``runtime.run()`` 或 ``runtime.resolve_permission()``
             返回的事件流。
         runtime: 当前会话的 Runtime，用于接收用户确认并恢复 Agent Loop。
-        context: 当前 Session 的模型上下文，用于权限恢复时继续同一轮 Loop。
 
     该函数把 CLI 的交互循环与 Runtime 状态机隔离开：Runtime 只产生事件，
     CLI 只收集输入并转发 PermissionResponse。
@@ -200,7 +199,7 @@ def run_agent_events(events, runtime, context):
                 continue
             render_permission_request(event)
             response = read_permission_response(event)
-            current_events = runtime.resolve_permission(context, response)
+            current_events = runtime.resolve_permission(response)
             break
         else:
             return
@@ -247,6 +246,7 @@ def build_runtime() -> tuple[Runtime, Context]:
         tools,
         execution_context,
         permission,
+        context,
     )
     return runtime, context
 
@@ -290,7 +290,7 @@ def main():
 
         try:
             context.append_user_message(user_input)
-            run_agent_events(runtime.run(context), runtime, context)
+            run_agent_events(runtime.run(), runtime)
         except Exception as e:
             print(f"\n[error] {e}")
 

@@ -30,9 +30,10 @@ from storage.types import AgentProfile, LLMProfile  # noqa: E402
 class FakeRuntime:
     """用可观察的最小 Runtime 验证 Session 层只做调度。"""
 
-    def __init__(self, agent_id: str, session_id: str) -> None:
+    def __init__(self, agent_id: str, session_id: str, context) -> None:
         self.agent_id = agent_id
         self.session_id = session_id
+        self.context = context
         self.contexts = []
         self.wait_for_permission = False
         self.cancel_calls = 0
@@ -43,7 +44,8 @@ class FakeRuntime:
         self.cancel_calls += 1
         self.wait_for_permission = False
 
-    def run(self, context):
+    def run(self):
+        context = self.context
         self.contexts.append(context)
         if self.wait_for_permission:
             context.append_function_call(
@@ -65,7 +67,8 @@ class FakeRuntime:
             return
         yield from self._complete(context)
 
-    def resolve_permission(self, context, response):
+    def resolve_permission(self, response):
+        context = self.context
         self.contexts.append(context)
         context.append_function_call_output(
             self.agent_id,
@@ -113,7 +116,7 @@ class FakeSessionService(SessionService):
         self.runtimes = {}
 
     def _create_runtime(self, agent, member, *_args):
-        runtime = FakeRuntime(member.agent_id, member.session_id)
+        runtime = FakeRuntime(member.agent_id, member.session_id, _args[-1])
         self.runtimes[(member.session_id, member.agent_id)] = runtime
         return runtime
 

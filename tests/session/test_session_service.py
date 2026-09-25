@@ -130,8 +130,8 @@ class SessionServiceTests(unittest.TestCase):
 
         self.assertIs(runtimes[0].permission, runtimes[1].permission)
         self.assertEqual(runtimes[0].permission._session_id, execution.session.id)
-        self.assertIs(runtimes[0].ctx.process_manager, execution.process_manager)
-        self.assertIs(runtimes[1].ctx.process_manager, execution.process_manager)
+        self.assertIs(runtimes[0].execution_context.process_manager, execution.process_manager)
+        self.assertIs(runtimes[1].execution_context.process_manager, execution.process_manager)
 
     def test_settings_refresh_runtime_environment_before_first_message(self):
         """项目与模式属于 Session，更新后必须重建 Runtime 环境。"""
@@ -147,9 +147,9 @@ class SessionServiceTests(unittest.TestCase):
         self.assertIsNot(runtime, old_runtime)
         self.assertEqual(execution.session.project_path, str(project))
         self.assertEqual(execution.session.permission_mode, "yolo")
-        self.assertEqual(runtime.ctx.project_path, str(project))
+        self.assertEqual(runtime.execution_context.project_path, str(project))
         self.assertEqual(runtime.permission._mode.value, "yolo")
-        self.assertIs(runtime.ctx.process_manager, execution.process_manager)
+        self.assertIs(runtime.execution_context.process_manager, execution.process_manager)
 
 
 if __name__ == "__main__":

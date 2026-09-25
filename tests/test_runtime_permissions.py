@@ -99,8 +99,8 @@ class RuntimePermissionTests(unittest.TestCase):
         """用预设 LLM 响应构造 Runtime，并替换网络调用。"""
         llm = FakeLLM(responses)
         context = Context(FakeLLM([]), session_id=self.ctx.session_id)
-        runtime = Runtime(llm, self.tools, self.ctx, self.permission)
-        runtime.call_llm = llm.next_response
+        runtime = Runtime(llm, self.tools, self.ctx, self.permission, context)
+        runtime.call_llm = lambda: llm.next_response(context)
         return runtime, context, llm
 
     def test_ask_yields_permission_event_without_executing_or_calling_llm_again(self):
@@ -110,7 +110,7 @@ class RuntimePermissionTests(unittest.TestCase):
         ])
 
         context.append_user_message("write a file")
-        events = list(runtime.run(context))
+        events = list(runtime.run())
 
         self.assertEqual(len(events), 1)
         self.assertIsInstance(events[0], PermissionRequiredEvent)
@@ -126,10 +126,9 @@ class RuntimePermissionTests(unittest.TestCase):
             [LLMResponse("done", data=[], is_stop=True)],
         ])
         context.append_user_message("write a file")
-        list(runtime.run(context))
+        list(runtime.run())
 
         events = list(runtime.resolve_permission(
-            context,
             PermissionResponse(
                 call_id="call_001",
                 decision=PermissionDecision.ALLOW,
@@ -157,10 +156,9 @@ class RuntimePermissionTests(unittest.TestCase):
             [LLMResponse("done", data=[], is_stop=True)],
         ])
         context.append_user_message("write a file")
-        list(runtime.run(context))
+        list(runtime.run())
 
         list(runtime.resolve_permission(
-            context,
             PermissionResponse(
                 call_id="call_001",
                 decision=PermissionDecision.DENY,
@@ -180,11 +178,10 @@ class RuntimePermissionTests(unittest.TestCase):
             [LLMResponse("done", data=[], is_stop=True)],
         ])
         context.append_user_message("write a file")
-        list(runtime.run(context))
+        list(runtime.run())
 
         with self.assertRaises(ValueError):
             list(runtime.resolve_permission(
-                context,
                 PermissionResponse(
                     call_id="other-call",
                     decision=PermissionDecision.ALLOW,
@@ -194,7 +191,6 @@ class RuntimePermissionTests(unittest.TestCase):
         self.assertEqual(self.executions, [])
 
         list(runtime.resolve_permission(
-            context,
             PermissionResponse(
                 call_id="call_001",
                 decision=PermissionDecision.DENY,
@@ -203,7 +199,6 @@ class RuntimePermissionTests(unittest.TestCase):
         ))
         with self.assertRaises(ValueError):
             list(runtime.resolve_permission(
-                context,
                 PermissionResponse(
                     call_id="call_001",
                     decision=PermissionDecision.ALLOW,
@@ -226,11 +221,10 @@ class RuntimePermissionTests(unittest.TestCase):
             [LLMResponse("done", data=[], is_stop=True)],
         ])
         context.append_user_message("write two files")
-        first_events = list(runtime.run(context))
+        first_events = list(runtime.run())
         self.assertEqual(first_events[0].request.call_id, "call_001")
 
         second_events = list(runtime.resolve_permission(
-            context,
             PermissionResponse(
                 call_id="call_001",
                 decision=PermissionDecision.ALLOW,
@@ -241,7 +235,6 @@ class RuntimePermissionTests(unittest.TestCase):
         self.assertEqual(len(self.executions), 1)
 
         list(runtime.resolve_permission(
-            context,
             PermissionResponse(
                 call_id="call_002",
                 decision=PermissionDecision.DENY,
