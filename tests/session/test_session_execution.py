@@ -27,8 +27,8 @@ from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
 from storage.types import AgentProfile, LLMProfile  # noqa: E402
 
 
-class FakeRuntime:
-    """用可观察的最小 Runtime 验证 Session 层只做调度。"""
+class FakeAgent:
+    """用可观察的最小 Agent 验证 Session 层只做调度。"""
 
     def __init__(self, agent_id: str, session_id: str, context) -> None:
         self.agent_id = agent_id
@@ -40,7 +40,7 @@ class FakeRuntime:
         self.output_content = None
 
     def cancel(self):
-        """记录 Session 只取消当前成员 Runtime 的调用。"""
+        """记录 Session 只取消当前成员 Agent 的调用。"""
         self.cancel_calls += 1
         self.wait_for_permission = False
 
@@ -109,16 +109,24 @@ class FakeProcessManager:
 
 
 class FakeSessionService(SessionService):
-    """以受控 Runtime 替换 Service 内部装配，隔离模型调用。"""
+    """以受控 Agent 替换 Service 内部装配，隔离模型调用。"""
 
     def __init__(self, database) -> None:
         super().__init__(database)
-        self.runtimes = {}
+        self.created_agents = {}
 
-    def _create_runtime(self, agent, member, *_args):
-        runtime = FakeRuntime(member.agent_id, member.session_id, _args[-1])
-        self.runtimes[(member.session_id, member.agent_id)] = runtime
-        return runtime
+    def _create_agents(self, _session, members, _process_manager, context):
+        agents = {
+            member.agent_id: FakeAgent(member.agent_id, member.session_id, context)
+            for member in members
+        }
+        self.created_agents.update(
+            {
+                (member.session_id, member.agent_id): agents[member.agent_id]
+                for member in members
+            }
+        )
+        return agents
 
 
 class SessionExecutionTests(unittest.TestCase):
@@ -168,9 +176,9 @@ class SessionExecutionTests(unittest.TestCase):
         execution = self.sessions.load(session.id)
 
         self.assertEqual(execution.context.export(), saved)
-        runtime = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
-        self.assertEqual(runtime.contexts, [])
-        self.assertEqual(len(execution.runtimes), 1)
+        agent = self.sessions.created_agents[(session.id, "agent_1V3ASAXQ2A")]
+        self.assertEqual(agent.contexts, [])
+        self.assertEqual(len(execution.agents), 1)
         self.assertIs(execution.context, execution.context)
 
     def test_load_rebuilds_context_from_raw_timeline_when_snapshot_is_empty(self):
@@ -193,7 +201,7 @@ class SessionExecutionTests(unittest.TestCase):
             ],
         )
 
-    def test_same_agent_in_two_sessions_gets_separate_context_and_runtime_state(self):
+    def test_same_agent_in_two_sessions_gets_separate_context_and_agent_state(self):
         first = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
         second = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
         first_session = first.session
@@ -201,14 +209,14 @@ class SessionExecutionTests(unittest.TestCase):
 
         list(first.send("仅第一会话的消息"))
 
-        first_runtime = self.sessions.runtimes[
+        first_agent = self.sessions.created_agents[
             (first_session.id, "agent_1V3ASAXQ2A")
         ]
-        second_runtime = self.sessions.runtimes[
+        second_agent = self.sessions.created_agents[
             (second_session.id, "agent_1V3ASAXQ2A")
         ]
         self.assertIsNot(first.context, second.context)
-        self.assertIsNot(first_runtime, second_runtime)
+        self.assertIsNot(first_agent, second_agent)
         self.assertEqual(second.context.export(), [])
 
     def test_direct_send_persists_user_and_agent_events_with_current_context(self):
@@ -230,14 +238,14 @@ class SessionExecutionTests(unittest.TestCase):
             [item.kind for item in persisted.load_visible("agent_1V3ASAXQ2A")],
             ["USER_MESSAGE", "AGENT_MESSAGE"],
         )
-        runtime = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
-        self.assertEqual(runtime.contexts, [execution.context])
+        agent = self.sessions.created_agents[(session.id, "agent_1V3ASAXQ2A")]
+        self.assertEqual(agent.contexts, [execution.context])
 
     def test_direct_send_persists_agent_message_from_sdk_content_object(self):
         """模型 SDK 的输出文本对象也必须进入可刷新历史。"""
         execution = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
-        runtime = self.sessions.runtimes[(execution.session.id, "agent_1V3ASAXQ2A")]
-        runtime.output_content = [SimpleNamespace(text="SDK 对象输出")]
+        agent = self.sessions.created_agents[(execution.session.id, "agent_1V3ASAXQ2A")]
+        agent.output_content = [SimpleNamespace(text="SDK 对象输出")]
 
         list(execution.send("请回答"))
 
@@ -255,8 +263,8 @@ class SessionExecutionTests(unittest.TestCase):
     def test_direct_send_skips_blank_sdk_output_in_history(self):
         """空白模型输出不能让持久化失败或产生无意义的聊天气泡。"""
         execution = self.sessions.create_direct_session("agent_1V3ASAXQ2A")
-        runtime = self.sessions.runtimes[(execution.session.id, "agent_1V3ASAXQ2A")]
-        runtime.output_content = [SimpleNamespace(text=" ")]
+        agent = self.sessions.created_agents[(execution.session.id, "agent_1V3ASAXQ2A")]
+        agent.output_content = [SimpleNamespace(text=" ")]
 
         list(execution.send("请回答"))
 
@@ -273,8 +281,8 @@ class SessionExecutionTests(unittest.TestCase):
 
         list(execution.send("请分别给出意见"))
 
-        first = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
-        second = self.sessions.runtimes[(session.id, "agent_9U3M7BKP2C")]
+        first = self.sessions.created_agents[(session.id, "agent_1V3ASAXQ2A")]
+        second = self.sessions.created_agents[(session.id, "agent_9U3M7BKP2C")]
         self.assertEqual(first.contexts, [execution.context])
         self.assertEqual(second.contexts, [execution.context])
         self.assertEqual(
@@ -286,13 +294,13 @@ class SessionExecutionTests(unittest.TestCase):
             ],
         )
 
-    def test_permission_resume_uses_the_same_runtime_and_context_before_group_continues(self):
+    def test_permission_resume_uses_the_same_agent_and_context_before_group_continues(self):
         execution = self.sessions.create_group_session(
             ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
         )
         session = execution.session
-        first = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
-        second = self.sessions.runtimes[(session.id, "agent_9U3M7BKP2C")]
+        first = self.sessions.created_agents[(session.id, "agent_1V3ASAXQ2A")]
+        second = self.sessions.created_agents[(session.id, "agent_9U3M7BKP2C")]
         first.wait_for_permission = True
 
         paused = list(execution.send("先读取文件"))
@@ -331,8 +339,8 @@ class SessionExecutionTests(unittest.TestCase):
             ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
         )
         session = execution.session
-        first = self.sessions.runtimes[(session.id, "agent_1V3ASAXQ2A")]
-        second = self.sessions.runtimes[(session.id, "agent_9U3M7BKP2C")]
+        first = self.sessions.created_agents[(session.id, "agent_1V3ASAXQ2A")]
+        second = self.sessions.created_agents[(session.id, "agent_9U3M7BKP2C")]
         first.wait_for_permission = True
         process_manager = FakeProcessManager()
         execution.process_manager = process_manager

@@ -17,15 +17,12 @@ from permission.types import (
     PermissionResponse,
     PermissionScope,
 )
-from runtime.agent import Agent as StableAgent
+from runtime.agent import Agent
 from permission.PermissionManager import PermissionManager
-from runtime.runtime import Runtime
 from runtime.runtime_events import PermissionRequiredEvent
 from session.ExecutionContext import ExecutionContext
 from storage.ids import generate_id
-from storage.types import AgentProfile
 from tools.registry.catalog import ToolCatalog
-from tools.tools import Tools
 
 def print_help():
     print("可用命令:")
@@ -180,13 +177,13 @@ def read_permission_response(event: PermissionRequiredEvent) -> PermissionRespon
         )
 
 
-def run_agent_events(events, runtime):
+def run_agent_events(events, agent):
     """消费 Agent 事件，并在权限事件处交互后继续消费恢复流。
 
     Args:
         events: ``runtime.run()`` 或 ``runtime.resolve_permission()``
             返回的事件流。
-        runtime: 当前会话的 Runtime，用于接收用户确认并恢复 Agent Loop。
+        agent: 当前会话的 Agent，用于接收用户确认并恢复 Agent Loop。
 
     该函数把 CLI 的交互循环与 Runtime 状态机隔离开：Runtime 只产生事件，
     CLI 只收集输入并转发 PermissionResponse。
@@ -199,60 +196,45 @@ def run_agent_events(events, runtime):
                 continue
             render_permission_request(event)
             response = read_permission_response(event)
-            current_events = runtime.resolve_permission(response)
+            current_events = agent.resolve_permission(response)
             break
         else:
             return
 BASE_URL = "http://192.168.31.6:18080"
 API_KEY = "sk-5c206cdd7da2521f5949d6f78f9f40d1320caf8414eb187423c0e23e0619c8a8"
 MODEL = "gpt-5.6-luna"
-SYSTEM_PROMPT = "你是一个智能助手，帮助解决问题，实现用户的需求。 "
-
-
-def build_runtime() -> tuple[Runtime, Context]:
-    """为 CLI 创建稳定 Agent 和当前会话的隔离运行时。"""
+def build_agent() -> Agent:
+    """为 CLI 创建一个持有当前 Context 的完整 Agent。"""
     agent_id = generate_id("agent")
     session_id = generate_id("session")
     tool_names = ["read", "write"]
-    profile = AgentProfile(
-        id=agent_id,
-        name="CLI Agent",
-        description="命令行中的个人 Agent",
-        personality="务实",
-        expertise=["通用任务"],
-        llm_profile_id=generate_id("llm"),
-        tools=tool_names,
-    )
-    agent = StableAgent(
-        agent_id=agent_id,
-        profile=profile,
-        llm_config=LLMConfig(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),
-        tool_definitions=tuple(ToolCatalog().get(name) for name in tool_names),
-    )
     context = Context(
         LLM(BASE_URL, API_KEY, MODEL),
         session_id=session_id,
     )
     execution_context = ExecutionContext(os.getcwd(), agent_id, session_id)
-    tools = Tools(execution_context)
-    tools.batch_register(list(agent.tool_definitions))
     permission = PermissionManager(
         mode=PermissionMode.BUILD,
         session_id=session_id,
         project_path=os.getcwd(),
     )
-    runtime = Runtime(
-        LLM(BASE_URL, API_KEY, MODEL, SYSTEM_PROMPT),
-        tools,
-        execution_context,
-        permission,
-        context,
+    return Agent(
+        agent_id=agent_id,
+        name="CLI Agent",
+        description="命令行中的个人 Agent",
+        personality="务实",
+        expertise=("通用任务",),
+        llm_config=LLMConfig(BASE_URL, API_KEY, MODEL),
+        tool_definitions=tuple(ToolCatalog().get(name) for name in tool_names),
+        context=context,
+        execution_context=execution_context,
+        permission=permission,
+        permission_mode=PermissionMode.BUILD.value,
     )
-    return runtime, context
 
 
 def main():
-    runtime, context = build_runtime()
+    agent = build_agent()
     print("Agent CLI 已启动，输入 /help 查看命令。")
 
     while True:
@@ -275,7 +257,7 @@ def main():
 
         if user_input == "/tools":
             print("已注册工具:")
-            for tool in runtime.tools.list:
+            for tool in agent.tools.list:
                 print(f"- {tool['name']}")
             continue
 
@@ -284,13 +266,13 @@ def main():
             continue
 
         if user_input == "/clear":
-            context.messages = []
+            agent.context.restore([])
             print("会话上下文已清空。")
             continue
 
         try:
-            context.append_user_message(user_input)
-            run_agent_events(runtime.run(), runtime)
+            agent.context.append_user_message(user_input)
+            run_agent_events(agent.run(), agent)
         except Exception as e:
             print(f"\n[error] {e}")
 

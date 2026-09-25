@@ -10,8 +10,6 @@ from permission.PermissionManager import PermissionManager
 from permission.types import PermissionMode, PermissionResponse
 from runtime.agent import Agent
 from runtime.agent_factory import AgentFactory
-from runtime.prompt_builder import PromptBuilder
-from runtime.runtime import Runtime
 from runtime.runtime_events import PermissionRequiredEvent, RuntimeEvent
 from storage.context_service import ContextService
 from storage.database import StateDatabase
@@ -21,14 +19,13 @@ from storage.repositories.session import SessionRepository
 from storage.repositories.session_agent import SessionAgentRepository
 from storage.repositories.session_permission_rule import SessionPermissionRuleRepository
 from storage.types import Session, SessionAgent
-from tools.tools import Tools
 
 from .ExecutionContext import ExecutionContext
 from .session_process_manager import SessionProcessManager
 
 
 class SessionExecution:
-    """一个已打开 Session 的共享 Context 和成员 Runtime 状态。"""
+    """一个已打开 Session 的共享 Context 和成员 Agent 状态。"""
 
     def __init__(
         self,
@@ -38,8 +35,8 @@ class SessionExecution:
         context_service: ContextService,
         session_repository: SessionRepository,
         members: tuple[SessionAgent, ...],
-        runtimes: dict[str, Runtime],
-        refresh_runtimes: Callable[[Session], dict[str, Runtime]],
+        agents: dict[str, Agent],
+        refresh_agents: Callable[[Session], dict[str, Agent]],
         process_manager: SessionProcessManager,
     ) -> None:
         self.session = session
@@ -47,8 +44,8 @@ class SessionExecution:
         self.context_service = context_service
         self._session_repository = session_repository
         self.members = members
-        self.runtimes = runtimes
-        self._refresh_runtimes = refresh_runtimes
+        self.agents = agents
+        self._refresh_agents = refresh_agents
         self.process_manager = process_manager
         self._closed = False
         self._active_member_index: int | None = None
@@ -73,25 +70,25 @@ class SessionExecution:
         self,
         response: PermissionResponse,
     ) -> Generator[RuntimeEvent, None, None]:
-        """恢复等待权限的成员 Runtime，并继续后续成员。"""
+        """恢复等待权限的成员 Agent，并继续后续成员。"""
         self._require_open()
         if self._active_member_index is None:
             raise ValueError("Session 当前没有等待处理的权限请求")
         member_index = self._active_member_index
-        runtime = self.runtimes[self.members[member_index].agent_id]
+        agent = self.agents[self.members[member_index].agent_id]
         self._active_member_index = None
         yield from self._drive_from(
             member_index,
-            runtime.resolve_permission(response),
+            agent.resolve_permission(response),
         )
 
     def cancel(self) -> None:
-        """取消当前成员 Runtime，并保留已经持久化的 Session Context。"""
+        """取消当前成员 Agent，并保留已经持久化的 Session Context。"""
         member_index = self._active_member_index
         if member_index is None:
             member_index = self._current_member_index
         if member_index is not None:
-            self.runtimes[self.members[member_index].agent_id].cancel()
+            self.agents[self.members[member_index].agent_id].cancel()
         self._active_member_index = None
         self.context_service.save_context(self.context)
 
@@ -110,16 +107,16 @@ class SessionExecution:
             self.session.id,
             project_path,
         )
-        self.runtimes = self._refresh_runtimes(self.session)
+        self.agents = self._refresh_agents(self.session)
 
     def set_permission_mode(self, permission_mode: str) -> None:
-        """在没有活动 Runtime 时更新当前 Session 的权限模式。"""
+        """在没有活动 Agent 时更新当前 Session 的权限模式。"""
         self._require_idle_for_settings()
         self.session = self._session_repository.update_permission_mode(
             self.session.id,
             permission_mode,
         )
-        self.runtimes = self._refresh_runtimes(self.session)
+        self.agents = self._refresh_agents(self.session)
 
     def _require_idle_for_settings(self) -> None:
         self._require_open()
@@ -135,14 +132,14 @@ class SessionExecution:
         member_index: int,
         current_events: Generator[RuntimeEvent, None, None] | None = None,
     ) -> Generator[RuntimeEvent, None, None]:
-        """顺序调用成员 Runtime；权限暂停时保留当前成员位置。"""
+        """顺序调用成员 Agent；权限暂停时保留当前成员位置。"""
         for index in range(member_index, len(self.members)):
             member = self.members[index]
-            runtime = self.runtimes[member.agent_id]
+            agent = self.agents[member.agent_id]
             events = (
                 current_events
                 if index == member_index and current_events
-                else runtime.run()
+                else agent.run()
             )
             self._current_member_index = index
             try:
@@ -162,7 +159,7 @@ class SessionExecution:
             current_events = None
 
     def _persist_runtime_changes(self, agent_id: str, event: RuntimeEvent) -> None:
-        """保存 Context 快照，并同步 Runtime 已产生的原始业务事件。"""
+        """保存 Context 快照，并同步 Agent 已产生的原始业务事件。"""
         self._persist_function_protocol_items(agent_id)
         if isinstance(event, LLMResponse) and event.type == "done":
             for item in event.data or []:
@@ -283,57 +280,50 @@ class SessionService:
         return self._open(session)
 
     def _open(self, session: Session) -> SessionExecution:
-        """组装一个 Session 唯一的共享 Context 与成员 Runtime。"""
+        """组装一个 Session 唯一的共享 Context 与成员 Agent。"""
         members = tuple(self.members.list_for_session(session.id))
         if not members:
             raise ValueError(f"Session 没有固定 Agent 成员: {session.id}")
-        agents = {
-            member.agent_id: self.agent_factory.load(member.agent_id)
-            for member in members
-        }
-        first_agent = agents[members[0].agent_id]
+        summarizer_config = self.agent_factory.load_llm_config(members[0].agent_id)
         context = Context(
             LLM(
-                first_agent.llm_config.base_url,
-                first_agent.llm_config.api_key,
-                first_agent.llm_config.model,
-                first_agent.llm_config.instructions,
+                summarizer_config.base_url,
+                summarizer_config.api_key,
+                summarizer_config.model,
             ),
             session_id=session.id,
         )
         context_service = ContextService(ContextItemRepository(self.database), session.id)
         context_service.restore_context(context, members[0].agent_id)
         process_manager = SessionProcessManager(session.id)
-        def create_runtimes(current_session: Session) -> dict[str, Runtime]:
-            return self._create_runtimes(
+        def create_agents(current_session: Session) -> dict[str, Agent]:
+            return self._create_agents(
                 current_session,
                 members,
-                agents,
                 process_manager,
                 context,
             )
 
-        runtimes = create_runtimes(session)
+        agents = create_agents(session)
         return SessionExecution(
             session=session,
             context=context,
             context_service=context_service,
             session_repository=self.sessions,
             members=members,
-            runtimes=runtimes,
-            refresh_runtimes=create_runtimes,
+            agents=agents,
+            refresh_agents=create_agents,
             process_manager=process_manager,
         )
 
-    def _create_runtimes(
+    def _create_agents(
         self,
         session: Session,
         members: tuple[SessionAgent, ...],
-        agents: dict[str, Agent],
         process_manager: SessionProcessManager,
         context: Context,
-    ) -> dict[str, Runtime]:
-        """为一个 Session 生成共享权限、独立执行状态的成员 Runtime。"""
+    ) -> dict[str, Agent]:
+        """为一个 Session 生成共享权限、独立能力环境的成员 Agent。"""
         permission = PermissionManager(
             mode=PermissionMode(session.permission_mode),
             session_id=session.id,
@@ -341,46 +331,20 @@ class SessionService:
             rule_repository=SessionPermissionRuleRepository(self.database),
         )
         return {
-            member.agent_id: self._create_runtime(
-                agents[member.agent_id],
-                member,
-                permission,
-                session.permission_mode,
-                session.project_path,
-                process_manager,
-                context,
+            member.agent_id: self.agent_factory.load(
+                member.agent_id,
+                context=context,
+                execution_context=ExecutionContext(
+                    session.project_path,
+                    member.agent_id,
+                    member.session_id,
+                    process_manager=process_manager,
+                ),
+                permission=permission,
+                permission_mode=session.permission_mode,
             )
             for member in members
         }
-
-    @staticmethod
-    def _create_runtime(
-        agent: Agent,
-        member: SessionAgent,
-        permission: PermissionManager,
-        permission_mode: str,
-        project_path: str | None,
-        process_manager: SessionProcessManager,
-        context: Context,
-    ) -> Runtime:
-        """为固定成员构造独立的 Agent Runtime 能力环境。"""
-        if member.agent_id != agent.agent_id:
-            raise ValueError("SessionAgent 与 Agent 身份不一致")
-        ctx = ExecutionContext(
-            project_path,
-            agent.agent_id,
-            member.session_id,
-            process_manager=process_manager,
-        )
-        llm = LLM(
-            agent.llm_config.base_url,
-            agent.llm_config.api_key,
-            agent.llm_config.model,
-            PromptBuilder().build(agent.profile, permission_mode=permission_mode),
-        )
-        tools = Tools(ctx)
-        tools.batch_register(list(agent.tool_definitions))
-        return Runtime(llm, tools, ctx, permission, context)
 
     def _require_enabled_agents(self, agent_ids: list[str]) -> None:
         """确认新 Session 选择的所有 Agent 均存在且已启用。"""

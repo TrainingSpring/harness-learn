@@ -1,20 +1,21 @@
-"""从持久化配置组装运行时 Agent。"""
+"""从持久化配置组装当前 Session 的完整 Agent。"""
 
+from context.context import Context
 from head.types import LLMConfig
-from runtime.agent import Agent
-from runtime.prompt_builder import PromptBuilder
+from permission.PermissionManager import PermissionManager
+from session.ExecutionContext import ExecutionContext
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
+from storage.types import AgentProfile, LLMProfile
 from tools.registry.catalog import ToolCatalog
+
+from .agent import Agent
+from .prompt_builder import PromptBuilder
 
 
 class AgentFactory:
-    """负责把 AgentProfile 及其依赖转换为短生命周期 Agent。
-
-    Factory 是配置层和运行时层之间的组装边界。它可以读取数据库，但 Agent
-    本身不需要知道 Repository 或工具模块如何加载。
-    """
+    """连接 storage 配置与 Session 注入依赖，创建完整 Agent。"""
 
     def __init__(
         self,
@@ -22,13 +23,6 @@ class AgentFactory:
         prompt_builder: PromptBuilder | None = None,
         tool_catalog: ToolCatalog | None = None,
     ) -> None:
-        """创建 AgentFactory。
-
-        Args:
-            database: 已初始化的 workspace 状态数据库。
-            prompt_builder: 可选的系统指令构建器。
-            tool_catalog: 可选的受信任工具目录。
-        """
         self.database = database
         self.llm_profiles = LLMProfileRepository(database)
         self.agent_profiles = AgentProfileRepository(database)
@@ -38,41 +32,54 @@ class AgentFactory:
     def load(
         self,
         agent_id: str,
+        *,
+        context: Context,
+        execution_context: ExecutionContext,
+        permission: PermissionManager,
+        permission_mode: str,
     ) -> Agent:
-        """根据 Agent ID 加载可跨 Session 复用的稳定 Agent。
+        """读取配置并创建一个只属于当前 Session 的 Agent 实例。"""
+        profile, llm_profile = self._load_sources(agent_id)
+        tool_definitions = tuple(
+            self.tool_catalog.get(name) for name in profile.tools
+        )
+        return Agent(
+            agent_id=profile.id,
+            name=profile.name,
+            description=profile.description,
+            personality=profile.personality,
+            expertise=tuple(profile.expertise),
+            llm_config=self._to_llm_config(llm_profile),
+            tool_definitions=tool_definitions,
+            context=context,
+            execution_context=execution_context,
+            permission=permission,
+            permission_mode=permission_mode,
+            prompt_builder=self.prompt_builder,
+        )
 
-        Args:
-            agent_id: AgentProfile 的稳定 ID。
-        Returns:
-            不携带 Session 状态的 Agent。
+    def load_llm_config(self, agent_id: str) -> LLMConfig:
+        """读取 Agent 的连接配置，供 Session 创建独立 Context summarizer。"""
+        _profile, llm_profile = self._load_sources(agent_id)
+        return self._to_llm_config(llm_profile)
 
-        Raises:
-            ValueError: Agent 或其 LLM 配置不存在。
-        """
+    def _load_sources(self, agent_id: str) -> tuple[AgentProfile, LLMProfile]:
         profile = self.agent_profiles.get(agent_id)
         if profile is None:
             raise ValueError(f"Agent 配置不存在: {agent_id}")
-
         llm_profile = self.llm_profiles.get(profile.llm_profile_id)
         if llm_profile is None:
             raise ValueError(
                 f"Agent 引用的 LLM 配置不存在: {profile.llm_profile_id}"
             )
-
-        tool_definitions = tuple(self.tool_catalog.get(name) for name in profile.tools)
         if not llm_profile.api_key:
             raise ValueError(f"LLM 配置未设置 API Key: {llm_profile.id}")
-        instructions = self.prompt_builder.build(profile)
-        llm_config = LLMConfig(
-            base_url=llm_profile.base_url or "",
-            api_key=llm_profile.api_key,
-            model=llm_profile.model,
-            instructions=instructions,
-        )
+        return profile, llm_profile
 
-        return Agent(
-            agent_id=profile.id,
-            profile=profile,
-            llm_config=llm_config,
-            tool_definitions=tool_definitions,
+    @staticmethod
+    def _to_llm_config(profile: LLMProfile) -> LLMConfig:
+        return LLMConfig(
+            base_url=profile.base_url or "",
+            api_key=profile.api_key,
+            model=profile.model,
         )

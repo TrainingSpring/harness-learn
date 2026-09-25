@@ -1,4 +1,4 @@
-"""AgentFactory 的稳定 Agent 配置加载测试。"""
+"""AgentFactory 的 storage 到运行时映射测试。"""
 
 import sys
 import tempfile
@@ -7,16 +7,25 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "code" / "agent"))
 
+from context.context import Context  # noqa: E402
+from permission.PermissionManager import PermissionManager  # noqa: E402
+from permission.types import PermissionMode  # noqa: E402
 from runtime.agent import Agent  # noqa: E402
 from runtime.agent_factory import AgentFactory  # noqa: E402
+from session.ExecutionContext import ExecutionContext  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
 from storage.types import AgentProfile, LLMProfile  # noqa: E402
 
 
+class SummarizerLLM:
+    def __init__(self) -> None:
+        self.system_prompt = ""
+
+
 class AgentFactoryTests(unittest.TestCase):
-    """验证数据库配置可以加载为稳定 Agent 定义。"""
+    """验证持久化配置被显式映射为完整 Agent。"""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -48,24 +57,58 @@ class AgentFactoryTests(unittest.TestCase):
         self.database.close()
         self.temp_dir.cleanup()
 
-    def test_load_returns_stable_agent(self):
-        """Factory 不应在加载 Agent 时创建 Session 执行状态。"""
-        agent = AgentFactory(self.database).load("agent_1V3ASAXQ2A")
+    def _session_dependencies(self):
+        session_id = "session_TEST01"
+        context = Context(SummarizerLLM(), session_id=session_id)
+        execution_context = ExecutionContext("/workspace", "agent_1V3ASAXQ2A", session_id)
+        permission = PermissionManager(
+            mode=PermissionMode.BUILD,
+            session_id=session_id,
+            project_path=execution_context.project_path,
+        )
+        return context, execution_context, permission
+
+    def test_load_maps_storage_fields_into_a_complete_agent(self):
+        context, execution_context, permission = self._session_dependencies()
+        agent = AgentFactory(self.database).load(
+            "agent_1V3ASAXQ2A",
+            context=context,
+            execution_context=execution_context,
+            permission=permission,
+            permission_mode="build",
+        )
 
         self.assertIsInstance(agent, Agent)
-        self.assertEqual(agent.agent_id, "agent_1V3ASAXQ2A")
-        self.assertFalse(hasattr(agent, "workspace"))
+        self.assertEqual(agent.name, "代码专家")
+        self.assertEqual(agent.expertise, ("Python",))
+        self.assertEqual(agent.llm_config.model, "gpt-5")
         self.assertEqual(
             tuple(tool.schema["name"] for tool in agent.tool_definitions),
             ("read", "write"),
         )
-        self.assertFalse(hasattr(agent, "session_id"))
-        self.assertFalse(hasattr(agent, "context"))
+        self.assertIs(agent.context, context)
+        self.assertIs(agent.execution_context, execution_context)
+        self.assertIs(agent.permission, permission)
+        self.assertFalse(hasattr(agent, "profile"))
+
+    def test_load_llm_config_only_exposes_connection_configuration(self):
+        config = AgentFactory(self.database).load_llm_config("agent_1V3ASAXQ2A")
+
+        self.assertEqual(config.base_url, "https://api.openai.com/v1")
+        self.assertEqual(config.model, "gpt-5")
+        self.assertEqual(config.api_key, "sk-test-key")
+        self.assertFalse(hasattr(config, "instructions"))
 
     def test_load_raises_for_unknown_agent(self):
-        """不存在的 Agent 配置不能创建默认定义。"""
+        context, execution_context, permission = self._session_dependencies()
         with self.assertRaises(ValueError):
-            AgentFactory(self.database).load("agent_8LRT3N5QYB")
+            AgentFactory(self.database).load(
+                "agent_8LRT3N5QYB",
+                context=context,
+                execution_context=execution_context,
+                permission=permission,
+                permission_mode="plan",
+            )
 
 
 if __name__ == "__main__":

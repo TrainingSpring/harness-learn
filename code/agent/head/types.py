@@ -98,10 +98,8 @@ class LLMConfig:
     LLM配置数据结构
     :param base_url: str: OpenAI API的baseUrl
     :param api_key: str: OpenAI API的密钥
-    :param instructions:str: LLM的指令
     :param model:str: 使用的模型名
     """
     base_url:str
     api_key:str
     model:str
-    instructions:str

@@ -121,35 +121,39 @@ class SessionServiceTests(unittest.TestCase):
         ).fetchone()[0]
         self.assertEqual((session_count, member_count), (0, 0))
 
-    def test_group_runtimes_share_one_session_permission_manager(self):
-        """群聊成员各有 Runtime，但必须共享会话级协作对象。"""
+    def test_group_agents_share_context_and_session_permission_manager(self):
+        """群聊成员各有 Agent，但必须共享会话级协作对象和 Context。"""
         execution = self.service.create_group_session(
             ["agent_1V3ASAXQ2A", "agent_9U3M7BKP2C"]
         )
-        runtimes = list(execution.runtimes.values())
+        agents = list(execution.agents.values())
 
-        self.assertIs(runtimes[0].permission, runtimes[1].permission)
-        self.assertEqual(runtimes[0].permission._session_id, execution.session.id)
-        self.assertIs(runtimes[0].execution_context.process_manager, execution.process_manager)
-        self.assertIs(runtimes[1].execution_context.process_manager, execution.process_manager)
+        self.assertIs(agents[0].context, execution.context)
+        self.assertIs(agents[1].context, execution.context)
+        self.assertIsNot(agents[0].runtime, agents[1].runtime)
+        self.assertIsNot(agents[0].tools, agents[1].tools)
+        self.assertIs(agents[0].permission, agents[1].permission)
+        self.assertEqual(agents[0].permission._session_id, execution.session.id)
+        self.assertIs(agents[0].execution_context.process_manager, execution.process_manager)
+        self.assertIs(agents[1].execution_context.process_manager, execution.process_manager)
 
-    def test_settings_refresh_runtime_environment_before_first_message(self):
-        """项目与模式属于 Session，更新后必须重建 Runtime 环境。"""
+    def test_settings_refresh_agent_environment_before_first_message(self):
+        """项目与模式属于 Session，更新后必须重建 Agent 环境。"""
         execution = self.service.create_direct_session("agent_1V3ASAXQ2A")
         project = Path(self.temp_dir.name) / "project"
         project.mkdir()
-        old_runtime = execution.runtimes["agent_1V3ASAXQ2A"]
+        old_agent = execution.agents["agent_1V3ASAXQ2A"]
 
         execution.set_project_path(str(project))
         execution.set_permission_mode("yolo")
 
-        runtime = execution.runtimes["agent_1V3ASAXQ2A"]
-        self.assertIsNot(runtime, old_runtime)
+        agent = execution.agents["agent_1V3ASAXQ2A"]
+        self.assertIsNot(agent, old_agent)
         self.assertEqual(execution.session.project_path, str(project))
         self.assertEqual(execution.session.permission_mode, "yolo")
-        self.assertEqual(runtime.execution_context.project_path, str(project))
-        self.assertEqual(runtime.permission._mode.value, "yolo")
-        self.assertIs(runtime.execution_context.process_manager, execution.process_manager)
+        self.assertEqual(agent.execution_context.project_path, str(project))
+        self.assertEqual(agent.permission._mode.value, "yolo")
+        self.assertIs(agent.execution_context.process_manager, execution.process_manager)
 
 
 if __name__ == "__main__":

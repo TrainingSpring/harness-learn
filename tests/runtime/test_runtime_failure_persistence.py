@@ -29,8 +29,8 @@ class SummarizerLLM:
         self.system_prompt = ""
 
 
-class FailingRuntime:
-    """模拟在写入 function call 后抛出内部异常的 Runtime。"""
+class FailingAgent:
+    """模拟在写入 function call 后抛出内部异常的 Agent。"""
 
     def __init__(self, context: Context) -> None:
         self.context = context
@@ -44,6 +44,9 @@ class FailingRuntime:
         )
         raise RuntimeError("provider unavailable")
         yield
+
+    def cancel(self) -> None:
+        pass
 
 
 def test_runtime_failure_persists_new_protocol_items_and_current_context():
@@ -85,8 +88,8 @@ def test_runtime_failure_persists_new_protocol_items_and_current_context():
                 context_service=context_service,
                 session_repository=SessionRepository(database),
                 members=(member,),
-                runtimes={member.agent_id: FailingRuntime(context)},
-                refresh_runtimes=lambda _session: {member.agent_id: FailingRuntime(context)},
+                agents={member.agent_id: FailingAgent(context)},
+                refresh_agents=lambda _session: {member.agent_id: FailingAgent(context)},
                 process_manager=SessionProcessManager(session.id),
             )
 
