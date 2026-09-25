@@ -1,8 +1,10 @@
 # Agent 与 Runtime 职责收口施工计划
 
-> 状态：待施工。
+> 状态：已施工。
 >
 > 本计划是独立的架构收口计划，不属于《子 Agent 开发迭代计划（未施工）》，也不表示子 Agent 功能开始施工。
+
+施工结果：阶段 0 至阶段 7 已完成。核心提交为 `35f9789` 和 `8ee92a2`；文档收口由后续文档提交完成。
 
 ## 1. 文档目的
 
@@ -477,7 +479,7 @@ docs/plan/子Agent开发迭代计划（未施工）.md
 
 ## 7. 分阶段施工
 
-## 阶段 0：冻结基线和最终契约
+## 阶段 0：冻结基线和最终契约（已完成）
 
 ### 目的
 
@@ -511,7 +513,7 @@ git diff --check
 
 无。
 
-## 阶段 1：将 Context 绑定到 Runtime
+## 阶段 1：将 Context 绑定到 Runtime（已完成）
 
 ### 目的
 
@@ -562,7 +564,7 @@ pytest -q tests/runtime/test_runtime_context_contract.py \
 
 阶段 0。
 
-## 阶段 2：把 Agent 收口为完整运行对象
+## 阶段 2：把 Agent 收口为完整运行对象（已完成）
 
 ### 目的
 
@@ -612,7 +614,7 @@ python -m compileall -q code/agent/runtime code/agent/head
 
 阶段 1。
 
-## 阶段 3：改造 AgentFactory 的 storage 映射
+## 阶段 3：改造 AgentFactory 的 storage 映射（已完成）
 
 ### 目的
 
@@ -654,7 +656,7 @@ pytest -q tests/runtime/test_agent_factory.py tests/runtime/test_agent.py
 
 阶段 2。
 
-## 阶段 4：Session 从 Runtime 调度切换为 Agent 调度
+## 阶段 4：Session 从 Runtime 调度切换为 Agent 调度（已完成）
 
 ### 目的
 
@@ -717,7 +719,7 @@ pytest -q tests/session \
 
 阶段 3。
 
-## 阶段 5：迁移 CLI 和剩余调用方
+## 阶段 5：迁移 CLI 和剩余调用方（已完成）
 
 ### 目的
 
@@ -762,7 +764,7 @@ python -m compileall -q code/agent code/cli client/web/server
 
 阶段 4。
 
-## 阶段 6：删除旧路径并做架构收口
+## 阶段 6：删除旧路径并做架构收口（已完成）
 
 ### 目的
 
@@ -794,7 +796,7 @@ python -m compileall -q code/agent code/cli client/web/server
 ### 验收
 
 - [ ] CodeGraph 找不到生产代码中的旧调用关系。
-- [ ] 运行时目录没有 storage AgentProfile 依赖。
+- [ ] `Agent` 模块没有 storage AgentProfile 依赖；仅 `AgentFactory` 作为配置映射边界允许读取 storage 类型。
 - [ ] 没有新增 AgentDefinition、Runtime Factory 或兼容 Adapter。
 - [ ] 所有测试替身与最终公开边界一致。
 
@@ -810,7 +812,7 @@ git diff --check
 
 阶段 5。
 
-## 阶段 7：更新架构文档和最终回归
+## 阶段 7：更新架构文档和最终回归（已完成）
 
 ### 目的
 
@@ -853,6 +855,22 @@ git diff --check
 ### 依赖
 
 阶段 6。
+
+### 实施记录
+
+阶段 7 已完成，实际结果如下：
+
+1. Runtime 已在构造时绑定 Context；生产代码中 `run(context)` 和
+   `resolve_permission(context, response)` 均已删除。
+2. Agent 已成为完整运行对象，保存显式身份字段、Context、LLM、Tools、
+   ExecutionContext、PermissionManager 和 Runtime。
+3. AgentFactory 已成为 storage 配置到运行时 Agent 的映射边界；Agent 不再保存
+   AgentProfile，PromptBuilder 不再接收 AgentProfile。
+4. SessionExecution 已从保存 `runtimes` 改为保存 `agents`；GROUP 成员共享同一
+   Context，但各自拥有独立 Runtime、LLM、Tools 和 ExecutionContext。
+5. CLI 已迁移到 Agent API，SessionService 不再直接创建成员 Runtime。
+6. 子 Agent 计划未施工，未新增子 Agent、临时存储或专用 Runtime 分支。
+7. 验证结果：`pytest -q`，289 passed；`python -m compileall -q code/agent code/cli client/web/server`；`git diff --check`。
 
 ## 8. 阶段依赖和提交策略
 

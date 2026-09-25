@@ -32,7 +32,7 @@ class Runtime:
         llm: 产生流式 LLM 响应的适配器。
         tools: 负责工具准备、执行和结果编码的工具集。
         permission: 对已构造的 PermissionRequest 作出权限决定的管理器。
-        ctx: 本次 Agent 会话的不可变执行环境，包含作者 agent_id。
+        execution_context: 本次 Agent 会话的不可变执行环境，包含作者 agent_id。
         state: 对外可观察的运行状态；WAITING_PERMISSION 表示必须调用
             resolve_permission() 才能继续。
     """

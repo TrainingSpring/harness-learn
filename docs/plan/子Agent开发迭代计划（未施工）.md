@@ -2,6 +2,8 @@
 
 > 状态：未施工。该计划当前仅作为后续设计参考，暂不进入实现阶段。
 
+> 当前接口说明：本计划最初基于 `Runtime.run(context)` 编写；Agent/Runtime 收口完成后，正式接口已经变为 `Agent.run()` 和 `Agent.resolve_permission(response)`，Runtime 的 Context 在构造时绑定。子 Agent 计划仍未施工，后续施工时以《Agent 与 Runtime 职责收口施工计划》后的实际接口为准。
+
 ## 1. 文档目的
 
 本文档定义第一版子 Agent 的产品边界、最小架构、模块职责、开发阶段和验收标准。
