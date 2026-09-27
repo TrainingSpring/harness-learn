@@ -5,7 +5,7 @@ import sqlite3
 from .errors import StorageSchemaError
 
 
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 7
 
 
 def migrate(connection: sqlite3.Connection) -> None:
@@ -67,6 +67,9 @@ def migrate(connection: sqlite3.Connection) -> None:
         if version == 5:
             _migrate_version_five_to_six(connection)
             version = 6
+        if version == 6:
+            _migrate_version_six_to_seven(connection)
+            version = 7
 
         if version != CURRENT_SCHEMA_VERSION:
             raise StorageSchemaError(
@@ -450,3 +453,41 @@ def _migrate_version_five_to_six(connection: sqlite3.Connection) -> None:
         """
     )
     connection.execute("PRAGMA foreign_keys = ON")
+
+
+def _migrate_version_six_to_seven(connection: sqlite3.Connection) -> None:
+    """创建 Skill 索引和 Agent-Skill 有序关联表。"""
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS skills (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL,
+            root_path TEXT NOT NULL UNIQUE,
+            instructions TEXT NOT NULL DEFAULT '',
+            license TEXT,
+            compatibility TEXT,
+            metadata_json TEXT NOT NULL DEFAULT '{}',
+            allowed_tools_json TEXT NOT NULL DEFAULT '[]',
+            content_digest TEXT NOT NULL,
+            status TEXT NOT NULL,
+            validation_error TEXT,
+            discovered_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS agent_skills (
+            agent_id TEXT NOT NULL,
+            skill_id TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (agent_id, skill_id),
+            FOREIGN KEY (agent_id) REFERENCES agent_profiles(id) ON DELETE CASCADE,
+            FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE RESTRICT
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_agent_skills_agent_position
+            ON agent_skills(agent_id, position);
+        UPDATE schema_metadata SET value = '7' WHERE key = 'schema_version';
+        """
+    )

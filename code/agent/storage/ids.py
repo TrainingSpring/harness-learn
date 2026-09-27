@@ -11,6 +11,7 @@ _SUPPORTED_PREFIXES = frozenset(
     {
         "agent",
         "llm",
+        "skill",
         "session",
         "item",
         "delegation",

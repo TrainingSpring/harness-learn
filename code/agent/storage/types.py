@@ -57,6 +57,41 @@ class LLMProfile:
 
 
 @dataclass
+class SkillProfile:
+    """固定 Skill 目录的数据库索引快照。"""
+
+    id: str
+    name: str
+    description: str
+    root_path: str
+    instructions: str
+    license: str | None
+    compatibility: str | None
+    metadata: dict[str, Any]
+    allowed_tools: list[str]
+    content_digest: str
+    status: str
+    validation_error: str | None
+    discovered_at: str | None = None
+    updated_at: str | None = None
+
+    def __post_init__(self) -> None:
+        validate_id("skill", self.id)
+        _validate_non_empty(self.name, "name")
+        _validate_non_empty(self.description, "description")
+        _validate_non_empty(self.root_path, "root_path")
+        _validate_non_empty(self.content_digest, "content_digest")
+        if self.status not in {"AVAILABLE", "INVALID", "MISSING"}:
+            raise ValueError("未知的 Skill 状态")
+        if not isinstance(self.metadata, dict):
+            raise ValueError("metadata 必须是字典")
+        if not isinstance(self.allowed_tools, list) or not all(
+            isinstance(item, str) and item.strip() for item in self.allowed_tools
+        ):
+            raise ValueError("allowed_tools 必须是非空字符串列表")
+
+
+@dataclass
 class AgentProfile:
     """可复用的逻辑 Agent 配置。
 
