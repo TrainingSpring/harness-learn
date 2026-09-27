@@ -93,12 +93,12 @@ class LLMProfileRepository:
                 connection.execute(
                     """
                     INSERT INTO llm_profiles (
-                        id, name, provider, base_url, model, api_key,
+                        id, name, protocol, base_url, model, api_key,
                         options_json, created_at, updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         name = excluded.name,
-                        provider = excluded.provider,
+                        protocol = excluded.protocol,
                         base_url = excluded.base_url,
                         model = excluded.model,
                         api_key = excluded.api_key,
@@ -108,7 +108,7 @@ class LLMProfileRepository:
                     (
                         updated_profile.id,
                         updated_profile.name,
-                        updated_profile.provider,
+                        updated_profile.protocol,
                         updated_profile.base_url,
                         updated_profile.model,
                         updated_profile.api_key,
@@ -173,7 +173,7 @@ class LLMProfileRepository:
             return LLMProfile(
                 id=row["id"],
                 name=row["name"],
-                provider=row["provider"],
+                protocol=row["protocol"],
                 base_url=row["base_url"],
                 model=row["model"],
                 api_key=row["api_key"],

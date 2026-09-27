@@ -1,6 +1,6 @@
 # LLM 多协议适配开发计划（核心适配已完成）
 
-> 状态：阶段 1 至阶段 4、阶段 5A 和阶段 6 已完成并收口；阶段 5B（Storage、API、UI 的 protocol 配置）暂未施工。
+> 状态：阶段 1 至阶段 6 已完成，计划收口。
 >
 > 本计划只处理 LLM 请求协议适配，不实现 Skills。Skills 后续只需要使用统一的 `LLM.call_stream()` / `LLM.call()` 接口，不应再依赖某一种厂商协议。
 
@@ -997,7 +997,7 @@ UI 新增“请求协议”下拉框，编辑时回显，列表显示 protocol �
 
 **明确不做**：Runtime 不加协议分支；Agent 不加专用调用方法；Adapter 不注入 Runtime；不改变 Session 组装职责。
 
-### 阶段 5B：Storage、API、UI 配置 protocol（未施工）
+### 阶段 5B：Storage、API、UI 配置 protocol（已完成）
 
 **修改**：
 
@@ -1024,7 +1024,7 @@ client/web/front/src/features/settings/pages/LLMSettingsPage.tsx
 
 **实际完成**：Session summarizer、AgentProfileAssistant、Runtime、Context 和
 Session 持久化链路已使用通用入口或协议无关消息格式；旧 Responses 快照仍可恢复。
-阶段 5 的 Storage/API/UI 配置工作不属于本次收口，仍待后续实施。
+阶段 5B 已完成：protocol 已贯通 Storage、API、UI，并完成旧 schema 迁移。
 
 ## 14. 文件清单
 
@@ -1080,7 +1080,7 @@ code/agent/session/ExecutionContext.py
 
 ## 15. 完成定义
 
-LLM 核心适配部分已完成；Storage/API/UI 的阶段 5 仍标记为未施工，不能将整份计划误认为全部完成：
+LLM 多协议适配及 Storage/API/UI 配置已经完成，计划可以收口：
 
 - `LLM` 有 `protocol` 属性，支持 Responses、Completions、Claude 三种协议。
 - 每种协议都有流式和普通专用方法。

@@ -37,6 +37,7 @@ export function CreateLlmDialog(props: LlmDialogProps) {
   const dialogRef = useModalFocus<HTMLDivElement>(isOpen);
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
+  const [protocol, setProtocol] = useState<"responses" | "completions" | "claude">("responses");
   const [model, setModel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isApiKeyVisible, setIsApiKeyVisible] = useState(false);
@@ -50,6 +51,7 @@ export function CreateLlmDialog(props: LlmDialogProps) {
     if (!isOpen) return;
     setName(editProfile?.name ?? "");
     setBaseUrl(editProfile?.baseUrl ?? "");
+    setProtocol(editProfile?.protocol ?? "responses");
     setModel(editProfile?.model ?? "");
     setApiKey("");
     setIsApiKeyVisible(false);
@@ -90,7 +92,7 @@ export function CreateLlmDialog(props: LlmDialogProps) {
     try {
       const result = mode === "edit"
         ? await listSavedLlmProfileModels(props.profile.id)
-        : await discoverDraftModels({ provider: "openai", baseUrl: baseUrl.trim() || null, apiKey: apiKey.trim() });
+        : await discoverDraftModels({ protocol, baseUrl: baseUrl.trim() || null, apiKey: apiKey.trim() });
       setModelOptions((current) => Array.from(new Set([...current, ...result.models])).sort());
     } catch (error) {
       setFormError(error instanceof Error ? error.message : "无法获取模型列表，请稍后重试");
@@ -117,7 +119,7 @@ export function CreateLlmDialog(props: LlmDialogProps) {
     }
     const commonFields = {
       name: name.trim(),
-      provider: "openai" as const,
+      protocol,
       baseUrl: baseUrl.trim() || null,
       model: model.trim(),
       options: parsedOptions,
@@ -142,7 +144,7 @@ export function CreateLlmDialog(props: LlmDialogProps) {
         <p className="form-notice">{mode === "edit" ? "已保存的 API Key 默认遮蔽显示，可通过右侧图标切换显示。" : "API Key 将保存到本地工作区数据库，列表和非编辑接口不会显示其内容。"}</p>
         <form className="form-stack" onSubmit={handleSubmit}>
           <label className="form-field"><span>配置名称</span><input value={name} onChange={(event) => setName(event.target.value)} required autoFocus /></label>
-          <label className="form-field"><span>服务商</span><select value="openai" onChange={() => undefined}><option value="openai">OpenAI 兼容</option></select></label>
+          <label className="form-field"><span>请求协议</span><select value={protocol} onChange={(event) => setProtocol(event.target.value as typeof protocol)}><option value="responses">Responses</option><option value="completions">Chat Completions</option><option value="claude">Claude Messages</option></select></label>
           <label className="form-field"><span>Base URL</span><input type="url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" /></label>
           <div className="form-field"><div className="form-field__label-row"><span id="llm-model-label">模型</span><IconButton type="button" label="刷新模型列表" disabled={isLoadingModels || isSubmitting} onClick={() => { void handleRefreshModels(); }}><RefreshCw className={isLoadingModels ? "spin" : undefined} size={16} /></IconButton></div><select id="llm-model" aria-labelledby="llm-model-label" value={model} onChange={(event) => setModel(event.target.value)} required><option value="" disabled>请选择模型</option>{modelOptions.map((option) => <option value={option} key={option}>{option}</option>)}</select></div>
           <div className="form-field"><div className="form-field__label-row"><span id="llm-api-key-label">API Key</span><IconButton type="button" label={isApiKeyVisible ? "隐藏 API Key 内容" : "显示 API Key 内容"} disabled={!apiKey || isLoadingApiKey} onClick={() => setIsApiKeyVisible((current) => !current)}>{isApiKeyVisible ? <EyeOff size={16} /> : <Eye size={16} />}</IconButton></div><input aria-labelledby="llm-api-key-label" type={isApiKeyVisible ? "text" : "password"} value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="sk-..." required={mode === "create"} disabled={isLoadingApiKey} autoComplete="off" /></div>

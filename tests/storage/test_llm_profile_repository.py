@@ -34,7 +34,7 @@ class LLMProfileRepositoryTests(unittest.TestCase):
         return LLMProfile(
             id=profile_id,
             name=name,
-            provider="openai",
+            protocol="responses",
             base_url="https://api.openai.com/v1",
             model="gpt-5",
             api_key="sk-local-test-key",

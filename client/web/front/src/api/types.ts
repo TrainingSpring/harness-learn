@@ -129,7 +129,7 @@ export interface SessionDetail extends SessionSummary {
 export interface LLMProfileSummary {
   id: string;
   name: string;
-  provider: string;
+  protocol: "responses" | "completions" | "claude";
   baseUrl: string | null;
   model: string;
   hasApiKey: boolean;
@@ -139,7 +139,7 @@ export interface LLMProfileSummary {
 /** 创建 LLM 配置时提交并持久化的连接参数。 */
 export interface CreateLLMProfileRequest {
   name: string;
-  provider: "openai";
+  protocol: "responses" | "completions" | "claude";
   baseUrl: string | null;
   model: string;
   apiKey: string;
@@ -149,7 +149,7 @@ export interface CreateLLMProfileRequest {
 /** 编辑 LLM 配置时省略 apiKey 表示保留数据库中的原密钥。 */
 export interface UpdateLLMProfileRequest {
   name: string;
-  provider: "openai";
+  protocol: "responses" | "completions" | "claude";
   baseUrl: string | null;
   model: string;
   apiKey?: string;
@@ -158,7 +158,7 @@ export interface UpdateLLMProfileRequest {
 
 /** 用尚未保存的表单连接参数拉取模型列表。 */
 export interface DiscoverDraftModelsRequest {
-  provider: "openai";
+  protocol: "responses" | "completions" | "claude";
   baseUrl: string | null;
   apiKey: string;
 }

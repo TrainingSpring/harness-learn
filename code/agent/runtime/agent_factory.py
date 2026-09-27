@@ -82,5 +82,5 @@ class AgentFactory:
             base_url=profile.base_url or "",
             api_key=profile.api_key,
             model=profile.model,
-            protocol=profile.options.get("protocol", "responses"),
+            protocol=profile.protocol,
         )

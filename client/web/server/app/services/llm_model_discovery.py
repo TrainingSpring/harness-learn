@@ -1,4 +1,4 @@
-"""从 OpenAI 兼容服务商读取可选模型。"""
+"""按请求协议从对应接口读取可选模型。"""
 
 from typing import Any
 
@@ -10,18 +10,20 @@ class ModelDiscoveryError(Exception):
 
 
 async def discover_models(
-    provider: str,
+    protocol: str,
     base_url: str | None,
     api_key: str,
     *,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> list[str]:
-    """读取 OpenAI 兼容 ``/models`` 响应中的模型 ID。
+    """读取协议模型列表接口返回的模型 ID。
 
     任何服务商错误都收敛为同一公开异常，避免把连接地址、响应内容或 API Key
     传回浏览器。
     """
-    if provider != "openai" or not base_url or not api_key:
+    if protocol == "openai":
+        protocol = "responses"
+    if protocol not in {"responses", "completions", "claude"} or not base_url or not api_key:
         raise ModelDiscoveryError("无法获取模型列表，请检查连接配置后重试")
 
     endpoint = f"{base_url.rstrip('/')}/models"

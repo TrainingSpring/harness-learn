@@ -34,14 +34,14 @@ it("提交 LLM 表单时保存 API Key 和 JSON 参数", async () => {
 
   expect(onSubmit).toHaveBeenCalledWith({
     name: "OpenAI 主配置",
-    provider: "openai",
+    protocol: "responses",
     baseUrl: "https://api.openai.com/v1",
     model: "gpt-5",
     apiKey: "sk-test-key",
     options: { temperature: 0.2 },
   });
   expect(discoverDraftModels).toHaveBeenCalledWith({
-    provider: "openai",
+    protocol: "responses",
     baseUrl: "https://api.openai.com/v1",
     apiKey: "sk-test-key",
   });
@@ -58,7 +58,7 @@ it("编辑时默认遮蔽回显 API Key，并支持显示和隐藏", async () =>
       profile={{
         id: "llm_OPENAI0001",
         name: "主模型",
-        provider: "openai",
+        protocol: "responses",
         baseUrl: "https://api.openai.com/v1",
         model: "gpt-5",
         hasApiKey: true,
@@ -86,7 +86,7 @@ it("编辑时默认遮蔽回显 API Key，并支持显示和隐藏", async () =>
 
   expect(onSubmit).toHaveBeenCalledWith({
     name: "主模型",
-    provider: "openai",
+    protocol: "responses",
     baseUrl: "https://api.openai.com/v1",
     model: "gpt-5-mini",
     apiKey: "sk-saved-key",

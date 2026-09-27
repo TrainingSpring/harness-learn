@@ -12,7 +12,7 @@ class LLMProfileSummary(ApiModel):
 
     id: str
     name: str
-    provider: str
+    protocol: Literal["responses", "completions", "claude"]
     base_url: str | None
     model: str
     has_api_key: bool
@@ -29,7 +29,7 @@ class CreateLLMProfileRequest(ApiModel):
     """创建 LLM 配置时提交并持久化的连接参数。"""
 
     name: str = Field(min_length=1)
-    provider: Literal["openai"]
+    protocol: Literal["responses", "completions", "claude"] = "responses"
     base_url: str | None = None
     model: str = Field(min_length=1)
     api_key: str = Field(min_length=1)
@@ -43,7 +43,7 @@ class UpdateLLMProfileRequest(ApiModel):
     """
 
     name: str = Field(min_length=1)
-    provider: Literal["openai"]
+    protocol: Literal["responses", "completions", "claude"] = "responses"
     base_url: str | None = None
     model: str = Field(min_length=1)
     api_key: str | None = None
@@ -53,7 +53,7 @@ class UpdateLLMProfileRequest(ApiModel):
 class ModelDiscoveryRequest(ApiModel):
     """根据尚未保存的表单连接参数读取模型列表。"""
 
-    provider: Literal["openai"]
+    protocol: Literal["responses", "completions", "claude"] = "responses"
     base_url: str | None = None
     api_key: str = Field(min_length=1)
 

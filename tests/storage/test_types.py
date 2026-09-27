@@ -90,7 +90,7 @@ class StorageTypeTests(unittest.TestCase):
         profile = LLMProfile(
             id="llm_7KQ2M8P4XZ",
             name="代码模型",
-            provider="openai",
+            protocol="responses",
             base_url="https://api.openai.com/v1",
             model="gpt-5",
             api_key="sk-local-test-key",

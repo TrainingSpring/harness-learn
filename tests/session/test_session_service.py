@@ -28,7 +28,7 @@ class SessionServiceTests(unittest.TestCase):
             LLMProfile(
                 id="llm_7KQ2M8P4XZ",
                 name="通用模型",
-                provider="openai",
+                protocol="responses",
                 base_url=None,
                 model="gpt-5",
                 api_key="sk-test-key",

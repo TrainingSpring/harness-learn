@@ -5,7 +5,7 @@ import sqlite3
 from .errors import StorageSchemaError
 
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 
 def migrate(connection: sqlite3.Connection) -> None:
@@ -64,6 +64,9 @@ def migrate(connection: sqlite3.Connection) -> None:
         if version == 4:
             _migrate_version_four_to_five(connection)
             version = 5
+        if version == 5:
+            _migrate_version_five_to_six(connection)
+            version = 6
 
         if version != CURRENT_SCHEMA_VERSION:
             raise StorageSchemaError(
@@ -79,7 +82,7 @@ def _create_version_one_schema(connection: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS llm_profiles (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
-            provider TEXT NOT NULL,
+            protocol TEXT NOT NULL DEFAULT 'responses',
             base_url TEXT,
             model TEXT NOT NULL,
             credential_ref TEXT NOT NULL,
@@ -407,3 +410,43 @@ def _migrate_version_four_to_five(connection: sqlite3.Connection) -> None:
         WHERE key = 'schema_version';
         """
     )
+
+
+def _migrate_version_five_to_six(connection: sqlite3.Connection) -> None:
+    """把 LLM 协议提升为独立字段，并删除无语义的 provider。"""
+    connection.execute("PRAGMA foreign_keys = OFF")
+    connection.executescript(
+        """
+        BEGIN IMMEDIATE;
+        CREATE TABLE llm_profiles_v6 (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            protocol TEXT NOT NULL DEFAULT 'responses',
+            base_url TEXT,
+            model TEXT NOT NULL,
+            api_key TEXT NOT NULL DEFAULT '',
+            options_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        INSERT INTO llm_profiles_v6 (
+            id, name, protocol, base_url, model, api_key,
+            options_json, created_at, updated_at
+        )
+        SELECT
+            id, name,
+            CASE
+                WHEN json_extract(options_json, '$.protocol') IN ('responses', 'completions', 'claude')
+                THEN json_extract(options_json, '$.protocol')
+                ELSE 'responses'
+            END,
+            base_url, model, api_key,
+            json_remove(options_json, '$.protocol'), created_at, updated_at
+        FROM llm_profiles;
+        DROP TABLE llm_profiles;
+        ALTER TABLE llm_profiles_v6 RENAME TO llm_profiles;
+        UPDATE schema_metadata SET value = '6' WHERE key = 'schema_version';
+        COMMIT;
+        """
+    )
+    connection.execute("PRAGMA foreign_keys = ON")

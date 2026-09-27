@@ -126,7 +126,7 @@ class ChatService:
                     active.pending_call_id = runtime_event.request.call_id
                     yield self._permission_event(active, runtime_event)
                     return
-                if not isinstance(runtime_event, LLMResponse):
+                if not hasattr(runtime_event, "type"):
                     continue
                 if runtime_event.type == "text" and runtime_event.text:
                     yield self._event(

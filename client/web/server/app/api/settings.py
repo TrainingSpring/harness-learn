@@ -29,7 +29,7 @@ def _llm_summary(profile: LLMProfile) -> LLMProfileSummary:
     return LLMProfileSummary(
         id=profile.id,
         name=profile.name,
-        provider=profile.provider,
+        protocol=profile.protocol,
         base_url=profile.base_url,
         model=profile.model,
         has_api_key=bool(profile.api_key),
@@ -84,7 +84,7 @@ async def create_llm_profile(
     profile = LLMProfile(
         id=generate_id("llm"),
         name=request.name,
-        provider=request.provider,
+        protocol=request.protocol,
         base_url=request.base_url,
         model=request.model,
         api_key=request.api_key,
@@ -117,7 +117,7 @@ async def update_llm_profile(
     profile = LLMProfile(
         id=current.id,
         name=request.name,
-        provider=request.provider,
+        protocol=request.protocol,
         base_url=request.base_url,
         model=request.model,
         api_key=request.api_key or current.api_key,
@@ -135,7 +135,7 @@ async def update_llm_profile(
 async def discover_draft_models(request: ModelDiscoveryRequest) -> ModelListResponse:
     """用尚未保存的表单参数获取可选模型。"""
     try:
-        models = await discover_models(request.provider, request.base_url, request.api_key)
+        models = await discover_models(request.protocol, request.base_url, request.api_key)
     except ModelDiscoveryError as error:
         raise ApiError(502, "MODEL_DISCOVERY_FAILED", str(error)) from error
     return ModelListResponse(models=models)
@@ -156,7 +156,7 @@ async def discover_saved_models(
     if not profile.api_key:
         raise ApiError(400, "API_KEY_REQUIRED", "请先填写 API Key")
     try:
-        models = await discover_models(profile.provider, profile.base_url, profile.api_key)
+        models = await discover_models(profile.protocol, profile.base_url, profile.api_key)
     except ModelDiscoveryError as error:
         raise ApiError(502, "MODEL_DISCOVERY_FAILED", str(error)) from error
     return ModelListResponse(models=models)

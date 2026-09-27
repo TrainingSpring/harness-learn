@@ -13,7 +13,7 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
       llmProfiles={[{
         id: "llm_OPENAI0001",
         name: "主模型",
-        provider: "openai",
+        protocol: "responses",
         baseUrl: null,
         model: "gpt-5",
         hasApiKey: true,
@@ -83,7 +83,7 @@ it("只有填写描述并选择 LLM 后才启用 AI 生成按钮", async () => {
       llmProfiles={[{
         id: "llm_OPENAI0001",
         name: "主模型",
-        provider: "openai",
+        protocol: "responses",
         baseUrl: null,
         model: "gpt-5",
         hasApiKey: true,

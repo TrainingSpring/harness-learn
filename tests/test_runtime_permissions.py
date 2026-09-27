@@ -141,13 +141,13 @@ class RuntimePermissionTests(unittest.TestCase):
         self.assertEqual(runtime.state, RuntimeState.IDLE)
         self.assertEqual(llm.call_count, 2)
         self.assertEqual(
-            llm.contexts[1][-1]["type"],
-            "function_call_output",
+            llm.contexts[1][-1]["kind"],
+            "tool_result",
         )
-        self.assertEqual(llm.contexts[1][-1]["call_id"], "call_001")
+        self.assertEqual(llm.contexts[1][-1]["tool_call_id"], "call_001")
         output = context.messages[-1]
-        self.assertEqual(output["type"], "function_call_output")
-        self.assertEqual(output["call_id"], "call_001")
+        self.assertEqual(output["kind"], "tool_result")
+        self.assertEqual(output["tool_call_id"], "call_001")
 
     def test_deny_response_never_executes_tool_but_returns_structured_failure(self):
         """用户拒绝后不执行工具，而是向模型追加标准失败结果。"""
@@ -168,7 +168,7 @@ class RuntimePermissionTests(unittest.TestCase):
 
         self.assertEqual(self.executions, [])
         output = context.messages[-1]
-        self.assertEqual(output["type"], "function_call_output")
+        self.assertEqual(output["kind"], "tool_result")
         self.assertIn('"PERMISSION_DENIED"', output["output"])
 
     def test_invalid_or_repeated_permission_response_does_not_execute_call(self):

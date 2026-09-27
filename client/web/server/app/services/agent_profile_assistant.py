@@ -85,7 +85,7 @@ JSON 必须且只能包含以下字段：
         try:
             llm = self.llm_factory(
                 *factory_args,
-                protocol=getattr(profile, "options", {}).get("protocol", "responses"),
+                protocol=getattr(profile, "protocol", "responses"),
             )
         except TypeError:
             llm = self.llm_factory(*factory_args)

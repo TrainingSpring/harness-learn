@@ -23,7 +23,7 @@ class LLMProfile:
     Attributes:
         id: 带 llm_ 前缀的稳定配置 ID。
         name: 用户可读的配置名称。
-        provider: 模型服务商名称。
+        protocol: 请求协议名称。
         base_url: 可选的服务地址。
         model: 模型名称。
         api_key: 保存在当前 workspace SQLite 中的 API Key。
@@ -34,7 +34,7 @@ class LLMProfile:
 
     id: str
     name: str
-    provider: str
+    protocol: str
     base_url: str | None
     model: str
     api_key: str
@@ -46,7 +46,9 @@ class LLMProfile:
         """校验 LLMProfile 的身份和必填连接参数。"""
         validate_id("llm", self.id)
         _validate_non_empty(self.name, "name")
-        _validate_non_empty(self.provider, "provider")
+        from head.types import validate_protocol
+
+        self.protocol = validate_protocol(self.protocol)
         _validate_non_empty(self.model, "model")
         if not isinstance(self.api_key, str):
             raise ValueError("api_key 必须是字符串")

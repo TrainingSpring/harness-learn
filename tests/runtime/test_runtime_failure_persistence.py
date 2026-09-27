@@ -59,7 +59,7 @@ def test_runtime_failure_persists_new_protocol_items_and_current_context():
                 LLMProfile(
                     id="llm_7KQ2M8P4XZ",
                     name="测试模型",
-                    provider="openai",
+                    protocol="responses",
                     base_url=None,
                     model="gpt-5",
                     api_key="sk-test-key",

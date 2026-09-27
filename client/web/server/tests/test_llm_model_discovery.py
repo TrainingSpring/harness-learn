@@ -21,7 +21,7 @@ def test_discover_models_extracts_sorted_unique_ids() -> None:
 
     models = asyncio.run(
         discover_models(
-            "openai",
+            "responses",
             "https://api.example.com/v1/",
             "sk-test-key",
             transport=httpx.MockTransport(handler),
@@ -42,7 +42,7 @@ def test_discover_models_hides_upstream_details() -> None:
     try:
         asyncio.run(
             discover_models(
-                "openai",
+                "responses",
                 "https://api.example.com/v1",
                 "sk-test-key",
                 transport=httpx.MockTransport(handler),

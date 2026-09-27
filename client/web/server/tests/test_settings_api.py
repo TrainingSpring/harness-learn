@@ -14,7 +14,7 @@ def test_list_llm_profiles_hides_api_key(client) -> None:
     assert item == {
         "id": "llm_TESTLLM001",
         "name": "本地 GPT",
-        "provider": "openai",
+        "protocol": "responses",
         "baseUrl": "https://api.openai.com/v1",
         "model": "gpt-5",
         "hasApiKey": True,
@@ -61,7 +61,7 @@ def test_create_llm_profile_generates_id_and_hides_api_key(client) -> None:
         "/api/settings/llm-profiles",
         json={
             "name": "备用 GPT",
-            "provider": "openai",
+            "protocol": "responses",
             "baseUrl": "https://api.example.com/v1",
             "model": "gpt-5-mini",
             "apiKey": "sk-backup-key",
@@ -86,7 +86,7 @@ def test_create_llm_profile_rejects_duplicate_name(client) -> None:
         "/api/settings/llm-profiles",
         json={
             "name": "本地 GPT",
-            "provider": "openai",
+            "protocol": "responses",
             "model": "gpt-5",
             "apiKey": "sk-other-key",
         },
@@ -102,7 +102,7 @@ def test_update_llm_profile_preserves_api_key_when_omitted(client) -> None:
         "/api/settings/llm-profiles/llm_TESTLLM001",
         json={
             "name": "更新后的 GPT",
-            "provider": "openai",
+            "protocol": "responses",
             "baseUrl": "https://api.example.com/v1",
             "model": "gpt-5-mini",
             "options": {"temperature": 0.1},
@@ -122,7 +122,7 @@ def test_update_llm_profile_rejects_unknown_profile(client) -> None:
         "/api/settings/llm-profiles/llm_UNKNOWN000",
         json={
             "name": "无效配置",
-            "provider": "openai",
+            "protocol": "responses",
             "model": "gpt-5",
             "options": {},
         },
@@ -152,7 +152,7 @@ def test_delete_llm_profile_removes_unused_profile(client) -> None:
         "/api/settings/llm-profiles",
         json={
             "name": "可删除配置",
-            "provider": "openai",
+            "protocol": "responses",
             "model": "gpt-5-mini",
             "apiKey": "sk-delete-key",
             "options": {},
@@ -175,7 +175,7 @@ def test_discover_draft_models_returns_only_model_ids(client, monkeypatch) -> No
     response = client.post(
         "/api/settings/llm-profiles/models",
         json={
-            "provider": "openai",
+            "protocol": "responses",
             "baseUrl": "https://api.example.com/v1",
             "apiKey": "sk-draft-key",
         },
@@ -184,7 +184,7 @@ def test_discover_draft_models_returns_only_model_ids(client, monkeypatch) -> No
     assert response.status_code == 200
     assert response.json() == {"models": ["gpt-5", "gpt-5-mini"]}
     assert "sk-draft-key" not in response.text
-    discover.assert_awaited_once_with("openai", "https://api.example.com/v1", "sk-draft-key")
+    discover.assert_awaited_once_with("responses", "https://api.example.com/v1", "sk-draft-key")
 
 
 def test_discover_saved_models_rejects_missing_api_key(client, monkeypatch) -> None:
@@ -192,7 +192,7 @@ def test_discover_saved_models_rejects_missing_api_key(client, monkeypatch) -> N
     current = LLMProfile(
         id="llm_TESTLLM001",
         name="无密钥配置",
-        provider="openai",
+        protocol="responses",
         base_url="https://api.example.com/v1",
         model="gpt-5-mini",
         api_key="",

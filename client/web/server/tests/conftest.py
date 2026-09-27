@@ -33,7 +33,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
             LLMProfile(
                 id="llm_TESTLLM001",
                 name="本地 GPT",
-                provider="openai",
+                protocol="responses",
                 base_url="https://api.openai.com/v1",
                 model="gpt-5",
                 api_key="sk-test-key",
