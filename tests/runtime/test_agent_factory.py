@@ -16,7 +16,8 @@ from session.ExecutionContext import ExecutionContext  # noqa: E402
 from storage.database import StateDatabase  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
-from storage.types import AgentProfile, LLMProfile  # noqa: E402
+from storage.repositories.skill import SkillRepository  # noqa: E402
+from storage.types import AgentProfile, LLMProfile, SkillProfile  # noqa: E402
 
 
 class SummarizerLLM:
@@ -41,6 +42,22 @@ class AgentFactoryTests(unittest.TestCase):
                 api_key="sk-test-key",
             )
         )
+        SkillRepository(self.database).upsert(
+            SkillProfile(
+                id="skill_REVIEW0001",
+                name="review",
+                description="Review code",
+                root_path="/skills/review",
+                instructions="Review the code carefully.",
+                license=None,
+                compatibility=None,
+                metadata={},
+                allowed_tools=["read"],
+                content_digest="digest-review",
+                status="AVAILABLE",
+                validation_error=None,
+            )
+        )
         AgentProfileRepository(self.database).save(
             AgentProfile(
                 id="agent_1V3ASAXQ2A",
@@ -50,6 +67,7 @@ class AgentFactoryTests(unittest.TestCase):
                 expertise=["Python"],
                 llm_profile_id="llm_7KQ2M8P4XZ",
                 tools=["read", "write"],
+                skill_ids=["skill_REVIEW0001"],
             )
         )
 
@@ -90,6 +108,8 @@ class AgentFactoryTests(unittest.TestCase):
         self.assertIs(agent.execution_context, execution_context)
         self.assertIs(agent.permission, permission)
         self.assertFalse(hasattr(agent, "profile"))
+        self.assertEqual([skill.id for skill in agent.skills], ["skill_REVIEW0001"])
+        self.assertEqual(agent.skills[0].instructions, "Review the code carefully.")
 
     def test_load_llm_config_only_exposes_connection_configuration(self):
         config = AgentFactory(self.database).load_llm_config("agent_1V3ASAXQ2A")

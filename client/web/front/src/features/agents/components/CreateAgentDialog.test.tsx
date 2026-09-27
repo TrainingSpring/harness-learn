@@ -23,6 +23,7 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
         { name: "read", description: "读取文件", inputSchema: {}, permissionAction: "filesystem.read" },
         { name: "bash", description: "执行命令", inputSchema: {}, permissionAction: "process.exec" },
       ]}
+      skills={[]}
       onClose={vi.fn()}
       onSubmit={onSubmit}
       isSuggesting={false}
@@ -51,6 +52,7 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
     expertise: ["Documentation", "Technical Writing"],
     llmProfileId: "llm_OPENAI0001",
     tools: ["read"],
+    skillIds: [],
     isEnabled: true,
   });
 });
@@ -63,6 +65,7 @@ it("创建角色弹窗不可见时不渲染表单", () => {
       error={null}
       llmProfiles={[]}
       tools={[]}
+      skills={[]}
       onClose={vi.fn()}
       onSubmit={vi.fn()}
       isSuggesting={false}
@@ -90,6 +93,7 @@ it("只有填写描述并选择 LLM 后才启用 AI 生成按钮", async () => {
         options: {},
       }]}
       tools={[]}
+      skills={[]}
       onClose={vi.fn()}
       onSubmit={vi.fn()}
       isSuggesting={false}

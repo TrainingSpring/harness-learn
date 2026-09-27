@@ -15,6 +15,7 @@ def test_list_agents_returns_only_enabled_profiles(client) -> None:
         "personality": "直接、严谨",
         "expertise": ["Python", "API"],
         "tools": ["read", "bash"],
+        "skills": [],
         "isEnabled": True,
     }
     assert payload["pagination"] == {"limit": 20, "offset": 0, "hasMore": False}

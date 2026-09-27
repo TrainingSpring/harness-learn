@@ -26,6 +26,13 @@ class AgentProfileRepository:
         """
         self.database = database
 
+    def _skill_ids(self, agent_id: str) -> list[str]:
+        rows = self.database.connection.execute(
+            "SELECT skill_id FROM agent_skills WHERE agent_id = ? ORDER BY position ASC",
+            (agent_id,),
+        ).fetchall()
+        return [row["skill_id"] for row in rows]
+
     def get(self, agent_id: str) -> AgentProfile | None:
         """根据稳定 Agent ID 读取配置。"""
         validate_id("agent", agent_id)
@@ -33,7 +40,7 @@ class AgentProfileRepository:
             "SELECT * FROM agent_profiles WHERE id = ?",
             (agent_id,),
         ).fetchone()
-        return None if row is None else self._from_row(row)
+        return None if row is None else self._from_row(row, self._skill_ids(agent_id))
 
     def list_enabled(
         self,
@@ -82,7 +89,7 @@ class AgentProfileRepository:
                 """,
                 (expertise, limit, offset),
             ).fetchall()
-        return [self._from_row(row) for row in rows]
+        return [self._from_row(row, self._skill_ids(row["id"])) for row in rows]
 
     def save(self, profile: AgentProfile) -> AgentProfile:
         """新增或更新 AgentProfile，并返回带时间戳的对象。
@@ -142,6 +149,14 @@ class AgentProfileRepository:
                         now,
                     ),
                 )
+                connection.execute("DELETE FROM agent_skills WHERE agent_id = ?", (updated_profile.id,))
+                connection.executemany(
+                    "INSERT INTO agent_skills (agent_id, skill_id, position, created_at) VALUES (?, ?, ?, ?)",
+                    [
+                        (updated_profile.id, skill_id, position, now)
+                        for position, skill_id in enumerate(updated_profile.skill_ids)
+                    ],
+                )
         except sqlite3.IntegrityError as error:
             raise StorageConflictError(
                 f"AgentProfile 保存冲突: {updated_profile.id}"
@@ -182,7 +197,7 @@ class AgentProfileRepository:
             raise ValueError("offset 必须是非负整数")
 
     @staticmethod
-    def _from_row(row: sqlite3.Row) -> AgentProfile:
+    def _from_row(row: sqlite3.Row, skill_ids: list[str] | None = None) -> AgentProfile:
         """将数据库行严格转换为 AgentProfile。"""
         try:
             expertise = json.loads(row["expertise_json"])
@@ -200,6 +215,7 @@ class AgentProfileRepository:
                 expertise=expertise,
                 llm_profile_id=row["llm_profile_id"],
                 tools=tools,
+                skill_ids=skill_ids or [],
                 is_enabled=bool(row["is_enabled"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],

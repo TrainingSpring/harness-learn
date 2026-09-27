@@ -31,6 +31,7 @@ def _summary(profile: AgentProfile) -> AgentSummary:
         personality=profile.personality,
         expertise=profile.expertise,
         tools=profile.tools,
+        skills=profile.skill_ids,
         is_enabled=profile.is_enabled,
     )
 
@@ -118,6 +119,15 @@ async def create_agent(
         services.tool_catalog.validate_names(request.tools)
     except ValueError as error:
         raise ApiError(422, "INVALID_TOOL", str(error)) from error
+    skills = []
+    for skill_id in dict.fromkeys(request.skill_ids):
+        try:
+            skill = services.skill_profiles.get(skill_id)
+        except ValueError as error:
+            raise ApiError(422, "INVALID_SKILL", "Skill ID 无效") from error
+        if skill is None or skill.status != "AVAILABLE":
+            raise ApiError(422, "INVALID_SKILL", "只能关联可用 Skill")
+        skills.append(skill.id)
 
     profile = AgentProfile(
         id=generate_id("agent"),
@@ -127,6 +137,7 @@ async def create_agent(
         expertise=request.expertise,
         llm_profile_id=request.llm_profile_id,
         tools=request.tools,
+        skill_ids=skills,
         is_enabled=request.is_enabled,
     )
     try:

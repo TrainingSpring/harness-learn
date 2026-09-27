@@ -16,6 +16,7 @@ class AgentSummary(ApiModel):
     personality: str
     expertise: list[str]
     tools: list[str]
+    skills: list[str]
     is_enabled: bool
 
 
@@ -31,6 +32,7 @@ class CreateAgentRequest(ApiModel):
     expertise: list[str] = Field(default_factory=list)
     llm_profile_id: str
     tools: list[str] = Field(default_factory=list)
+    skill_ids: list[str] = Field(default_factory=list)
     is_enabled: bool = True
 
 

@@ -29,6 +29,7 @@ export interface AgentSummary extends AgentReference {
   personality: string;
   expertise: string[];
   tools: string[];
+  skills: string[];
   isEnabled: boolean;
 }
 
@@ -40,6 +41,7 @@ export interface CreateAgentRequest {
   expertise: string[];
   llmProfileId: string;
   tools: string[];
+  skillIds: string[];
   isEnabled: boolean;
 }
 

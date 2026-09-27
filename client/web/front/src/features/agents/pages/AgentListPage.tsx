@@ -8,7 +8,7 @@ import { Skeleton } from "../../../components/Skeleton";
 import { createAgent, generateAgentProfileSuggestion, listAgents } from "../api";
 import { AgentCard } from "../components/AgentCard";
 import { CreateAgentDialog } from "../components/CreateAgentDialog";
-import { listLlmProfiles, listTools } from "../../settings/api";
+import { listLlmProfiles, listSkills, listTools } from "../../settings/api";
 
 /** 已启用角色的发现页。 */
 export function AgentListPage() {
@@ -16,6 +16,7 @@ export function AgentListPage() {
   const agents = useQuery({ queryKey: ["agents"], queryFn: listAgents });
   const llmProfiles = useQuery({ queryKey: ["llm-profiles"], queryFn: listLlmProfiles });
   const tools = useQuery({ queryKey: ["tools"], queryFn: listTools });
+  const skills = useQuery({ queryKey: ["skills"], queryFn: listSkills });
   const createMutation = useMutation({
     mutationFn: createAgent,
     onSuccess: async () => {
@@ -38,6 +39,7 @@ export function AgentListPage() {
         error={createMutation.error?.message ?? null}
         llmProfiles={llmProfiles.data?.items ?? []}
         tools={tools.data?.items ?? []}
+        skills={skills.data?.items.filter((skill) => skill.status === "AVAILABLE") ?? []}
         isSuggesting={suggestionMutation.isPending}
         onClose={() => { if (!createMutation.isPending) setIsCreateOpen(false); }}
         onSubmit={(request) => { createMutation.mutate(request); }}

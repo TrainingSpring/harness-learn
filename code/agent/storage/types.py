@@ -115,6 +115,7 @@ class AgentProfile:
     expertise: list[str]
     llm_profile_id: str
     tools: list[str]
+    skill_ids: list[str] = field(default_factory=list)
     is_enabled: bool = True
     created_at: str | None = None
     updated_at: str | None = None
@@ -132,6 +133,10 @@ class AgentProfile:
             isinstance(item, str) and item.strip() for item in self.tools
         ):
             raise ValueError("tools 必须是非空字符串列表")
+        if not isinstance(self.skill_ids, list) or len(self.skill_ids) != len(set(self.skill_ids)):
+            raise ValueError("skill_ids 必须是不重复的字符串列表")
+        for skill_id in self.skill_ids:
+            validate_id("skill", skill_id)
 
 
 @dataclass

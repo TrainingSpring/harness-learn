@@ -50,6 +50,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
                 expertise=["Python", "API"],
                 llm_profile_id="llm_TESTLLM001",
                 tools=["read", "bash"],
+                skill_ids=[],
             )
         )
         agents.save(

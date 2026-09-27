@@ -8,6 +8,7 @@ import type {
   CreateAgentRequest,
   LLMProfileSummary,
   ToolSummary,
+  SkillSummary,
 } from "../../../api/types";
 
 interface CreateAgentDialogProps {
@@ -16,6 +17,7 @@ interface CreateAgentDialogProps {
   error: string | null;
   llmProfiles: LLMProfileSummary[];
   tools: ToolSummary[];
+  skills: SkillSummary[];
   isSuggesting: boolean;
   onClose: () => void;
   onSubmit: (request: CreateAgentRequest) => void;
@@ -29,6 +31,7 @@ export function CreateAgentDialog({
   error,
   llmProfiles,
   tools,
+  skills,
   isSuggesting,
   onClose,
   onSubmit,
@@ -41,6 +44,7 @@ export function CreateAgentDialog({
   const [expertise, setExpertise] = useState("");
   const [llmProfileId, setLlmProfileId] = useState("");
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [isEnabled, setIsEnabled] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
@@ -53,6 +57,7 @@ export function CreateAgentDialog({
     setExpertise("");
     setLlmProfileId("");
     setSelectedTools([]);
+    setSelectedSkills([]);
     setIsEnabled(true);
     setFormError(null);
     setSuggestionError(null);
@@ -75,6 +80,12 @@ export function CreateAgentDialog({
       : [...current, toolName]);
   };
 
+  const toggleSkill = (skillId: string) => {
+    setSelectedSkills((current) => current.includes(skillId)
+      ? current.filter((item) => item !== skillId)
+      : [...current, skillId]);
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError(null);
@@ -89,6 +100,7 @@ export function CreateAgentDialog({
       expertise: expertise.split(",").map((item) => item.trim()).filter(Boolean),
       llmProfileId,
       tools: selectedTools,
+      skillIds: selectedSkills,
       isEnabled,
     });
   };
@@ -159,6 +171,10 @@ export function CreateAgentDialog({
           <fieldset className="form-field form-fieldset"><legend>可用工具</legend>
             {tools.length === 0 && <p className="form-hint">当前没有可配置工具。</p>}
             <div className="checkbox-grid">{tools.map((tool) => <label className="checkbox-option" key={tool.name}><input type="checkbox" checked={selectedTools.includes(tool.name)} onChange={() => toggleTool(tool.name)} /><span>{tool.name}</span></label>)}</div>
+          </fieldset>
+          <fieldset className="form-field form-fieldset"><legend>Skills</legend>
+            {skills.length === 0 && <p className="form-hint">当前没有可用 Skill。</p>}
+            <div className="checkbox-grid">{skills.map((skill) => <label className="checkbox-option" key={skill.id}><input type="checkbox" checked={selectedSkills.includes(skill.id)} onChange={() => toggleSkill(skill.id)} /><span>{skill.name}</span></label>)}</div>
           </fieldset>
           <label className="checkbox-option"><input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /><span>启用此角色</span></label>
           {(suggestionError || formError || error) && <p className="inline-error" role="alert">{suggestionError || formError || error}</p>}

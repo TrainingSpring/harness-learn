@@ -12,6 +12,7 @@ from storage.database import StateDatabase  # noqa: E402
 from storage.errors import StorageConflictError  # noqa: E402
 from storage.repositories.agent_profile import AgentProfileRepository  # noqa: E402
 from storage.repositories.llm_profile import LLMProfileRepository  # noqa: E402
+from storage.repositories.skill import SkillRepository  # noqa: E402
 from storage.types import AgentProfile, LLMProfile  # noqa: E402
 
 
@@ -25,6 +26,7 @@ class AgentProfileRepositoryTests(unittest.TestCase):
         self.database.initialize()
         self.llm_repository = LLMProfileRepository(self.database)
         self.repository = AgentProfileRepository(self.database)
+        self.skill_repository = SkillRepository(self.database)
         self.llm_repository.save(
             LLMProfile(
                 id="llm_7KQ2M8P4XZ",
@@ -106,6 +108,41 @@ class AgentProfileRepositoryTests(unittest.TestCase):
         loaded = self.repository.get("agent_1V3ASAXQ2A")
         self.assertEqual(loaded.name, "更新后的代码专家")
         self.assertEqual(len(self.repository.list_enabled(10, 0)), 1)
+
+    def test_save_and_update_preserves_skill_order(self):
+        """保存和更新 Agent 时应按配置顺序读回 Skill 关联。"""
+        self.skill_repository.upsert(self.make_skill("skill_FIRST0001A", "first"))
+        self.skill_repository.upsert(self.make_skill("skill_SECOND001A", "second"))
+
+        profile = self.make_profile()
+        profile.skill_ids = ["skill_SECOND001A", "skill_FIRST0001A"]
+        self.repository.save(profile)
+        self.assertEqual(
+            self.repository.get(profile.id).skill_ids,
+            ["skill_SECOND001A", "skill_FIRST0001A"],
+        )
+
+        profile.skill_ids = ["skill_FIRST0001A"]
+        self.repository.save(profile)
+        self.assertEqual(self.repository.get(profile.id).skill_ids, ["skill_FIRST0001A"])
+
+    def make_skill(self, skill_id, name):
+        from storage.types import SkillProfile
+
+        return SkillProfile(
+            id=skill_id,
+            name=name,
+            description=f"{name} skill",
+            root_path=f"/skills/{name}",
+            instructions=f"Use {name}.",
+            license=None,
+            compatibility=None,
+            metadata={},
+            allowed_tools=[],
+            content_digest=f"digest-{name}",
+            status="AVAILABLE",
+            validation_error=None,
+        )
 
     def test_missing_llm_reference_is_a_storage_conflict(self):
         """Agent 引用不存在的 LLM 时不能写入孤立配置。"""

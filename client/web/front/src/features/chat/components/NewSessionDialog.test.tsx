@@ -11,6 +11,7 @@ const agents: AgentSummary[] = [{
   personality: "直接",
   expertise: ["代码"],
   tools: [],
+  skills: [],
   isEnabled: true,
 }];
 

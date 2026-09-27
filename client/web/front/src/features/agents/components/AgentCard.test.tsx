@@ -12,6 +12,7 @@ it("展示角色能力并将角色 id 带入新对话链接", () => {
         personality: "直接、严谨",
         expertise: ["Python", "API"],
         tools: ["read", "write", "bash", "edit"],
+        skills: [],
         isEnabled: true,
       }} />
     </MemoryRouter>,

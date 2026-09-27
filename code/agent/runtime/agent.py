@@ -10,6 +10,7 @@ from permission.types import PermissionResponse
 from session.ExecutionContext import ExecutionContext
 from tools.tools import Tools
 from tools.types import Tool
+from skills.types import SkillDefinition
 
 from .prompt_builder import PromptBuilder
 from .runtime import Runtime
@@ -29,6 +30,7 @@ class Agent:
         expertise: tuple[str, ...],
         llm_config: LLMConfig,
         tool_definitions: tuple[Tool, ...],
+        skills: tuple[SkillDefinition, ...] = (),
         context: Context,
         execution_context: ExecutionContext,
         permission: PermissionManager,
@@ -47,6 +49,7 @@ class Agent:
         self.expertise = tuple(expertise)
         self.llm_config = llm_config
         self.tool_definitions = tuple(tool_definitions)
+        self.skills = tuple(skills)
         self.context = context
         self.execution_context = execution_context
         self.permission = permission

@@ -9,6 +9,8 @@ from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.types import AgentProfile, LLMProfile
 from tools.registry.catalog import ToolCatalog
+from storage.repositories.skill import SkillRepository
+from skills.types import SkillDefinition, SkillStatus
 
 from .agent import Agent
 from .prompt_builder import PromptBuilder
@@ -28,6 +30,7 @@ class AgentFactory:
         self.agent_profiles = AgentProfileRepository(database)
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.tool_catalog = tool_catalog or ToolCatalog()
+        self.skill_profiles = SkillRepository(database)
 
     def load(
         self,
@@ -43,6 +46,18 @@ class AgentFactory:
         tool_definitions = tuple(
             self.tool_catalog.get(name) for name in profile.tools
         )
+        skills = tuple(
+            SkillDefinition(
+                id=skill.id, name=skill.name, description=skill.description,
+                root_path=skill.root_path, instructions=skill.instructions,
+                license=skill.license, compatibility=skill.compatibility,
+                metadata=skill.metadata, allowed_tools=tuple(skill.allowed_tools),
+                content_digest=skill.content_digest,
+                status=SkillStatus(skill.status), validation_error=skill.validation_error,
+            )
+            for skill in self.skill_profiles.list_for_agent(profile.id)
+            if skill.status == "AVAILABLE"
+        )
         return Agent(
             agent_id=profile.id,
             name=profile.name,
@@ -51,6 +66,7 @@ class AgentFactory:
             expertise=tuple(profile.expertise),
             llm_config=self._to_llm_config(llm_profile),
             tool_definitions=tool_definitions,
+            skills=skills,
             context=context,
             execution_context=execution_context,
             permission=permission,
