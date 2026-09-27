@@ -51,6 +51,17 @@ export const apiClient = {
     );
   },
 
+  async postForm<TResponse>(path: string, body: FormData, signal?: AbortSignal): Promise<TResponse> {
+    return parseResponse<TResponse>(
+      await fetch(path, {
+        method: "POST",
+        headers: { Accept: "application/json" },
+        body,
+        signal,
+      }),
+    );
+  },
+
   async patch<TRequest, TResponse>(path: string, body: TRequest, signal?: AbortSignal): Promise<TResponse> {
     return parseResponse<TResponse>(
       await fetch(path, {

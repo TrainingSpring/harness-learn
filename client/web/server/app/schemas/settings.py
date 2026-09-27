@@ -71,3 +71,28 @@ class ToolSummary(ApiModel):
     description: str
     input_schema: dict[str, Any]
     permission_action: str
+
+
+class SkillSummary(ApiModel):
+    """供设置页和角色配置页使用的 Skill 索引摘要。"""
+
+    id: str
+    name: str
+    description: str
+    license: str | None
+    compatibility: str | None
+    status: Literal["AVAILABLE", "INVALID", "MISSING"]
+    validation_error: str | None
+    agent_count: int
+    updated_at: str | None
+
+
+class SkillSyncResult(ApiModel):
+    """一次 Skill 刷新的统计结果。"""
+
+    added: int
+    updated: int
+    unchanged: int
+    missing: int
+    invalid: int
+    items: list[SkillSummary]

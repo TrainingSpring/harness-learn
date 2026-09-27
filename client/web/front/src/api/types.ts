@@ -179,6 +179,29 @@ export interface ToolSummary {
   permissionAction: string;
 }
 
+export type SkillStatus = "AVAILABLE" | "INVALID" | "MISSING";
+
+export interface SkillSummary {
+  id: string;
+  name: string;
+  description: string;
+  license: string | null;
+  compatibility: string | null;
+  status: SkillStatus;
+  validationError: string | null;
+  agentCount: number;
+  updatedAt: string | null;
+}
+
+export interface SkillSyncResult {
+  added: number;
+  updated: number;
+  unchanged: number;
+  missing: number;
+  invalid: number;
+  items: SkillSummary[];
+}
+
 export type PermissionScope = "once" | "session";
 export type PermissionDecision = "allow" | "deny";
 

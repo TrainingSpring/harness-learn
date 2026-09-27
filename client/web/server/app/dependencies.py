@@ -14,7 +14,10 @@ from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session_query import SessionQueryRepository
+from storage.repositories.skill import SkillRepository
 from tools.registry.catalog import ToolCatalog
+from skills.catalog import SkillCatalog
+from skills.sync_service import SkillSyncService
 
 from .services.chat_service import ChatService
 from .services.agent_profile_assistant import AgentProfileAssistant
@@ -44,6 +47,9 @@ class ApplicationServices:
     llm_profiles: LLMProfileRepository
     agent_profile_assistant: AgentProfileAssistant
     tool_catalog: ToolCatalog
+    skill_catalog: SkillCatalog
+    skill_profiles: SkillRepository
+    skill_sync_service: SkillSyncService
     session_queries: SessionQueryRepository
     context_items: ContextItemRepository
     run_registry: RunRegistry

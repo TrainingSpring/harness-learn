@@ -1,6 +1,9 @@
 """LLM 创建及工具、LLM 配置查询路由。"""
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+import io
+import zipfile
+from pathlib import Path
 
 from storage.errors import StorageConflictError
 from storage.ids import generate_id
@@ -16,6 +19,8 @@ from ..schemas.settings import (
     ModelDiscoveryRequest,
     ModelListResponse,
     ToolSummary,
+    SkillSummary,
+    SkillSyncResult,
     UpdateLLMProfileRequest,
 )
 from ..services.llm_model_discovery import ModelDiscoveryError, discover_models
@@ -199,4 +204,86 @@ async def list_tools(
         items=items,
         # 工具目录当前是本地受信列表，不提供动态分页。但仍使用统一外壳，让前端不需要为特殊接口写分支。
         pagination=Pagination(limit=len(items), offset=0, has_more=False),
+    )
+
+
+def _skill_summary(profile, services: ApplicationServices) -> SkillSummary:
+    return SkillSummary(
+        id=profile.id,
+        name=profile.name,
+        description=profile.description,
+        license=profile.license,
+        compatibility=profile.compatibility,
+        status=profile.status,
+        validation_error=profile.validation_error,
+        agent_count=services.skill_profiles.count_agents(profile.id),
+        updated_at=profile.updated_at,
+    )
+
+
+@router.get("/skills", response_model=ListResponse[SkillSummary])
+async def list_skills(
+    services: ApplicationServices = Depends(get_services),
+) -> ListResponse[SkillSummary]:
+    """只从数据库读取已同步的 Skill 索引。"""
+    items = [_skill_summary(skill, services) for skill in services.skill_profiles.list_all()]
+    return ListResponse(
+        items=items,
+        pagination=Pagination(limit=len(items), offset=0, has_more=False),
+    )
+
+
+@router.post("/skills/refresh", response_model=SkillSyncResult)
+async def refresh_skills(
+    services: ApplicationServices = Depends(get_services),
+) -> SkillSyncResult:
+    """扫描固定 Skill 目录并更新数据库索引。"""
+    result = services.skill_sync_service.refresh()
+    items = [_skill_summary(skill, services) for skill in services.skill_profiles.list_all()]
+    return SkillSyncResult(
+        added=result.added,
+        updated=result.updated,
+        unchanged=result.unchanged,
+        missing=result.missing,
+        invalid=result.invalid,
+        items=items,
+    )
+
+
+@router.post("/skills/import", response_model=SkillSyncResult)
+async def import_skill(
+    file: UploadFile = File(...),
+    services: ApplicationServices = Depends(get_services),
+) -> SkillSyncResult:
+    """导入 ZIP Skill 到固定目录后执行刷新。"""
+    if not file.filename or not file.filename.lower().endswith(".zip"):
+        raise ApiError(400, "SKILL_IMPORT_INVALID", "只支持 ZIP 格式的 Skill")
+    payload = await file.read()
+    if len(payload) > 20 * 1024 * 1024:
+        raise ApiError(413, "SKILL_IMPORT_TOO_LARGE", "Skill 压缩包不能超过 20MB")
+    try:
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            members = archive.infolist()
+            if len(members) > 500:
+                raise ValueError("Skill 文件数量超过限制")
+            root = services.skill_catalog.root
+            root.mkdir(parents=True, exist_ok=True)
+            for member in members:
+                path = Path(member.filename)
+                if path.is_absolute() or ".." in path.parts or member.filename.startswith("/"):
+                    raise ValueError("压缩包包含非法路径")
+                if member.is_dir():
+                    continue
+                target = (root / path).resolve()
+                if target != root and root not in target.parents:
+                    raise ValueError("压缩包路径不能逃逸 Skills 目录")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(archive.read(member))
+    except (zipfile.BadZipFile, OSError, ValueError) as error:
+        raise ApiError(400, "SKILL_IMPORT_INVALID", "Skill 压缩包无法导入") from error
+    result = services.skill_sync_service.refresh()
+    items = [_skill_summary(skill, services) for skill in services.skill_profiles.list_all()]
+    return SkillSyncResult(
+        added=result.added, updated=result.updated, unchanged=result.unchanged,
+        missing=result.missing, invalid=result.invalid, items=items,
     )

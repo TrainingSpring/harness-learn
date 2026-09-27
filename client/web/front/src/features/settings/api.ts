@@ -7,6 +7,8 @@ import type {
   LLMProfileSummary,
   ModelListResponse,
   ToolSummary,
+  SkillSummary,
+  SkillSyncResult,
   UpdateLLMProfileRequest,
 } from "../../api/types";
 
@@ -52,4 +54,18 @@ export function getLlmProfileApiKey(profileId: string): Promise<ApiKeyResponse> 
 
 export function listTools(): Promise<ListResponse<ToolSummary>> {
   return apiClient.get("/api/settings/tools");
+}
+
+export function listSkills(): Promise<ListResponse<SkillSummary>> {
+  return apiClient.get("/api/settings/skills");
+}
+
+export function refreshSkills(): Promise<SkillSyncResult> {
+  return apiClient.post<void, SkillSyncResult>("/api/settings/skills/refresh");
+}
+
+export function importSkill(file: File): Promise<SkillSyncResult> {
+  const body = new FormData();
+  body.append("file", file);
+  return apiClient.postForm<SkillSyncResult>("/api/settings/skills/import", body);
 }

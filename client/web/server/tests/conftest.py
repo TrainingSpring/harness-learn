@@ -68,5 +68,6 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
         database.close()
 
     app = create_app(WebServerSettings(workspace=tmp_path))
+    app.state.skill_root = tmp_path / "skills"
     with TestClient(app) as test_client:
         yield test_client

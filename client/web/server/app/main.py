@@ -27,7 +27,10 @@ from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.repositories.context_item import ContextItemRepository
 from storage.repositories.session_query import SessionQueryRepository
+from storage.repositories.skill import SkillRepository
 from tools.registry.catalog import ToolCatalog
+from skills.catalog import SkillCatalog
+from skills.sync_service import SkillSyncService
 
 
 def create_app(settings: WebServerSettings) -> FastAPI:
@@ -45,6 +48,8 @@ def create_app(settings: WebServerSettings) -> FastAPI:
         catalog = ToolCatalog()
         session_queries = SessionQueryRepository(database)
         context_items = ContextItemRepository(database)
+        skill_profiles = SkillRepository(database)
+        skill_catalog = SkillCatalog()
         llm_profiles = LLMProfileRepository(database)
         run_registry = RunRegistry()
         session_service = SessionService(database)
@@ -55,6 +60,9 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             llm_profiles=llm_profiles,
             agent_profile_assistant=AgentProfileAssistant(llm_profiles),
             tool_catalog=catalog,
+            skill_catalog=skill_catalog,
+            skill_profiles=skill_profiles,
+            skill_sync_service=SkillSyncService(skill_catalog, skill_profiles),
             session_queries=session_queries,
             context_items=context_items,
             run_registry=run_registry,
