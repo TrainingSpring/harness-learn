@@ -9,6 +9,7 @@ import type {
   LLMProfileSummary,
   ToolSummary,
   SkillSummary,
+  AgentDetail,
 } from "../../../api/types";
 
 interface CreateAgentDialogProps {
@@ -22,6 +23,8 @@ interface CreateAgentDialogProps {
   onClose: () => void;
   onSubmit: (request: CreateAgentRequest) => void;
   onSuggest: (request: AgentProfileSuggestionRequest) => Promise<AgentProfileSuggestion>;
+  initialAgent?: AgentDetail | null;
+  submitLabel?: string;
 }
 
 /** 角色创建弹窗；负责收集表单值，不直接访问 API 或数据库。 */
@@ -36,6 +39,8 @@ export function CreateAgentDialog({
   onClose,
   onSubmit,
   onSuggest,
+  initialAgent = null,
+  submitLabel = "创建角色",
 }: CreateAgentDialogProps) {
   const dialogRef = useModalFocus<HTMLDivElement>(isOpen);
   const [name, setName] = useState("");
@@ -51,14 +56,14 @@ export function CreateAgentDialog({
 
   useEffect(() => {
     if (!isOpen) return;
-    setName("");
-    setDescription("");
-    setPersonality("");
-    setExpertise("");
-    setLlmProfileId("");
-    setSelectedTools([]);
-    setSelectedSkills([]);
-    setIsEnabled(true);
+    setName(initialAgent?.name ?? "");
+    setDescription(initialAgent?.description ?? "");
+    setPersonality(initialAgent?.personality ?? "");
+    setExpertise(initialAgent?.expertise.join(", ") ?? "");
+    setLlmProfileId(initialAgent?.llmProfileId ?? "");
+    setSelectedTools(initialAgent?.tools ?? []);
+    setSelectedSkills(initialAgent?.skills ?? []);
+    setIsEnabled(initialAgent?.isEnabled ?? true);
     setFormError(null);
     setSuggestionError(null);
   }, [isOpen]);
@@ -139,7 +144,7 @@ export function CreateAgentDialog({
         tabIndex={-1}
       >
         <div className="dialog-heading">
-          <div><p className="eyebrow">角色目录</p><h2 id="create-agent-title">新增角色</h2></div>
+          <div><p className="eyebrow">角色目录</p><h2 id="create-agent-title">{initialAgent ? "编辑角色" : "新增角色"}</h2></div>
           <Button variant="ghost" aria-label="关闭" icon={<X size={17} />} onClick={onClose} />
         </div>
         <form className="form-stack" onSubmit={handleSubmit}>
@@ -178,7 +183,7 @@ export function CreateAgentDialog({
           </fieldset>
           <label className="checkbox-option"><input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /><span>启用此角色</span></label>
           {(suggestionError || formError || error) && <p className="inline-error" role="alert">{suggestionError || formError || error}</p>}
-          <div className="dialog-actions"><Button type="button" onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={isSubmitting} icon={<Plus size={16} />}>{isSubmitting ? "创建中…" : "创建角色"}</Button></div>
+          <div className="dialog-actions"><Button type="button" onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={isSubmitting} icon={<Plus size={16} />}>{isSubmitting ? "保存中…" : submitLabel}</Button></div>
         </form>
       </div>
     </div>

@@ -1,9 +1,10 @@
-import { ArrowRight, TerminalSquare } from "lucide-react";
+import { ArrowRight, Pencil, TerminalSquare } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Button } from "../../../components/Button";
 import type { AgentSummary } from "../../../api/types";
 
 /** 角色发现页中的独立条目，强调职责和可用能力。 */
-export function AgentCard({ agent }: { agent: AgentSummary }) {
+export function AgentCard({ agent, onEdit }: { agent: AgentSummary; onEdit: (agentId: string) => void }) {
   const visibleTools = agent.tools.slice(0, 3);
   const remaining = agent.tools.length - visibleTools.length;
 
@@ -26,6 +27,7 @@ export function AgentCard({ agent }: { agent: AgentSummary }) {
         {remaining > 0 && <span>另有 {remaining} 项</span>}
       </div>
       <div className="agent-card__actions">
+        <Button variant="ghost" aria-label={`编辑${agent.name}`} icon={<Pencil size={15} />} onClick={() => onEdit(agent.id)} />
         <Link className="text-link" to={`/agents/${encodeURIComponent(agent.id)}`}>查看详情</Link>
         <Link className="button button--primary" aria-label={`与${agent.name}开始对话`} to={`/new?agentId=${encodeURIComponent(agent.id)}`}>
           开始对话 <ArrowRight size={15} />

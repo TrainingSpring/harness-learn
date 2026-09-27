@@ -45,6 +45,8 @@ export interface CreateAgentRequest {
   isEnabled: boolean;
 }
 
+export type UpdateAgentRequest = CreateAgentRequest;
+
 /** 请求 AI 根据原始描述生成角色表单草案。 */
 export interface AgentProfileSuggestionRequest {
   description: string;

@@ -94,6 +94,33 @@ async def get_agent(
     return _detail(profile)
 
 
+def _validated_profile_data(request: CreateAgentRequest, services: ApplicationServices) -> dict:
+    """校验并整理创建/更新共用的角色配置。"""
+    try:
+        llm_profile = services.llm_profiles.get(request.llm_profile_id)
+    except ValueError as error:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在") from error
+    if llm_profile is None:
+        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在")
+    try:
+        services.tool_catalog.validate_names(request.tools)
+    except ValueError as error:
+        raise ApiError(422, "INVALID_TOOL", str(error)) from error
+    skills = []
+    for skill_id in dict.fromkeys(request.skill_ids):
+        try:
+            skill = services.skill_profiles.get(skill_id)
+        except ValueError as error:
+            raise ApiError(422, "INVALID_SKILL", "Skill ID 无效") from error
+        if skill is None or skill.status != "AVAILABLE":
+            raise ApiError(422, "INVALID_SKILL", "只能关联可用 Skill")
+        skills.append(skill.id)
+    return {"name": request.name, "description": request.description,
+            "personality": request.personality, "expertise": request.expertise,
+            "llm_profile_id": request.llm_profile_id, "tools": request.tools,
+            "skill_ids": skills, "is_enabled": request.is_enabled}
+
+
 @router.post("", response_model=AgentDetail, status_code=status.HTTP_201_CREATED)
 async def create_agent(
     request: CreateAgentRequest,
@@ -108,40 +135,35 @@ async def create_agent(
     Returns:
         新建角色的详情；ID 由服务端生成。
     """
-    try:
-        llm_profile = services.llm_profiles.get(request.llm_profile_id)
-    except ValueError as error:
-        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在") from error
-    if llm_profile is None:
-        raise ApiError(404, "LLM_PROFILE_NOT_FOUND", "LLM 配置不存在")
-
-    try:
-        services.tool_catalog.validate_names(request.tools)
-    except ValueError as error:
-        raise ApiError(422, "INVALID_TOOL", str(error)) from error
-    skills = []
-    for skill_id in dict.fromkeys(request.skill_ids):
-        try:
-            skill = services.skill_profiles.get(skill_id)
-        except ValueError as error:
-            raise ApiError(422, "INVALID_SKILL", "Skill ID 无效") from error
-        if skill is None or skill.status != "AVAILABLE":
-            raise ApiError(422, "INVALID_SKILL", "只能关联可用 Skill")
-        skills.append(skill.id)
+    data = _validated_profile_data(request, services)
 
     profile = AgentProfile(
         id=generate_id("agent"),
-        name=request.name,
-        description=request.description,
-        personality=request.personality,
-        expertise=request.expertise,
-        llm_profile_id=request.llm_profile_id,
-        tools=request.tools,
-        skill_ids=skills,
-        is_enabled=request.is_enabled,
+        **data,
     )
     try:
         saved = services.agent_profiles.save(profile)
+    except StorageConflictError as error:
+        raise ApiError(409, "AGENT_PROFILE_CONFLICT", "角色配置保存冲突") from error
+    return _detail(saved)
+
+
+@router.patch("/{agent_id}", response_model=AgentDetail)
+async def update_agent(
+    agent_id: str,
+    request: CreateAgentRequest,
+    services: ApplicationServices = Depends(get_services),
+) -> AgentDetail:
+    """更新角色配置，保留稳定 Agent ID 和创建时间。"""
+    try:
+        current = services.agent_profiles.get(agent_id)
+    except ValueError as error:
+        raise ApiError(404, "AGENT_NOT_FOUND", "Agent 不存在") from error
+    if current is None:
+        raise ApiError(404, "AGENT_NOT_FOUND", "Agent 不存在")
+    data = _validated_profile_data(request, services)
+    try:
+        saved = services.agent_profiles.save(AgentProfile(id=current.id, created_at=current.created_at, **data))
     except StorageConflictError as error:
         raise ApiError(409, "AGENT_PROFILE_CONFLICT", "角色配置保存冲突") from error
     return _detail(saved)

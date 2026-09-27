@@ -23,3 +23,12 @@ def test_create_agent_rejects_unknown_skill(client):
     response = client.post("/api/agents", json={"name": "错误角色", "description": "bad", "personality": "", "expertise": [], "llmProfileId": "llm_TESTLLM001", "tools": [], "skillIds": ["skill_UNKNOWN01"], "isEnabled": True})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "INVALID_SKILL"
+
+
+def test_update_agent_persists_role_and_skill_configuration(client):
+    skill_id = _import_skill(client)
+    created = client.post("/api/agents", json={"name": "旧角色", "description": "old", "personality": "", "expertise": [], "llmProfileId": "llm_TESTLLM001", "tools": [], "skillIds": [], "isEnabled": True}).json()
+    response = client.patch(f"/api/agents/{created['id']}", json={"name": "新角色", "description": "updated", "personality": "严谨", "expertise": ["review"], "llmProfileId": "llm_TESTLLM001", "tools": ["read"], "skillIds": [skill_id], "isEnabled": True})
+    assert response.status_code == 200
+    assert response.json()["name"] == "新角色"
+    assert response.json()["skills"] == [skill_id]

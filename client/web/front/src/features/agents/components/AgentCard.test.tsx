@@ -1,11 +1,12 @@
 import { render, screen } from "@testing-library/react";
+import { vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { AgentCard } from "./AgentCard";
 
 it("展示角色能力并将角色 id 带入新对话链接", () => {
   render(
     <MemoryRouter>
-      <AgentCard agent={{
+      <AgentCard onEdit={vi.fn()} agent={{
         id: "agent_ENGINEER01",
         name: "工程师",
         description: "负责实现和审查代码",
