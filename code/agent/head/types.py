@@ -1,6 +1,19 @@
-from openai.types.responses.response import Response,ResponseUsage,ResponseOutputItem
 from dataclasses import dataclass
 from typing import Any
+
+
+SUPPORTED_PROTOCOLS = frozenset(("responses", "completions", "claude"))
+
+
+def validate_protocol(protocol: str) -> str:
+    """Validate and normalize the protocol used by :class:`LLM`."""
+    if not isinstance(protocol, str) or not protocol.strip():
+        raise ValueError("protocol 必须是非空字符串")
+    normalized = protocol.strip().lower()
+    if normalized not in SUPPORTED_PROTOCOLS:
+        supported = ", ".join(sorted(SUPPORTED_PROTOCOLS))
+        raise ValueError(f"不支持的 LLM 协议: {protocol}，支持: {supported}")
+    return normalized
 
 class LLMUsage:
     """LLMUsage
@@ -17,13 +30,35 @@ class LLMUsage:
         self.input_tokens = input_tokens
 
     @staticmethod
-    def to_LLMUsage(usage:ResponseUsage):
+    def from_responses_usage(usage: Any):
         return LLMUsage(
-            total_tokens=usage.total_tokens,
-            cached_token=usage.input_tokens_details.cached_tokens,
-            output_tokens=usage.output_tokens,
-            input_tokens=usage.input_tokens,
+            total_tokens=getattr(usage, "total_tokens", 0) or 0,
+            cached_token=getattr(getattr(usage, "input_tokens_details", None), "cached_tokens", 0) or 0,
+            output_tokens=getattr(usage, "output_tokens", 0) or 0,
+            input_tokens=getattr(usage, "input_tokens", 0) or 0,
         )
+
+    @staticmethod
+    def from_completions_usage(usage: Any):
+        return LLMUsage(
+            total_tokens=getattr(usage, "total_tokens", 0) or 0,
+            cached_token=0,
+            output_tokens=getattr(usage, "completion_tokens", 0) or 0,
+            input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+        )
+
+    @staticmethod
+    def from_claude_usage(usage: Any):
+        input_tokens = getattr(usage, "input_tokens", 0) or 0
+        output_tokens = getattr(usage, "output_tokens", 0) or 0
+        return LLMUsage(
+            total_tokens=input_tokens + output_tokens,
+            cached_token=getattr(usage, "cache_read_input_tokens", 0) or 0,
+            output_tokens=output_tokens,
+            input_tokens=input_tokens,
+        )
+
+    to_LLMUsage = from_responses_usage
 
 
 class LLMResponseOutputItem:
@@ -44,7 +79,7 @@ class LLMResponseOutputItem:
         self.status = status
 
     @staticmethod
-    def to_LLMResponseOutputItem(item:ResponseOutputItem):
+    def to_LLMResponseOutputItem(item: Any):
         return LLMResponseOutputItem(
             type=item.type,
             id=getattr(item,"id",None),
@@ -55,7 +90,7 @@ class LLMResponseOutputItem:
             status=getattr(item,"status",None),
         )
     @staticmethod
-    def to_LLMResponseOutputItems(items:list[ResponseOutputItem]):
+    def to_LLMResponseOutputItems(items: list[Any]):
         return [LLMResponseOutputItem.to_LLMResponseOutputItem(item) for item in items]
 
     def to_dict(self):
@@ -88,6 +123,7 @@ class LLMResponse:
     is_stop: bool|None = None
     arguments:str|None = None
     name:str|None = None
+    call_id: str|None = None
     usage:LLMUsage|None=None
     message:Any|None = None
 
@@ -103,3 +139,7 @@ class LLMConfig:
     base_url:str
     api_key:str
     model:str
+    protocol: str = "responses"
+
+    def __post_init__(self) -> None:
+        self.protocol = validate_protocol(self.protocol)
