@@ -270,7 +270,8 @@ code, pre { font-family: var(--font-mono); }
 .skill-multiselect__trigger { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 10px; color: var(--text-secondary); background: var(--bg-subtle); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); text-align: left; }
 .skill-multiselect__trigger:hover { border-color: var(--focus); }
 .skill-multiselect__menu { position: absolute; z-index: 5; top: calc(100% + 5px); left: 0; right: 0; display: grid; gap: 5px; max-height: 220px; overflow-y: auto; padding: 7px; background: var(--bg); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); box-shadow: 0 12px 28px rgb(0 0 0 / 16%); }
-.skill-multiselect__menu .checkbox-option { width: 100%; }
+.skill-multiselect__menu .checkbox-option { width: 100%; justify-content: flex-start; }
+.skill-multiselect__menu .checkbox-option input { width: auto; }
 .form-hint, .form-notice { margin: 0; color: var(--text-muted) !important; font-size: 12px; }
 .form-notice { margin: -8px 0 16px; padding: 9px 10px; background: var(--bg-subtle); border-left: 2px solid var(--accent); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
