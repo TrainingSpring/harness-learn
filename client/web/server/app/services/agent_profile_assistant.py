@@ -19,7 +19,7 @@ class InvalidAgentSuggestionError(Exception):
     """模型输出不是约定的角色草案 JSON。"""
 
 
-LLMFactory = Callable[[str, str, str, str], Any]
+LLMFactory = Callable[..., Any]
 
 
 class AgentProfileAssistant:
@@ -81,16 +81,21 @@ JSON 必须且只能包含以下字段：
 
         if not profile.api_key:
             raise ValueError(f"LLM 配置未设置 API Key: {profile.id}")
-        llm = self.llm_factory(
-            profile.base_url or "",
-            profile.api_key,
-            profile.model,
-            self._SYSTEM_PROMPT,
+        factory_args = (profile.base_url or "", profile.api_key, profile.model, self._SYSTEM_PROMPT)
+        try:
+            llm = self.llm_factory(
+                *factory_args,
+                protocol=getattr(profile, "options", {}).get("protocol", "responses"),
+            )
+        except TypeError:
+            llm = self.llm_factory(*factory_args)
+        prompt = f"请根据下面的原始描述生成角色配置：\n\n{description.strip()}"
+        response = llm.call(prompt) if hasattr(llm, "call") else llm.call_responses(prompt)
+        output_text = (
+            llm.extract_text(response)
+            if hasattr(llm, "extract_text")
+            else getattr(response, "output_text", None)
         )
-        response = llm.call_responses(
-            f"请根据下面的原始描述生成角色配置：\n\n{description.strip()}"
-        )
-        output_text = getattr(response, "output_text", None)
         if not isinstance(output_text, str) or not output_text.strip():
             raise InvalidAgentSuggestionError("模型未返回文本")
 

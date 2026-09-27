@@ -246,8 +246,16 @@ class Context:
     ) -> dict[str, Any]:
         if isinstance(msg, str):
             return {"kind": type, "role": role, "content": msg}
-        if isinstance(msg, LLMResponseOutputItem):
-            return Context._normalize_message(msg.to_dict())
+        if hasattr(msg, "type") and hasattr(msg, "name") and hasattr(msg, "arguments"):
+            return Context._normalize_message({
+                "type": msg.type,
+                "id": msg.id,
+                "content": msg.content,
+                "name": msg.name,
+                "arguments": msg.arguments,
+                "call_id": msg.call_id,
+                "status": msg.status,
+            })
         if isinstance(msg, dict):
             item = copy.deepcopy(msg)
             legacy_type = item.pop("type", None)

@@ -161,10 +161,10 @@ class SessionExecution:
     def _persist_runtime_changes(self, agent_id: str, event: RuntimeEvent) -> None:
         """保存 Context 快照，并同步 Agent 已产生的原始业务事件。"""
         self._persist_function_protocol_items(agent_id)
-        if isinstance(event, LLMResponse) and event.type == "done":
+        # 按事件契约读取，避免不同导入路径或协议适配器产生的等价事件
+        # 因类身份不同而无法持久化。
+        if getattr(event, "type", None) == "done" and hasattr(event, "data"):
             for item in event.data or []:
-                if item.type != "message":
-                    continue
                 text = self._message_text(item)
                 if text.strip():
                     self.context_service.append_agent_message(agent_id, text)
@@ -208,15 +208,21 @@ class SessionExecution:
                 self._recorded_output_call_ids.add(call_id)
 
     @staticmethod
-    def _message_text(item: LLMResponseOutputItem) -> str:
+    def _message_text(item: LLMResponseOutputItem | dict) -> str:
         """提取已写入 Context 的模型文本。"""
-        if isinstance(item.content, str):
-            return item.content
-        if not isinstance(item.content, list):
+        if isinstance(item, dict):
+            content = item.get("content")
+        else:
+            content = getattr(item, "content", None)
+        if isinstance(content, str):
+            return content
+        if content is not None and not isinstance(content, list):
+            return str(content)
+        if not isinstance(content, list):
             return ""
         return "".join(
             part.get("text") if isinstance(part, dict) else getattr(part, "text", "")
-            for part in item.content
+            for part in content
             if isinstance(
                 part.get("text") if isinstance(part, dict) else getattr(part, "text", None),
                 str,
@@ -290,6 +296,7 @@ class SessionService:
                 summarizer_config.base_url,
                 summarizer_config.api_key,
                 summarizer_config.model,
+                protocol=summarizer_config.protocol,
             ),
             session_id=session.id,
         )
