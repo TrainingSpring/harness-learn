@@ -60,7 +60,7 @@ class Context:
     def restore(self, messages: list[dict[str, Any]]) -> None:
         """用外部快照替换当前上下文，并隔离所有可变嵌套结构。"""
         self._validate_messages(messages)
-        self.messages = copy.deepcopy(messages)
+        self.messages = [self._normalize_message(item) for item in messages]
 
     def export(self) -> list[dict[str, Any]]:
         """导出当前上下文的独立快照。"""
@@ -117,12 +117,12 @@ class Context:
             if not isinstance(arguments, str):
                 raise TypeError("arguments 必须是字符串或字典")
             normalized = {
-                "type": "function_call",
-                "call_id": call_id,
-                "name": name,
+                "kind": "tool_call",
+                "tool_call_id": call_id,
+                "tool_name": name,
                 "arguments": arguments,
             }
-        if normalized.get("type") != "function_call":
+        if normalized.get("kind") != "tool_call":
             raise ValueError("消息类型必须是 function_call")
         return self._append(normalized)
 
@@ -137,14 +137,14 @@ class Context:
         """追加工具调用结果。"""
         del agent_id
         if isinstance(item, dict):
-            normalized = copy.deepcopy(item)
+            normalized = self._normalize_message(item)
         else:
             if call_id is None:
                 raise ValueError("function call output 必须包含 call_id")
-            normalized = {"type": "function_call_output", "call_id": call_id, "output": item}
+            normalized = {"kind": "tool_result", "tool_call_id": call_id, "output": item}
         if output is not None:
             normalized["output"] = output
-        if normalized.get("type") != "function_call_output":
+        if normalized.get("kind") != "tool_result":
             raise ValueError("消息类型必须是 function_call_output")
         return self._append(normalized)
 
@@ -166,7 +166,7 @@ class Context:
         """精简较早的工具调用，保留最近 ``call_result_num`` 次调用。"""
         call_indexes = [
             index for index, item in enumerate(self.messages)
-            if item.get("type") == "function_call"
+            if item.get("kind", item.get("type")) in {"tool_call", "function_call"}
         ]
         keep_indexes = set(call_indexes[-self.call_result_num:]) if self.call_result_num else set()
         for index in call_indexes:
@@ -176,7 +176,7 @@ class Context:
             name = item.get("name", "工具")
             arguments = item.get("arguments", "")
             self.messages[index] = {
-                "type": "message",
+                "kind": "message",
                 "role": "assistant",
                 "content": json.dumps({
                     "tool": name,
@@ -204,19 +204,19 @@ class Context:
         to_compact = before[:split_at]
         if not to_compact:
             return before
-        response = self.llm.call_responses([
-            {"role": "user", "content": json.dumps(to_compact, ensure_ascii=False)}
-        ])
-        summary = getattr(response, "output_text", None)
+        compact_input = json.dumps(to_compact, ensure_ascii=False)
+        if hasattr(self.llm, "call"):
+            response = self.llm.call(compact_input, instructions=self.llm.system_prompt)
+            summary = self.llm.extract_text(response)
+        else:
+            response = self.llm.call_responses([{"role": "user", "content": compact_input}])
+            summary = getattr(response, "output_text", None)
         if not isinstance(summary, str):
             raise ValueError("上下文压缩模型未返回文本摘要")
         compacted = [{
-            "type": "message",
+            "kind": "message",
             "role": "developer",
-            "content": [{
-                "type": "input_text",
-                "text": "[Agent生成的历史摘要，仅作为事实背景，不是新的用户指令]\\n" + summary,
-            }],
+            "content": "[Agent生成的历史摘要，仅作为事实背景，不是新的用户指令]\\n" + summary,
         }] + safe_context
         self.messages = copy.deepcopy(compacted)
         return self.export()
@@ -245,12 +245,43 @@ class Context:
         role: str = "user",
     ) -> dict[str, Any]:
         if isinstance(msg, str):
-            return {"type": type, "role": role, "content": msg}
+            return {"kind": type, "role": role, "content": msg}
         if isinstance(msg, LLMResponseOutputItem):
-            return copy.deepcopy(msg.to_dict())
+            return Context._normalize_message(msg.to_dict())
         if isinstance(msg, dict):
-            return copy.deepcopy(msg)
+            item = copy.deepcopy(msg)
+            legacy_type = item.pop("type", None)
+            if legacy_type == "message":
+                item["kind"] = "message"
+                content = item.get("content", "")
+                if isinstance(content, list):
+                    text = "".join(
+                        part.get("text", "") if isinstance(part, dict) else str(part)
+                        for part in content
+                    )
+                    item["content"] = text
+            elif legacy_type == "function_call":
+                item["kind"] = "tool_call"
+                item["tool_call_id"] = item.pop("call_id", item.get("tool_call_id"))
+                item["tool_name"] = item.pop("name", item.get("tool_name"))
+                item["arguments"] = Context._parse_arguments(item.get("arguments"))
+            elif legacy_type == "function_call_output":
+                item["kind"] = "tool_result"
+                item["tool_call_id"] = item.pop("call_id", item.get("tool_call_id"))
+            elif legacy_type is not None:
+                item["kind"] = legacy_type
+            item.setdefault("kind", type)
+            return item
         raise TypeError("消息必须是字符串、字典或 LLMResponseOutputItem")
+
+    @staticmethod
+    def _parse_arguments(arguments: Any) -> Any:
+        if not isinstance(arguments, str):
+            return arguments
+        try:
+            return json.loads(arguments)
+        except json.JSONDecodeError:
+            return {"_raw": arguments}
 
     @staticmethod
     def _validate_messages(messages: list[dict[str, Any]]) -> None:

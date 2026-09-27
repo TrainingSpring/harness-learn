@@ -28,6 +28,8 @@ class RecordingLLM:
         self.inputs.append(copy.deepcopy(model_input))
         yield LLMResponse(type="done", data=[], is_stop=True)
 
+    call_stream = call_responses_stream
+
 
 def _runtime(llm, context):
     execution_context = ExecutionContext("/workspace", "agent_TEST00001", "session_TEST01")

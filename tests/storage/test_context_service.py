@@ -120,11 +120,11 @@ class ContextServiceTests(unittest.TestCase):
             self.service.load_visible("agent_1V3ASAXQ2A")
         )
 
-        self.assertEqual(projected[0]["type"], "function_call")
-        self.assertEqual(projected[0]["call_id"], "call_001")
-        self.assertEqual(projected[0]["name"], "read")
-        self.assertEqual(projected[1]["type"], "function_call_output")
-        self.assertEqual(projected[1]["call_id"], output.call_id)
+        self.assertEqual(projected[0]["kind"], "tool_call")
+        self.assertEqual(projected[0]["tool_call_id"], "call_001")
+        self.assertEqual(projected[0]["tool_name"], "read")
+        self.assertEqual(projected[1]["kind"], "tool_result")
+        self.assertEqual(projected[1]["tool_call_id"], output.call_id)
         self.assertEqual(projected[1]["output"], "读取成功")
 
     def test_service_does_not_store_vendor_protocol_fields_in_payload(self):
@@ -157,7 +157,10 @@ class ContextServiceTests(unittest.TestCase):
 
         self.service.restore_context(context, "agent_1V3ASAXQ2A")
 
-        self.assertEqual(context.export(), saved)
+        self.assertEqual(
+            context.export(),
+            [{"kind": "message", "role": "developer", "content": "压缩摘要"}],
+        )
 
     def test_service_builds_initial_context_from_raw_events_when_current_is_empty(self):
         """新旧 Session 没有当前快照时，应从原始业务事件构建输入。"""
@@ -167,7 +170,7 @@ class ContextServiceTests(unittest.TestCase):
         self.service.restore_context(context, "agent_1V3ASAXQ2A")
 
         self.assertEqual(context.messages[0]["role"], "user")
-        self.assertEqual(context.messages[0]["content"][0]["text"], "从原始事件恢复")
+        self.assertEqual(context.messages[0]["content"], "从原始事件恢复")
 
     def test_service_saves_context_snapshot(self):
         """服务应能保存 Context 导出的独立快照。"""

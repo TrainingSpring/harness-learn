@@ -25,6 +25,13 @@ class FakeLLM:
             raise self.error
         return SimpleNamespace(output_text=self.output_text)
 
+    def call(self, _input, instructions=None):
+        return self.call_responses(_input)
+
+    @staticmethod
+    def extract_text(response):
+        return response.output_text
+
 
 class ContextGovernanceTests(unittest.TestCase):
     """验证 Context 的统一追加和治理行为。"""
@@ -52,8 +59,8 @@ class ContextGovernanceTests(unittest.TestCase):
 
         self.assertEqual(context.messages[0]["role"], "user")
         self.assertEqual(context.messages[1]["role"], "assistant")
-        self.assertEqual(context.messages[2]["type"], "function_call")
-        self.assertEqual(context.messages[3]["type"], "function_call_output")
+        self.assertEqual(context.messages[2]["kind"], "tool_call")
+        self.assertEqual(context.messages[3]["kind"], "tool_result")
 
     def test_function_call_governance_accepts_dict_messages(self):
         """治理不能假设消息一定是 SDK 对象。"""
@@ -68,8 +75,8 @@ class ContextGovernanceTests(unittest.TestCase):
 
         context.function_call_manager()
 
-        self.assertEqual(context.messages[0]["type"], "message")
-        self.assertEqual(context.messages[2]["type"], "function_call")
+        self.assertEqual(context.messages[0]["kind"], "message")
+        self.assertEqual(context.messages[2]["kind"], "tool_call")
 
     def test_compaction_failure_preserves_previous_context(self):
         """压缩模型失败时，治理前的上下文必须完整保留。"""
@@ -96,7 +103,7 @@ class ContextGovernanceTests(unittest.TestCase):
         context.compact_context()
 
         self.assertEqual(len(context.messages), 1)
-        self.assertIn("压缩摘要", context.messages[0]["content"][0]["text"])
+        self.assertIn("压缩摘要", context.messages[0]["content"])
 
     def test_usage_governance_uses_current_messages(self):
         """追加带 usage 的消息仍应以当前消息集合执行治理。"""

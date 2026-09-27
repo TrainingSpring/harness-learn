@@ -60,9 +60,9 @@ class ContextRestoreContractTests(unittest.TestCase):
         context.restore(messages)
         messages[0]["content"][0]["text"] = "外部修改"
         exported = context.export()
-        exported[0]["content"][0]["text"] = "导出修改"
+        exported[0]["content"] = "导出修改"
 
-        self.assertEqual(context.messages[0]["content"][0]["text"], "原始")
+        self.assertEqual(context.messages[0]["content"], "原始")
 
     def test_to_model_input_is_a_fresh_snapshot_with_system_messages(self):
         """模型输入应包含系统消息，但不能让调用方修改 Context 内部。"""

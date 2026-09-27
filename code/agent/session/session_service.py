@@ -174,10 +174,10 @@ class SessionExecution:
     def _persist_function_protocol_items(self, agent_id: str) -> None:
         """把 Context 中的新工具协议项写入不可变时间线。"""
         for item in self.context.export():
-            if item.get("type") != "function_call":
+            if item.get("kind", item.get("type")) not in {"tool_call", "function_call"}:
                 continue
-            call_id = item.get("call_id")
-            name = item.get("name")
+            call_id = item.get("tool_call_id", item.get("call_id"))
+            name = item.get("tool_name", item.get("name"))
             arguments = item.get("arguments")
             if not isinstance(call_id, str) or not isinstance(name, str):
                 continue
@@ -192,9 +192,9 @@ class SessionExecution:
                 )
 
         for item in self.context.export():
-            if item.get("type") != "function_call_output":
+            if item.get("kind", item.get("type")) not in {"tool_result", "function_call_output"}:
                 continue
-            call_id = item.get("call_id")
+            call_id = item.get("tool_call_id", item.get("call_id"))
             if not isinstance(call_id, str) or call_id in self._recorded_output_call_ids:
                 continue
             call = self.context_service.repository.find_by_call_id(self.session.id, call_id)

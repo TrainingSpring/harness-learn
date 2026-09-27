@@ -90,10 +90,17 @@ class Runtime:
 
     def call_llm(self) -> Generator[LLMResponse, None, None]:
         """使用绑定 Context 和工具 schema 请求一次 LLM 流。"""
-        return self.llm.call_responses_stream(
-            self.context.to_model_input(self.sys_message),
-            self.tools.list,
+        input_messages = self.context.export()
+        instructions = (
+            f"当前系统环境：{'windows' if os.name == 'nt' else 'linux'},"
+            f"项目目录{self.execution_context.project_path or '未选择'}"
         )
+        if hasattr(self.llm, "call_stream"):
+            try:
+                return self.llm.call_stream(input_messages, self.tools.list, instructions=instructions)
+            except TypeError:
+                return self.llm.call_stream(input_messages, self.tools.list)
+        return self.llm.call_responses_stream(self.context.to_model_input(self.sys_message), self.tools.list)
 
     def run(self) -> Generator[RuntimeEvent, None, None]:
         """使用绑定 Context 开始一次 Agent Loop。
@@ -279,8 +286,8 @@ class Runtime:
         self.context.append_function_call_output(
             self.execution_context.agent_id,
             {
-                "type": "function_call_output",
-                "call_id": call_id,
+                "kind": "tool_result",
+                "tool_call_id": call_id,
                 "output": encoded_output,
             },
         )

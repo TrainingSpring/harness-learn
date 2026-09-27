@@ -175,7 +175,10 @@ class SessionExecutionTests(unittest.TestCase):
 
         execution = self.sessions.load(session.id)
 
-        self.assertEqual(execution.context.export(), saved)
+        self.assertEqual(
+            execution.context.export(),
+            [{"kind": "message", "role": "developer", "content": "已有摘要"}],
+        )
         agent = self.sessions.created_agents[(session.id, "agent_1V3ASAXQ2A")]
         self.assertEqual(agent.contexts, [])
         self.assertEqual(len(execution.agents), 1)
@@ -194,9 +197,9 @@ class SessionExecutionTests(unittest.TestCase):
             execution.context.export(),
             [
                 {
-                    "type": "message",
+                    "kind": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": "从原始消息恢复"}],
+                    "content": "从原始消息恢复",
                 }
             ],
         )

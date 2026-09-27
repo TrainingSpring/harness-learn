@@ -20,7 +20,7 @@ class ContextService:
         session_id: 本服务操作的会话 ID。
 
     ContextService 保存的是用户消息、Agent 消息和工具事件等业务语义；
-    ``type``、``role`` 等厂商协议字段只在 ``to_responses_input`` 中生成。
+    Context 快照保存协议无关的内部消息；厂商格式由 LLM 层在调用时生成。
     """
 
     def __init__(
@@ -146,7 +146,7 @@ class ContextService:
         if agent_id is None:
             context.restore([])
             return []
-        initial = self.to_responses_input(self.load_visible(agent_id))
+        initial = self.to_internal_messages(self.load_visible(agent_id))
         context.restore(initial)
         return context.export()
 
@@ -155,44 +155,46 @@ class ContextService:
         self.save_current_context(context.export())
 
     @staticmethod
-    def to_responses_input(items: list[ContextItem]) -> list[dict[str, Any]]:
-        """把业务上下文项转换为当前 LLM 适配器需要的 Responses 输入。"""
+    def to_internal_messages(items: list[ContextItem]) -> list[dict[str, Any]]:
+        """把业务事件转换为协议无关的 Context 内部消息。"""
         projected: list[dict[str, Any]] = []
         for item in items:
             if item.kind == "USER_MESSAGE":
                 projected.append(
-                    ContextService._message_item("user", item.payload["text"])
+                    {"kind": "message", "role": "user", "content": item.payload["text"]}
                 )
             elif item.kind == "AGENT_MESSAGE":
                 projected.append(
-                    ContextService._message_item("assistant", item.payload["text"])
+                    {"kind": "message", "role": "assistant", "content": item.payload["text"]}
                 )
             elif item.kind == "FUNCTION_CALL":
                 projected.append(
                     {
-                        "type": "function_call",
-                        "call_id": item.call_id,
-                        "name": item.payload["name"],
+                        "kind": "tool_call",
+                        "tool_call_id": item.call_id,
+                        "tool_name": item.payload["name"],
                         "arguments": item.payload["arguments"],
                     }
                 )
             elif item.kind == "FUNCTION_CALL_OUTPUT":
                 projected.append(
                     {
-                        "type": "function_call_output",
-                        "call_id": item.call_id,
+                        "kind": "tool_result",
+                        "tool_call_id": item.call_id,
                         "output": item.payload["output"],
                     }
                 )
             elif item.kind in {"AGENT_DELEGATION", "SYSTEM_EVENT"}:
                 # 这些事件没有独立的 Responses 类型，用开发者消息承载事实背景。
                 projected.append(
-                    ContextService._message_item(
-                        "developer",
-                        item.payload.get("text", json.dumps(item.payload, ensure_ascii=False)),
-                    )
+                    {"kind": "message", "role": "developer", "content": item.payload.get(
+                        "text", json.dumps(item.payload, ensure_ascii=False)
+                    )}
                 )
         return projected
+
+    # Compatibility alias while existing callers migrate.
+    to_responses_input = to_internal_messages
 
     def _append(
         self,

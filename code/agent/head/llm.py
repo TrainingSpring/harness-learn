@@ -47,6 +47,25 @@ class LLM:
         method = getattr(self, f"call_{self.protocol}")
         return method(input, tools=tools, instructions=instructions)
 
+    @staticmethod
+    def extract_text(response: Any) -> str | None:
+        """从不同协议的普通响应中提取文本，不向上层泄漏协议字段。"""
+        output_text = getattr(response, "output_text", None)
+        if isinstance(output_text, str):
+            return output_text
+        content = getattr(response, "content", None)
+        if isinstance(content, list):
+            parts = [getattr(item, "text", None) for item in content]
+            text = "".join(part for part in parts if isinstance(part, str))
+            if text:
+                return text
+        choices = getattr(response, "choices", None)
+        if choices:
+            content = getattr(getattr(choices[0], "message", None), "content", None)
+            if isinstance(content, str):
+                return content
+        return None
+
     def call_responses_stream(self, input, tools=None, instructions=None):
         """调用 Responses，并转换为内部流式事件。"""
         with self._openai_client().responses.stream(
@@ -192,7 +211,7 @@ class LLM:
     @staticmethod
     def _normalize_base_url(base_url: str, protocol: str) -> str:
         if not isinstance(base_url, str) or not base_url.strip():
-            raise ValueError("base_url 必须是非空字符串")
+            return ""
         value = base_url.rstrip("/")
         if protocol in {"responses", "completions"} and not value.endswith("/v1"):
             value += "/v1"
@@ -216,14 +235,14 @@ class LLM:
         if isinstance(input, str):
             return messages + [{"role": "user", "content": input}]
         for item in input:
-            kind = item.get("type", "message")
-            if kind == "function_call":
+            kind = item.get("kind", item.get("type", "message"))
+            if kind in {"tool_call", "function_call"}:
                 messages.append({"role": "assistant", "content": None, "tool_calls": [{
-                    "id": item.get("call_id"), "type": "function",
-                    "function": {"name": item.get("name"), "arguments": cls._arguments_json(item.get("arguments"))},
+                    "id": item.get("tool_call_id", item.get("call_id")), "type": "function",
+                    "function": {"name": item.get("tool_name", item.get("name")), "arguments": cls._arguments_json(item.get("arguments"))},
                 }]})
-            elif kind == "function_call_output":
-                messages.append({"role": "tool", "tool_call_id": item.get("call_id"),
+            elif kind in {"tool_result", "function_call_output"}:
+                messages.append({"role": "tool", "tool_call_id": item.get("tool_call_id", item.get("call_id")),
                                  "content": cls._content_text(item.get("output", item.get("content", "")))})
             else:
                 messages.append({"role": item.get("role", "user"),
@@ -246,12 +265,12 @@ class LLM:
             return [{"role": "user", "content": input}]
         messages = []
         for item in input:
-            kind = item.get("type", "message")
-            if kind == "function_call":
-                messages.append({"role": "assistant", "content": [{"type": "tool_use", "id": item.get("call_id"),
-                    "name": item.get("name"), "input": item.get("arguments", {})}]})
-            elif kind == "function_call_output":
-                messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": item.get("call_id"),
+            kind = item.get("kind", item.get("type", "message"))
+            if kind in {"tool_call", "function_call"}:
+                messages.append({"role": "assistant", "content": [{"type": "tool_use", "id": item.get("tool_call_id", item.get("call_id")),
+                    "name": item.get("tool_name", item.get("name")), "input": item.get("arguments", {})}]})
+            elif kind in {"tool_result", "function_call_output"}:
+                messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": item.get("tool_call_id", item.get("call_id")),
                     "content": cls._content_text(item.get("output", item.get("content", "")))}]})
             elif item.get("role") != "system":
                 messages.append({"role": item.get("role", "user"), "content": cls._content_text(item.get("content", ""))})

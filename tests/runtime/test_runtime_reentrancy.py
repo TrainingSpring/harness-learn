@@ -110,7 +110,7 @@ def test_permission_resume_writes_tool_output_to_the_passed_context():
     ))
 
     assert executions == [{"target_path": "/outside/src/app.py"}]
-    assert context_a.messages[-1]["type"] == "function_call_output"
+    assert context_a.messages[-1]["kind"] == "tool_result"
     assert context_b.messages == []
 
 
