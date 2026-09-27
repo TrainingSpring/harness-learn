@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ChevronDown, LoaderCircle, Plus, Sparkles, X } from "lucide-react";
+import { LoaderCircle, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "../../../components/Button";
 import { useModalFocus } from "../../../hooks/useModalFocus";
+import { SkillPickerDialog } from "./SkillPickerDialog";
 import type {
   AgentProfileSuggestion,
   AgentProfileSuggestionRequest,
@@ -53,7 +54,7 @@ export function CreateAgentDialog({
   const [isEnabled, setIsEnabled] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
-  const [isSkillsOpen, setIsSkillsOpen] = useState(false);
+  const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -67,7 +68,7 @@ export function CreateAgentDialog({
     setIsEnabled(initialAgent?.isEnabled ?? true);
     setFormError(null);
     setSuggestionError(null);
-    setIsSkillsOpen(false);
+    setIsSkillPickerOpen(false);
   }, [isOpen]);
 
   useEffect(() => {
@@ -85,12 +86,6 @@ export function CreateAgentDialog({
     setSelectedTools((current) => current.includes(toolName)
       ? current.filter((item) => item !== toolName)
       : [...current, toolName]);
-  };
-
-  const toggleSkill = (skillId: string) => {
-    setSelectedSkills((current) => current.includes(skillId)
-      ? current.filter((item) => item !== skillId)
-      : [...current, skillId]);
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -181,21 +176,23 @@ export function CreateAgentDialog({
           </fieldset>
           <fieldset className="form-field form-fieldset"><legend>Skills</legend>
             {skills.length === 0 && <p className="form-hint">当前没有可用 Skill。</p>}
-            {skills.length > 0 && <div className="skill-multiselect">
-              <button type="button" className="skill-multiselect__trigger" aria-haspopup="listbox" aria-expanded={isSkillsOpen} onClick={() => setIsSkillsOpen((current) => !current)}>
-                <span>{selectedSkills.length > 0 ? `已选择 ${selectedSkills.length} 个 Skill` : "请选择 Skill"}</span>
-                <ChevronDown size={16} aria-hidden="true" />
-              </button>
-              {isSkillsOpen && <div className="skill-multiselect__menu" role="listbox" aria-label="选择 Skills" aria-multiselectable="true">
-                {skills.map((skill) => <label className="checkbox-option" key={skill.id} role="option" aria-selected={selectedSkills.includes(skill.id)}><input type="checkbox" checked={selectedSkills.includes(skill.id)} onChange={() => toggleSkill(skill.id)} /><span>{skill.name}</span></label>)}
-              </div>}
-            </div>}
+            {skills.length > 0 && <button type="button" className="skill-picker-trigger" onClick={() => setIsSkillPickerOpen(true)}>
+              <span>{selectedSkills.length > 0 ? `已选择 ${selectedSkills.length} 个 Skill` : "选择 Skills"}</span>
+              <span aria-hidden="true">→</span>
+            </button>}
           </fieldset>
           <label className="checkbox-option"><input type="checkbox" checked={isEnabled} onChange={(event) => setIsEnabled(event.target.checked)} /><span>启用此角色</span></label>
           {(suggestionError || formError || error) && <p className="inline-error" role="alert">{suggestionError || formError || error}</p>}
           <div className="dialog-actions"><Button type="button" onClick={onClose}>取消</Button><Button type="submit" variant="primary" disabled={isSubmitting} icon={<Plus size={16} />}>{isSubmitting ? "保存中…" : submitLabel}</Button></div>
         </form>
       </div>
+      <SkillPickerDialog
+        isOpen={isSkillPickerOpen}
+        skills={skills}
+        selectedSkillIds={selectedSkills}
+        onClose={() => setIsSkillPickerOpen(false)}
+        onConfirm={setSelectedSkills}
+      />
     </div>
   );
 }
