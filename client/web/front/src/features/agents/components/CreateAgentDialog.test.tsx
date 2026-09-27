@@ -108,3 +108,16 @@ it("只有填写描述并选择 LLM 后才启用 AI 生成按钮", async () => {
   await user.selectOptions(screen.getByLabelText("LLM 配置"), "llm_OPENAI0001");
   expect(suggestButton).toBeEnabled();
 });
+
+it("Skills 使用下拉多选并提交选中的 Skill ID", async () => {
+  const user = userEvent.setup();
+  const onSubmit = vi.fn();
+  render(<CreateAgentDialog isOpen isSubmitting={false} error={null} llmProfiles={[]} tools={[]} skills={[
+    { id: "skill_REVIEW0001", name: "代码审查", description: "", status: "AVAILABLE", validationError: null, license: null, compatibility: null, agentCount: 0, updatedAt: "" },
+    { id: "skill_DOCS000001", name: "文档编写", description: "", status: "AVAILABLE", validationError: null, license: null, compatibility: null, agentCount: 0, updatedAt: "" },
+  ]} onClose={vi.fn()} onSubmit={onSubmit} isSuggesting={false} onSuggest={vi.fn()} />);
+  await user.click(screen.getByRole("button", { name: "请选择 Skill" }));
+  await user.click(screen.getByLabelText("代码审查"));
+  expect(screen.getByText("已选择 1 个 Skill")).toBeInTheDocument();
+  expect(screen.getByRole("option", { name: /代码审查/ })).toHaveAttribute("aria-selected", "true");
+});
