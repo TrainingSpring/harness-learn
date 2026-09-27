@@ -15,6 +15,7 @@ class PromptBuilder:
         session_context: str | None = None,
         tools: list[str] | None = None,
         permission_mode: str | None = None,
+        skill_metadata: str | None = None,
     ) -> str:
         """生成当前 Agent 的系统指令。"""
         if not agent.description.strip():
@@ -41,6 +42,8 @@ class PromptBuilder:
             sections.append(self._permission_instruction(permission_mode))
         if session_context:
             sections.append(f"当前会话背景：{session_context}")
+        if skill_metadata:
+            sections.append(skill_metadata)
         return "\n".join(sections)
 
     @staticmethod

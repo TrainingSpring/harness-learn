@@ -1,6 +1,6 @@
-# Skills 开发迭代计划（未施工）
+# Skills 开发迭代计划（已完成）
 
-> 状态：阶段 0 至阶段 5 已完成；阶段 6 至阶段 7 未施工。
+> 状态：阶段 0 至阶段 7 已完成。
 >
 > 本文是 Skills 功能的设计与施工计划；各阶段状态以标题和顶部状态为准。
 >
@@ -1060,7 +1060,7 @@ Skill allowed-tools（未声明时表示不额外限制，仍受 Agent tools 限
 - Session 创建时 AgentFactory 能加载该 Agent 的 Skill 集合。
 - Session 仍负责创建 Context，Agent 仍负责创建 Runtime。
 
-### 阶段 6：PromptBuilder、Runtime 动态指令和资源边界
+### 阶段 6：PromptBuilder、Runtime 动态指令和资源边界（已完成）
 
 **目标**：Skill 真正影响模型输入，但不污染 Context 和权限体系。
 
@@ -1088,7 +1088,7 @@ Skill allowed-tools（未声明时表示不额外限制，仍受 Agent tools 限
 - Skill allowed-tools 不能增加 Agent 工具。
 - Skill 脚本和资源不绕过权限流程。
 
-### 阶段 7：完整回归、可观测性和收口
+### 阶段 7：完整回归、可观测性和收口（已完成）
 
 **目标**：验证完整链路并清理临时兼容代码。
 

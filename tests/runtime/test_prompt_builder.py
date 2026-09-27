@@ -80,6 +80,14 @@ class PromptBuilderTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             PromptBuilder().build(self.agent)
 
+    def test_build_includes_skill_metadata_without_skill_body(self):
+        prompt = PromptBuilder().build(
+            self.agent,
+            skill_metadata="已配置的 Skills：\n- review: Review code",
+        )
+        self.assertIn("review", prompt)
+        self.assertNotIn("Review carefully", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

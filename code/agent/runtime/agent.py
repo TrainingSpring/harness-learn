@@ -11,6 +11,7 @@ from session.ExecutionContext import ExecutionContext
 from tools.tools import Tools
 from tools.types import Tool
 from skills.types import SkillDefinition
+from skills.skills import SkillSet
 
 from .prompt_builder import PromptBuilder
 from .runtime import Runtime
@@ -50,6 +51,7 @@ class Agent:
         self.llm_config = llm_config
         self.tool_definitions = tuple(tool_definitions)
         self.skills = tuple(skills)
+        self.skill_set = SkillSet(self.skills)
         self.context = context
         self.execution_context = execution_context
         self.permission = permission
@@ -59,6 +61,7 @@ class Agent:
         instructions = (prompt_builder or PromptBuilder()).build(
             self,
             permission_mode=permission_mode,
+            skill_metadata=self.skill_set.metadata_prompt(),
         )
         self.llm = LLM(
             llm_config.base_url,
@@ -74,9 +77,11 @@ class Agent:
             context,
         )
 
-    def run(self) -> Generator[RuntimeEvent, None, None]:
+    def run(self, *, active_skill_ids: tuple[str, ...] = ()) -> Generator[RuntimeEvent, None, None]:
         """执行当前 Agent 的一轮 Agent Loop。"""
-        return self.runtime.run()
+        return self.runtime.run(
+            skill_instructions=self.skill_set.instructions_for(active_skill_ids),
+        )
 
     def resolve_permission(
         self,

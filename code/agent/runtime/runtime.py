@@ -88,13 +88,15 @@ class Runtime:
         """返回当前运行状态，供宿主判断是否需要展示权限交互。"""
         return self._state
 
-    def call_llm(self) -> Generator[LLMResponse, None, None]:
+    def call_llm(self, skill_instructions: str = "") -> Generator[LLMResponse, None, None]:
         """使用绑定 Context 和工具 schema 请求一次 LLM 流。"""
         input_messages = self.context.export()
         instructions = (
             f"当前系统环境：{'windows' if os.name == 'nt' else 'linux'},"
             f"项目目录{self.execution_context.project_path or '未选择'}"
         )
+        if skill_instructions:
+            instructions += "\n当前轮激活的 Skill 指令：\n" + skill_instructions
         if hasattr(self.llm, "call_stream"):
             try:
                 return self.llm.call_stream(input_messages, self.tools.list, instructions=instructions)
@@ -102,7 +104,7 @@ class Runtime:
                 return self.llm.call_stream(input_messages, self.tools.list)
         return self.llm.call_responses_stream(self.context.to_model_input(self.sys_message), self.tools.list)
 
-    def run(self) -> Generator[RuntimeEvent, None, None]:
+    def run(self, *, skill_instructions: str = "") -> Generator[RuntimeEvent, None, None]:
         """使用绑定 Context 开始一次 Agent Loop。
 
         Yields:
@@ -116,7 +118,7 @@ class Runtime:
             raise ValueError(f"Runtime 当前状态为 {self._state.value}，不能开始新消息")
         self._cancelled = False
         self._state = RuntimeState.RUNNING
-        yield from self._run_llm_loop()
+        yield from self._run_llm_loop(skill_instructions)
 
     def cancel(self) -> None:
         """取消当前运行，丢弃未执行的工具调用和权限暂停状态。"""
@@ -125,13 +127,18 @@ class Runtime:
         self._tool_queue.clear()
         self._state = RuntimeState.IDLE
 
-    def _run_llm_loop(self) -> Generator[RuntimeEvent, None, None]:
+    def _run_llm_loop(self, skill_instructions: str = "") -> Generator[RuntimeEvent, None, None]:
         """持续请求 LLM，直到结束或遇到需要用户确认的工具调用。"""
         while True:
             if self._cancelled:
                 self._state = RuntimeState.IDLE
                 return
-            for response in self.call_llm():
+            responses = (
+                self.call_llm(skill_instructions)
+                if skill_instructions
+                else self.call_llm()
+            )
+            for response in responses:
                 if self._cancelled:
                     self._state = RuntimeState.IDLE
                     return
