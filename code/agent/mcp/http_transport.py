@@ -5,7 +5,7 @@ from __future__ import annotations
 import itertools
 import json
 from threading import Event
-from typing import Final
+from typing import Callable, Final
 
 import httpx
 
@@ -24,7 +24,7 @@ from .protocol import (
     encode_message,
     parse_message,
 )
-from .transport import NotificationHandler
+from .transport import NotificationHandler, RequestHandler
 from .types import RemoteMcpServerConfig
 
 
@@ -45,6 +45,7 @@ class StreamableHttpTransport:
         on_notification: NotificationHandler | None = None,
         max_response_bytes: int = _DEFAULT_MAX_RESPONSE_BYTES,
         client: httpx.Client | None = None,
+        access_token_provider: Callable[[], str | None] | None = None,
     ) -> None:
         if not isinstance(config, RemoteMcpServerConfig):
             raise TypeError("config 必须是 RemoteMcpServerConfig")
@@ -59,6 +60,8 @@ class StreamableHttpTransport:
         self._session_id: str | None = None
         self._protocol_version: str | None = None
         self._closed = False
+        self._access_token_provider = access_token_provider
+        self._on_request: RequestHandler | None = None
 
     @property
     def session_id(self) -> str | None:
@@ -117,6 +120,14 @@ class StreamableHttpTransport:
         self._session_id = None
         if self._owns_client:
             self._client.close()
+
+    def set_request_handler(self, handler: RequestHandler | None) -> None:
+        """设置 SSE 中 Server request 的处理器；响应通过独立 POST 回传。"""
+        self._on_request = handler
+
+    def set_access_token_provider(self, provider: Callable[[], str | None] | None) -> None:
+        """注入运行时 token；token 不进入远程 Server 配置或 URL。"""
+        self._access_token_provider = provider
 
     def _post_request(
         self,
@@ -203,7 +214,25 @@ class StreamableHttpTransport:
                     # 观察回调不能改变远程协议请求的结果。
                     pass
             return None
+        if isinstance(message, JsonRpcRequest):
+            if self._on_request is None:
+                raise McpProtocolError("MCP Server request 没有处理器")
+            response = self._on_request(message)
+            if not isinstance(response, JsonRpcResponse):
+                raise McpProtocolError("MCP Server request 处理器必须返回 response")
+            self._send_server_response(response)
+            return None
         return self._matching_response(message, request_id)
+
+    def _send_server_response(self, response: JsonRpcResponse) -> None:
+        """通过同一 MCP endpoint 回送 Server request 的 response。"""
+        with self._client.stream(
+            "POST", self.config.url, headers=self._headers(),
+            content=encode_message(response), timeout=self._timeout(timeout_ms=None),
+        ) as result:
+            self._capture_session_id(result)
+            if result.status_code not in {200, 202, 204}:
+                raise McpTransportError(f"MCP Server request response 发送失败: HTTP {result.status_code}")
 
     @staticmethod
     def _matching_response(message: object, request_id: int | str) -> JsonRpcResponse:
@@ -241,6 +270,10 @@ class StreamableHttpTransport:
             headers["Mcp-Session-Id"] = self._session_id
         if self._protocol_version is not None:
             headers["MCP-Protocol-Version"] = self._protocol_version
+        if self._access_token_provider is not None:
+            token = self._access_token_provider()
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
         return headers
 
     def _capture_session_id(self, response: httpx.Response) -> None:

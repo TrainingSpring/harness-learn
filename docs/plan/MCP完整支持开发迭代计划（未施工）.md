@@ -1,6 +1,6 @@
-# MCP 完整支持开发迭代计划（未施工）
+# MCP 完整支持开发迭代计划（阶段 10-12 未施工）
 
-> 状态：未施工。
+> 状态：阶段 0 至阶段 9 已完成；阶段 10 至阶段 12 未施工。
 >
 > 本计划根据当前产品设定重新收口。MCP Server 注册配置由用户可编辑的
 > `~/harness-learn/mcp/config.json` 管理；SQLite 只保存 Agent 对 MCP Server 的引用，
@@ -410,12 +410,10 @@ MCP Server 的描述、Tool annotations、Prompt 内容不能绕过上述规则�
 code/agent/mcp/
 ├── __init__.py
 ├── types.py                 # 配置、状态、能力和 DTO 的内部类型
-├── config.py                # config.json 路径和 Local/Remote 判别联合类型
 ├── config_store.py          # 读取、校验、刷新、原子写入、版本冲突检测
 ├── registry.py              # Server ID 查询、enabled 校验和外部修改检测
 ├── process_manager.py       # 本地 Server 启停、重启、状态和实例注册
 ├── protocol.py              # JSON-RPC request/response/notification/error
-├── validation.py            # 外部消息、Schema、URI 和大小校验
 ├── transport.py             # Transport 抽象、请求关联、通知、超时、取消
 ├── stdio_transport.py       # 本地 subprocess、stdin/stdout、stderr、退出处理
 ├── http_transport.py        # Streamable HTTP、SSE、session id、重连
@@ -432,7 +430,10 @@ code/agent/mcp/
 ├── roots.py                 # workspace roots 和 roots/list_changed
 ├── sampling.py              # Server -> Client sampling 桥接
 ├── elicitation.py           # Server -> Client 用户输入桥接
-├── logging.py               # MCP 日志脱敏、限长和等级
+├── logging.py               # MCP 日志等级、脱敏和限长
+├── events.py                # 日志、进度、资源更新内部事件
+├── server_requests.py        # Server -> Client request 分发
+├── completions.py            # Completion 参数和结果校验
 └── errors.py                # 稳定异常和错误码
 ```
 
@@ -822,7 +823,7 @@ Session 使用同一个 Server 时请求 ID、订阅、Context 和连接状态�
   释放当前 Session 的 MCP 连接；应用退出释放连接管理器。
 - 新增 MCP Tool、Schema、权限和 Runtime 回归测试。
 
-### 阶段 7：Resources、Roots、Prompts 和 Completions（施工中）
+### 阶段 7：Resources、Roots、Prompts 和 Completions（已完成）
 
 **目标**：完整处理 MCP 的非 Tool 能力，并保持 Context 边界。
 
@@ -843,7 +844,17 @@ Session 使用同一个 Server 时请求 ID、订阅、Context 和连接状态�
 **验收**：资源和 Prompt 能被明确使用；未经请求不会自动进入 Context；文件资源仍服从
 Session workspace、Roots 和 PermissionManager。
 
-### 阶段 8：Logging、Progress、Cancellation、Sampling、Elicitation（未施工）
+**完成记录（2026-09-28）**：
+
+- 新增 `resources.py`、`roots.py`、`prompts.py` 和 `completions.py`，分别负责
+  Resource/Template、workspace Root、Prompt message 和 Completion 的协议模型与结果校验。
+- `McpClient` 增加 Resource Template 列表、Resource 读取/订阅/取消订阅、Prompt 获取和
+  Completion 调用；Prompt 返回值会校验每条消息的 role/content，不会自动写入 Context。
+- Roots 通过 Server -> Client 的 `roots/list` 请求按当前 Session workspace 动态生成，
+  不保存到 MCP 配置文件。
+- 新增资源、Prompt、Root、Completion 的边界测试，覆盖畸形结果和无 Context 副作用约束。
+
+### 阶段 8：Logging、Progress、Cancellation、Sampling、Elicitation（已完成）
 
 **目标**：完成 Server -> Client 的交互能力和用户可见运行状态。
 
@@ -865,7 +876,21 @@ Session workspace、Roots 和 PermissionManager。
 **验收**：上述事件不阻塞无关 Session；敏感输入不进入普通日志；Sampling 不默认发送
 完整 Context；Elicitation 有明确来源和用户操作。
 
-### 阶段 9：远程认证和安全收口（未施工）
+**完成记录（2026-09-28）**：
+
+- 新增 `logging.py`、`sampling.py`、`elicitation.py`，将日志通知、sampling 请求/响应和
+  elicitation 请求/响应的协议校验从 Client/Transport 中独立出来。
+- `notifications.py` 将 logging、progress、resource updated 转换为 `McpLogEvent`、
+  `McpProgressEvent`、`McpResourceUpdatedEvent`，观察者异常不会破坏协议读循环。
+- `server_requests.py` 支持 `roots/list`，并允许宿主显式注册 sampling/elicitation 回调；
+  未注册的 Server request 返回稳定 MCP 错误，MCP 层不会自行读取完整 Context、调用模型或
+  绕过 Session 权限。
+- stdio Transport 支持 Server -> Client request 并回写 JSON-RPC response；Streamable HTTP
+  在 SSE 响应中收到 Server request 时，通过同一 MCP endpoint 回传 response。
+- 原有 Transport 的取消事件继续发送 `notifications/cancelled`；所有新增事件均保持在
+  Session/连接范围内，不写入普通 Context。
+
+### 阶段 9：远程认证和安全收口（已完成）
 
 **目标**：完成 Streamable HTTP 的认证、授权和安全策略。
 
@@ -886,6 +911,18 @@ Session workspace、Roots 和 PermissionManager。
 
 **验收**：认证成功、失败、过期、撤销、state mismatch、错误 audience 和重定向攻击均有
 稳定处理和测试。
+
+**完成记录（2026-09-28）**：
+
+- 新增 `oauth.py`，提供 OAuth metadata 校验、Authorization Code + PKCE、一次性 state、
+  token 交换、刷新、动态 Client 注册和撤销能力。
+- OAuth endpoint、resource indicator 和 registration/revocation endpoint 强制 HTTPS，
+  redirect URI 仅允许 HTTP(S)；state 有 TTL 且只能消费一次。
+- `StreamableHttpTransport` 支持注入短生命周期 `access_token_provider`，自动加入 Bearer
+  header；token 不写入 MCP `config.json`、URL、日志或 Context。
+- OAuth token 只作为内存对象传递；MCP 配置仍只保存 `auth_mode`，授权 UI、授权状态 API
+  和安全状态展示留到阶段 10 的设置页施工。
+- 新增 OAuth PKCE/state/过期、endpoint 安全、动态注册和撤销回归测试。
 
 ### 阶段 10：MCP 设置页（未施工）
 

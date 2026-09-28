@@ -13,6 +13,7 @@ from .notifications import McpNotificationDispatcher
 from .pagination import collect_pages
 from .protocol import JsonRpcNotification, JsonRpcParams
 from .transport import McpTransport
+from .server_requests import McpServerRequestHandler
 
 
 class McpClientState(StrEnum):
@@ -47,6 +48,10 @@ class McpClient:
         self._state = McpClientState.NEW
         self._initialization: McpInitialization | None = None
         self._lock = Lock()
+        self.server_requests = McpServerRequestHandler()
+        set_handler = getattr(self.transport, "set_request_handler", None)
+        if callable(set_handler):
+            set_handler(self.server_requests.handle)
 
     @property
     def state(self) -> McpClientState:
@@ -107,6 +112,25 @@ class McpClient:
     def list_prompts(self, *, timeout_ms: int | None = None) -> tuple[dict[str, Any], ...]:
         return self._list("prompts", "prompts/list", "prompts", timeout_ms)
 
+    def list_roots(self, *, workspace: str | None = None) -> dict[str, Any]:
+        """生成 Server 请求 roots/list 时可返回的当前工作目录描述。"""
+        from .roots import roots_for_workspace
+        return {"roots": [root.to_dict() for root in roots_for_workspace(workspace)]}
+
+    def configure_server_requests(
+        self,
+        *,
+        workspace: str | None = None,
+        sampling: Any | None = None,
+        elicitation: Any | None = None,
+    ) -> None:
+        """配置 Server request 回调；未配置的请求会收到稳定错误。"""
+        self.server_requests.workspace = workspace
+        if sampling is not None:
+            self.server_requests.register("sampling/createMessage", sampling)
+        if elicitation is not None:
+            self.server_requests.register("elicitation/create", elicitation)
+
     def list_resource_templates(self, *, timeout_ms: int | None = None) -> tuple[dict[str, Any], ...]:
         self._require_capability("resources")
         return collect_pages(
@@ -153,9 +177,8 @@ class McpClient:
         result = self._request(
             "resources/read", {"uri": uri}, timeout_ms=timeout_ms, cancel_event=cancel_event
         )
-        if not isinstance(result, dict) or not isinstance(result.get("contents"), list):
-            raise McpProtocolError("MCP resources/read 结果必须包含 contents 数组")
-        return result
+        from .resources import validate_resource_result
+        return validate_resource_result(result)
 
     def subscribe_resource(
         self,
@@ -197,8 +220,8 @@ class McpClient:
             {"name": name, "arguments": arguments or {}},
             timeout_ms=timeout_ms,
         )
-        if not isinstance(result, dict) or not isinstance(result.get("messages"), list):
-            raise McpProtocolError("MCP prompts/get 结果必须包含 messages 数组")
+        from .prompts import parse_prompt_result
+        parse_prompt_result(result)
         return result
 
     def set_logging_level(self, level: str, *, timeout_ms: int | None = None) -> dict[str, Any]:
@@ -206,9 +229,8 @@ class McpClient:
         if level not in {"debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"}:
             raise McpLifecycleError("MCP logging level 无效")
         result = self._request("logging/setLevel", {"level": level}, timeout_ms=timeout_ms)
-        if not isinstance(result, dict):
-            raise McpProtocolError("MCP logging/setLevel 结果必须是对象")
-        return result
+        from .logging import validate_logging_result
+        return validate_logging_result(result)
 
     def complete(
         self,
@@ -219,15 +241,14 @@ class McpClient:
     ) -> dict[str, Any]:
         """调用 completion/complete；参数构造和结果语义由阶段 7 接入。"""
         self._require_capability("completions")
+        from .completions import validate_completion_params, validate_completion_result
         result = self._request(
             "completion/complete",
-            params,
+            validate_completion_params(params),
             timeout_ms=timeout_ms,
             cancel_event=cancel_event,
         )
-        if not isinstance(result, dict):
-            raise McpLifecycleError("MCP completion 结果必须是对象")
-        return result
+        return validate_completion_result(result)
 
     def handle_notification(self, notification: JsonRpcNotification) -> bool:
         """分发 Server 通知；Transport 可把此方法作为回调注入。"""

@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Callable, Protocol
 from threading import Event
 
-from .protocol import JsonRpcNotification, JsonRpcParams, JsonRpcResponse
+from .protocol import JsonRpcNotification, JsonRpcParams, JsonRpcRequest, JsonRpcResponse
 
 
 NotificationHandler = Callable[[JsonRpcNotification], None]
+RequestHandler = Callable[[JsonRpcRequest], JsonRpcResponse]
 
 
 class McpTransport(Protocol):
@@ -29,3 +30,6 @@ class McpTransport(Protocol):
 
     def close(self) -> None:
         """释放连接、子进程和后台读取资源。"""
+
+    def set_request_handler(self, handler: RequestHandler | None) -> None:
+        """设置 Server -> Client request 的响应处理器。"""

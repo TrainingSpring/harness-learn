@@ -6,6 +6,8 @@ from collections.abc import Callable
 from threading import Lock
 
 from .protocol import JsonRpcNotification
+from .events import McpProgressEvent, McpResourceUpdatedEvent
+from .logging import parse_log_event
 
 
 _LIST_CHANGED_METHODS = {
@@ -24,6 +26,7 @@ class McpNotificationDispatcher:
             "resources": [],
             "prompts": [],
         }
+        self._event_listeners: list[Callable[[object], None]] = []
         self._lock = Lock()
 
     def subscribe_tools_changed(self, listener: Callable[[], None]) -> Callable[[], None]:
@@ -38,6 +41,24 @@ class McpNotificationDispatcher:
     def dispatch(self, notification: JsonRpcNotification) -> bool:
         """处理已验证通知；未知通知由后续能力阶段消费。"""
         kind = _LIST_CHANGED_METHODS.get(notification.method)
+        if notification.method == "notifications/message":
+            event = parse_log_event(notification.params)
+            self._dispatch_event(event)
+            return True
+        if notification.method == "notifications/progress":
+            params = notification.params if isinstance(notification.params, dict) else {}
+            token = params.get("progressToken")
+            progress = params.get("progress")
+            if isinstance(token, (str, int)) and not isinstance(token, bool) and isinstance(progress, (int, float)):
+                self._dispatch_event(McpProgressEvent(token, progress, params.get("total"), params.get("message")))
+                return True
+            return False
+        if notification.method == "notifications/resources/updated":
+            params = notification.params if isinstance(notification.params, dict) else {}
+            if isinstance(params.get("uri"), str):
+                self._dispatch_event(McpResourceUpdatedEvent(params["uri"]))
+                return True
+            return False
         if kind is None:
             return False
         with self._lock:
@@ -48,6 +69,28 @@ class McpNotificationDispatcher:
             except Exception:
                 pass
         return True
+
+    def subscribe_events(self, listener: Callable[[object], None]) -> Callable[[], None]:
+        if not callable(listener):
+            raise TypeError("listener 必须可调用")
+        with self._lock:
+            self._event_listeners.append(listener)
+
+        def unsubscribe() -> None:
+            with self._lock:
+                if listener in self._event_listeners:
+                    self._event_listeners.remove(listener)
+
+        return unsubscribe
+
+    def _dispatch_event(self, event: object) -> None:
+        with self._lock:
+            listeners = tuple(self._event_listeners)
+        for listener in listeners:
+            try:
+                listener(event)
+            except Exception:
+                pass
 
     def _subscribe(self, kind: str, listener: Callable[[], None]) -> Callable[[], None]:
         if not callable(listener):

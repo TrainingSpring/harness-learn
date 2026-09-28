@@ -62,6 +62,7 @@ class AgentFactory:
                 config = self.mcp_registry.require_enabled(server_id)
                 key = McpConnectionKey(execution_context.session_id, profile.id, server_id)
                 client = self.mcp_connections.connect(key, config)
+                client.configure_server_requests(workspace=execution_context.project_path)
                 mcp_tool_groups[f"mcp:{server_id}"] = tuple(build_mcp_tools(server_id, client))
         skills = tuple(
             SkillDefinition(

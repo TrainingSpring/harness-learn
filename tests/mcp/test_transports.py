@@ -18,7 +18,7 @@ from mcp.errors import (
     McpTransportTimeoutError,
 )
 from mcp.http_transport import StreamableHttpTransport
-from mcp.protocol import JsonRpcResponse
+from mcp.protocol import JsonRpcRequest, JsonRpcResponse
 from mcp.stdio_transport import StdioMcpTransport
 from mcp.types import LocalMcpServerConfig, RemoteMcpServerConfig
 
@@ -136,6 +136,38 @@ def test_streamable_http_dispatches_sse_notifications_before_response() -> None:
     try:
         assert transport.request("tools/list").unwrap() == {"ok": True}
         assert [event.method for event in notifications] == ["notifications/tools/list_changed"]
+    finally:
+        transport.close()
+
+
+def test_streamable_http_returns_server_request_response_and_injects_token() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        call = json.loads(request.content)
+        if "method" not in call:
+            return httpx.Response(202)
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=(
+                "data: {\"jsonrpc\":\"2.0\",\"id\":99,\"method\":\"roots/list\"}\n\n"
+                f"data: {json.dumps({'jsonrpc': '2.0', 'id': call['id'], 'result': {'ok': True}})}\n\n"
+            ),
+        )
+
+    transport = StreamableHttpTransport(
+        RemoteMcpServerConfig(id="mcp_REMOTE0001", name="Remote", url="https://example.test/mcp"),
+        access_token_provider=lambda: "access-token",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    transport.set_request_handler(lambda request: JsonRpcResponse(request.id, {"roots": []}))
+    try:
+        assert transport.request("tools/list").unwrap() == {"ok": True}
+        assert requests[0].headers["authorization"] == "Bearer access-token"
+        assert len(requests) == 2
+        assert json.loads(requests[1].content)["id"] == 99
     finally:
         transport.close()
 

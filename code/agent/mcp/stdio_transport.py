@@ -28,7 +28,7 @@ from .protocol import (
     encode_message,
     parse_message,
 )
-from .transport import NotificationHandler
+from .transport import NotificationHandler, RequestHandler
 from .types import LocalMcpServerConfig
 
 
@@ -58,6 +58,7 @@ class StdioMcpTransport:
         config: LocalMcpServerConfig,
         *,
         on_notification: NotificationHandler | None = None,
+        on_request: RequestHandler | None = None,
         max_message_bytes: int = _DEFAULT_MAX_MESSAGE_BYTES,
         diagnostic_bytes: int = _DEFAULT_DIAGNOSTIC_BYTES,
     ) -> None:
@@ -67,6 +68,7 @@ class StdioMcpTransport:
             raise ValueError("消息和诊断容量必须为正整数")
         self.config = config
         self._on_notification = on_notification
+        self._on_request = on_request
         self._max_message_bytes = max_message_bytes
         self._diagnostic_bytes = diagnostic_bytes
         self._pending: dict[int | str, _PendingResponse] = {}
@@ -157,6 +159,9 @@ class StdioMcpTransport:
         self._stdout_thread.join(timeout=0.1)
         self._stderr_thread.join(timeout=0.1)
 
+    def set_request_handler(self, handler: RequestHandler | None) -> None:
+        self._on_request = handler
+
     def _start_process(self) -> subprocess.Popen[bytes]:
         environment = os.environ.copy()
         environment.update(self.config.env)
@@ -177,7 +182,7 @@ class StdioMcpTransport:
         except OSError as error:
             raise McpTransportError("无法启动本地 MCP 服务") from error
 
-    def _write(self, message: JsonRpcRequest | JsonRpcNotification) -> None:
+    def _write(self, message: JsonRpcRequest | JsonRpcNotification | JsonRpcResponse) -> None:
         data = encode_message(message) + b"\n"
         if len(data) > self._max_message_bytes:
             raise McpProtocolError("MCP 请求超过消息大小限制")
@@ -254,6 +259,18 @@ class StdioMcpTransport:
                 except Exception:
                     # 外部观察回调不能破坏协议读循环。
                     pass
+            return
+        if isinstance(message, JsonRpcRequest):
+            if self._on_request is None:
+                self._set_terminal_error(McpProtocolError("MCP Server request 没有处理器"))
+                return
+            try:
+                response = self._on_request(message)
+                if not isinstance(response, JsonRpcResponse):
+                    raise McpProtocolError("MCP Server request 处理器必须返回 response")
+                self._write(response)
+            except Exception as error:
+                self._set_terminal_error(error if isinstance(error, McpProtocolError) else McpTransportError("MCP Server request 处理失败"))
             return
         self._set_terminal_error(McpProtocolError("当前 Client 不支持 Server 发起的 JSON-RPC request"))
 
