@@ -687,7 +687,7 @@ client/web/front/src/api/types.ts
 - Web 应用服务容器注入 `McpServerRegistry`，但 Agent、Session、Runtime 不依赖 Store 或配置文件实现。
 - 增加存储与 API 回归测试，覆盖读写去重、已注册 Server 和未知 Server 的拒绝。
 
-### 阶段 3：JSON-RPC 和 Transport（未施工）
+### 阶段 3：JSON-RPC 和 Transport（已完成）
 
 **目标**：完成可测试的双向 MCP 消息层。
 
@@ -709,6 +709,15 @@ client/web/front/src/api/types.ts
 - 禁止 Shell 拼接、禁止把原始错误和敏感 header 直接返回前端。
 
 **验收**：fake stdio/HTTP Server 能覆盖并发请求、通知、超时、取消、断线、畸形响应和退出。
+
+**完成记录（2026-09-28）**：
+
+- 新增 `protocol.py`，提供严格 JSON-RPC 2.0 request、response、notification、error 模型、ID 关联和 JSON 编码。
+- 新增 `transport.py`，定义不包含生命周期逻辑的同步 Transport 接口。
+- 新增 `stdio_transport.py`，使用 argv + `shell=False` 启动子进程；stdout 独占协议消息，stderr 独立有界收集；支持并发请求、通知回调、超时、取消、大小限制、优雅关闭和强制终止。
+- 新增 `http_transport.py`，支持 Streamable HTTP 的 JSON/SSE 响应、`Mcp-Session-Id`、协议版本头、超时、取消、响应大小限制和 404 会话过期信号。
+- Transport 不负责 `initialize`、能力发现、重连策略或 Tool 映射；404 只清理失效 Session ID 并交给后续 Client 生命周期层重新初始化。
+- 新增 8 个协议与 Transport 回归测试，覆盖并发响应、通知、超时、取消、SSE、会话失效、畸形响应和服务退出。
 
 ### 阶段 4：本地服务生命周期（未施工）
 
