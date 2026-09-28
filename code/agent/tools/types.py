@@ -120,6 +120,7 @@ class Tool:
     permission: PermissionRequirement
     argument_parser: Callable[[dict[str, Any]], dict[str, Any]] | None = None
     permission_resolver: Callable[[dict[str, Any]], PermissionRequirement] | None = None
+    source_id: str = "builtin"
 
     def resolve_permission(self, arguments: dict[str, Any]) -> PermissionRequirement:
         """返回当前已校验参数对应的权限需求。"""

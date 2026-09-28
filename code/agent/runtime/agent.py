@@ -10,6 +10,7 @@ from permission.types import PermissionResponse
 from session.ExecutionContext import ExecutionContext
 from tools.tools import Tools
 from tools.types import Tool
+from typing import Mapping
 from skills.types import SkillDefinition
 from skills.skills import SkillSet
 
@@ -31,6 +32,7 @@ class Agent:
         expertise: tuple[str, ...],
         llm_config: LLMConfig,
         tool_definitions: tuple[Tool, ...],
+        mcp_tool_groups: Mapping[str, tuple[Tool, ...]] | None = None,
         skills: tuple[SkillDefinition, ...] = (),
         context: Context,
         execution_context: ExecutionContext,
@@ -57,6 +59,8 @@ class Agent:
         self.permission = permission
         self.tools = Tools(execution_context)
         self.tools.batch_register(list(self.tool_definitions))
+        for source_id, definitions in (mcp_tool_groups or {}).items():
+            self.tools.replace_source(source_id, list(definitions))
 
         instructions = (prompt_builder or PromptBuilder()).build(
             self,

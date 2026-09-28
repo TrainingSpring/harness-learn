@@ -9,8 +9,12 @@ from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
 from storage.types import AgentProfile, LLMProfile
 from tools.registry.catalog import ToolCatalog
+from tools.types import Tool
 from storage.repositories.skill import SkillRepository
 from skills.types import SkillDefinition, SkillStatus
+from mcp.connection_manager import McpConnectionKey, McpConnectionManager
+from mcp.registry import McpServerRegistry
+from mcp.tools import build_mcp_tools
 
 from .agent import Agent
 from .prompt_builder import PromptBuilder
@@ -24,6 +28,8 @@ class AgentFactory:
         database: StateDatabase,
         prompt_builder: PromptBuilder | None = None,
         tool_catalog: ToolCatalog | None = None,
+        mcp_registry: McpServerRegistry | None = None,
+        mcp_connections: McpConnectionManager | None = None,
     ) -> None:
         self.database = database
         self.llm_profiles = LLMProfileRepository(database)
@@ -31,6 +37,8 @@ class AgentFactory:
         self.prompt_builder = prompt_builder or PromptBuilder()
         self.tool_catalog = tool_catalog or ToolCatalog()
         self.skill_profiles = SkillRepository(database)
+        self.mcp_registry = mcp_registry
+        self.mcp_connections = mcp_connections
 
     def load(
         self,
@@ -46,6 +54,15 @@ class AgentFactory:
         tool_definitions = tuple(
             self.tool_catalog.get(name) for name in profile.tools
         )
+        mcp_tool_groups: dict[str, tuple[Tool, ...]] = {}
+        if profile.mcp_server_ids:
+            if self.mcp_registry is None or self.mcp_connections is None:
+                raise ValueError("Agent 配置了 MCP，但当前宿主未提供 MCP 连接服务")
+            for server_id in profile.mcp_server_ids:
+                config = self.mcp_registry.require_enabled(server_id)
+                key = McpConnectionKey(execution_context.session_id, profile.id, server_id)
+                client = self.mcp_connections.connect(key, config)
+                mcp_tool_groups[f"mcp:{server_id}"] = tuple(build_mcp_tools(server_id, client))
         skills = tuple(
             SkillDefinition(
                 id=skill.id, name=skill.name, description=skill.description,
@@ -66,6 +83,7 @@ class AgentFactory:
             expertise=tuple(profile.expertise),
             llm_config=self._to_llm_config(llm_profile),
             tool_definitions=tool_definitions,
+            mcp_tool_groups=mcp_tool_groups,
             skills=skills,
             context=context,
             execution_context=execution_context,

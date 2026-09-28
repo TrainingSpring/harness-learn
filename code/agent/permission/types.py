@@ -21,6 +21,7 @@ class PermissionAction(StrEnum):
     BASH_EXECUTE = "bash.execute"
     PROCESS_INSPECT = "process.inspect"
     PROCESS_STOP = "process.stop"
+    MCP_TOOL_CALL = "mcp.tool.call"
 
 
 class PermissionDecision(StrEnum):

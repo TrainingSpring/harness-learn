@@ -107,6 +107,109 @@ class McpClient:
     def list_prompts(self, *, timeout_ms: int | None = None) -> tuple[dict[str, Any], ...]:
         return self._list("prompts", "prompts/list", "prompts", timeout_ms)
 
+    def list_resource_templates(self, *, timeout_ms: int | None = None) -> tuple[dict[str, Any], ...]:
+        self._require_capability("resources")
+        return collect_pages(
+            lambda params: self._request("resources/templates/list", params, timeout_ms=timeout_ms),
+            item_field="resourceTemplates",
+        )
+
+    def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any] | None = None,
+        *,
+        timeout_ms: int | None = None,
+        cancel_event: Event | None = None,
+    ) -> dict[str, Any]:
+        """调用 Server Tool；业务错误保留在 MCP CallToolResult 中。"""
+        self._require_capability("tools")
+        if not isinstance(name, str) or not name:
+            raise McpLifecycleError("MCP Tool name 必须是非空字符串")
+        if arguments is not None and not isinstance(arguments, dict):
+            raise McpLifecycleError("MCP Tool arguments 必须是对象")
+        result = self._request(
+            "tools/call",
+            {"name": name, "arguments": arguments or {}},
+            timeout_ms=timeout_ms,
+            cancel_event=cancel_event,
+        )
+        if not isinstance(result, dict) or not isinstance(result.get("content"), list):
+            raise McpProtocolError("MCP tools/call 结果必须包含 content 数组")
+        if "isError" in result and not isinstance(result["isError"], bool):
+            raise McpProtocolError("MCP tools/call isError 必须是布尔值")
+        return result
+
+    def read_resource(
+        self,
+        uri: str,
+        *,
+        timeout_ms: int | None = None,
+        cancel_event: Event | None = None,
+    ) -> dict[str, Any]:
+        self._require_capability("resources")
+        if not isinstance(uri, str) or not uri:
+            raise McpLifecycleError("MCP Resource URI 必须是非空字符串")
+        result = self._request(
+            "resources/read", {"uri": uri}, timeout_ms=timeout_ms, cancel_event=cancel_event
+        )
+        if not isinstance(result, dict) or not isinstance(result.get("contents"), list):
+            raise McpProtocolError("MCP resources/read 结果必须包含 contents 数组")
+        return result
+
+    def subscribe_resource(
+        self,
+        uri: str,
+        *,
+        timeout_ms: int | None = None,
+    ) -> dict[str, Any]:
+        if not self.initialization.capabilities.supports_subscriptions():
+            raise McpCapabilityUnavailableError("MCP Server 未声明 resources.subscribe 能力")
+        return self._resource_subscription("resources/subscribe", uri, timeout_ms)
+
+    def unsubscribe_resource(
+        self,
+        uri: str,
+        *,
+        timeout_ms: int | None = None,
+    ) -> dict[str, Any]:
+        if not self.initialization.capabilities.supports_subscriptions():
+            raise McpCapabilityUnavailableError("MCP Server 未声明 resources.subscribe 能力")
+        return self._resource_subscription("resources/unsubscribe", uri, timeout_ms)
+
+    def get_prompt(
+        self,
+        name: str,
+        arguments: dict[str, str] | None = None,
+        *,
+        timeout_ms: int | None = None,
+    ) -> dict[str, Any]:
+        self._require_capability("prompts")
+        if not isinstance(name, str) or not name:
+            raise McpLifecycleError("MCP Prompt name 必须是非空字符串")
+        if arguments is not None and (
+            not isinstance(arguments, dict)
+            or any(not isinstance(key, str) or not isinstance(value, str) for key, value in arguments.items())
+        ):
+            raise McpLifecycleError("MCP Prompt arguments 必须是字符串映射")
+        result = self._request(
+            "prompts/get",
+            {"name": name, "arguments": arguments or {}},
+            timeout_ms=timeout_ms,
+        )
+        if not isinstance(result, dict) or not isinstance(result.get("messages"), list):
+            raise McpProtocolError("MCP prompts/get 结果必须包含 messages 数组")
+        return result
+
+    def set_logging_level(self, level: str, *, timeout_ms: int | None = None) -> dict[str, Any]:
+        self._require_capability("logging")
+        if level not in {"debug", "info", "notice", "warning", "error", "critical", "alert", "emergency"}:
+            raise McpLifecycleError("MCP logging level 无效")
+        result = self._request("logging/setLevel", {"level": level}, timeout_ms=timeout_ms)
+        if not isinstance(result, dict):
+            raise McpProtocolError("MCP logging/setLevel 结果必须是对象")
+        return result
+
     def complete(
         self,
         params: dict[str, Any],
@@ -160,6 +263,20 @@ class McpClient:
             lambda params: self._request(method, params, timeout_ms=timeout_ms),
             item_field=item_field,
         )
+
+    def _resource_subscription(
+        self,
+        method: str,
+        uri: str,
+        timeout_ms: int | None,
+    ) -> dict[str, Any]:
+        self._require_ready()
+        if not isinstance(uri, str) or not uri:
+            raise McpLifecycleError("MCP Resource URI 必须是非空字符串")
+        result = self._request(method, {"uri": uri}, timeout_ms=timeout_ms)
+        if not isinstance(result, dict):
+            raise McpProtocolError(f"MCP {method} 结果必须是对象")
+        return result
 
     def _request(
         self,

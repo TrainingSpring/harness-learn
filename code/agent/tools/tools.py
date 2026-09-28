@@ -1,5 +1,6 @@
 import json
 import os
+from threading import RLock
 from base64 import b64encode
 
 from permission.types import PermissionRequirement
@@ -22,6 +23,7 @@ class Tools:
         self.ctx = ctx
         self.map:dict[str,Tool] = {}
         self.list:list[dict] = []
+        self._lock = RLock()
 
 
     def register(self,tool:Tool):
@@ -31,11 +33,11 @@ class Tools:
         :return : list[dict] :  工具集
         """
         name = tool.schema.get("name","")
-        if not self.map.get(name):
-            self.map[name] = tool
-            self.list.append(tool.schema)
-
-        return self.list
+        with self._lock:
+            if not self.map.get(name):
+                self.map[name] = tool
+                self.list.append(tool.schema)
+            return list(self.list)
 
     def batch_register(self,tools:list[Tool]):
         """
@@ -45,15 +47,39 @@ class Tools:
         """
         for tool in tools:
             self.register(tool)
-        return self.list
+        return self.get_tools()
+
+    def replace_source(self, source_id: str, tools: list[Tool]) -> list[dict]:
+        """原子替换一个动态来源的所有工具，保留内置工具和其他来源。"""
+        if not source_id:
+            raise ValueError("source_id 不能为空")
+        if any(tool.source_id != source_id for tool in tools):
+            raise ValueError("替换来源时工具 source_id 必须一致")
+        names = [tool.schema.get("name") for tool in tools]
+        if any(not isinstance(name, str) or not name for name in names) or len(set(names)) != len(names):
+            raise ValueError("动态工具名称必须非空且不能重复")
+        with self._lock:
+            preserved = {
+                name: tool for name, tool in self.map.items() if tool.source_id != source_id
+            }
+            duplicate = set(preserved).intersection(names)
+            if duplicate:
+                raise ValueError(f"动态工具名称与已有工具冲突: {sorted(duplicate)[0]}")
+            updated = dict(preserved)
+            updated.update({tool.schema["name"]: tool for tool in tools})
+            self.map = updated
+            self.list = [tool.schema for tool in updated.values()]
+            return list(self.list)
 
     def get_tools(self):
-        return self.list
+        with self._lock:
+            return list(self.list)
     def get_tool(self,name):
-        try:
-            return self.map[name]
-        except KeyError:
-            raise KeyError(f"工具不存在: {name}")
+        with self._lock:
+            try:
+                return self.map[name]
+            except KeyError:
+                raise KeyError(f"工具不存在: {name}")
 
     def prepare_call(
         self,
@@ -77,13 +103,14 @@ class Tools:
         参数在此处只解析一次。这样权限判断和真正执行共享同一份参数，
         不会因为重复 JSON 解析导致两条路径的行为不一致。
         """
-        tool = self.map.get(name)
+        with self._lock:
+            tool = self.map.get(name)
         if tool is None:
             raise ToolCallPreparationError(
                 ToolError("TOOL_NOT_FOUND", f"工具不存在: {name}")
             )
 
-        if self.ctx.project_path is None:
+        if self.ctx.project_path is None and tool.permission.resource_from is not None:
             raise ToolCallPreparationError(
                 ToolError("PROJECT_NOT_SELECTED", "当前 Session 未选择项目目录")
             )

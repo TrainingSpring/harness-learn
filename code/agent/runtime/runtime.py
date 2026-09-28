@@ -99,10 +99,10 @@ class Runtime:
             instructions += "\n当前轮激活的 Skill 指令：\n" + skill_instructions
         if hasattr(self.llm, "call_stream"):
             try:
-                return self.llm.call_stream(input_messages, self.tools.list, instructions=instructions)
+                return self.llm.call_stream(input_messages, self.tools.get_tools(), instructions=instructions)
             except TypeError:
-                return self.llm.call_stream(input_messages, self.tools.list)
-        return self.llm.call_responses_stream(self.context.to_model_input(self.sys_message), self.tools.list)
+                return self.llm.call_stream(input_messages, self.tools.get_tools())
+        return self.llm.call_responses_stream(self.context.to_model_input(self.sys_message), self.tools.get_tools())
 
     def run(self, *, skill_instructions: str = "") -> Generator[RuntimeEvent, None, None]:
         """使用绑定 Context 开始一次 Agent Loop。

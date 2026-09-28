@@ -10,6 +10,8 @@ from permission.PermissionManager import PermissionManager
 from permission.types import PermissionMode, PermissionResponse
 from runtime.agent import Agent
 from runtime.agent_factory import AgentFactory
+from mcp.connection_manager import McpConnectionManager
+from mcp.registry import McpServerRegistry
 from runtime.runtime_events import PermissionRequiredEvent, RuntimeEvent
 from storage.context_service import ContextService
 from storage.database import StateDatabase
@@ -38,6 +40,7 @@ class SessionExecution:
         agents: dict[str, Agent],
         refresh_agents: Callable[[Session], dict[str, Agent]],
         process_manager: SessionProcessManager,
+        mcp_connections: McpConnectionManager | None = None,
     ) -> None:
         self.session = session
         self.context = context
@@ -47,6 +50,7 @@ class SessionExecution:
         self.agents = agents
         self._refresh_agents = refresh_agents
         self.process_manager = process_manager
+        self.mcp_connections = mcp_connections
         self._closed = False
         self._active_member_index: int | None = None
         self._current_member_index: int | None = None
@@ -98,6 +102,8 @@ class SessionExecution:
             return
         self.cancel()
         self.process_manager.stop_all()
+        if self.mcp_connections is not None:
+            self.mcp_connections.close_session(self.session.id)
         self._closed = True
 
     def set_project_path(self, project_path: str | None) -> None:
@@ -233,12 +239,23 @@ class SessionExecution:
 class SessionService:
     """统一创建、恢复并打开固定成员 Session。"""
 
-    def __init__(self, database: StateDatabase) -> None:
+    def __init__(
+        self,
+        database: StateDatabase,
+        *,
+        mcp_registry: McpServerRegistry | None = None,
+        mcp_connections: McpConnectionManager | None = None,
+    ) -> None:
         self.database = database
         self.sessions = SessionRepository(database)
         self.members = SessionAgentRepository(database)
         self.agent_profiles = AgentProfileRepository(database)
-        self.agent_factory = AgentFactory(database)
+        self.mcp_connections = mcp_connections
+        self.agent_factory = AgentFactory(
+            database,
+            mcp_registry=mcp_registry,
+            mcp_connections=mcp_connections,
+        )
 
     def create_direct_session(
         self,
@@ -321,6 +338,7 @@ class SessionService:
             agents=agents,
             refresh_agents=create_agents,
             process_manager=process_manager,
+            mcp_connections=self.mcp_connections,
         )
 
     def _create_agents(

@@ -258,6 +258,22 @@ class RuntimePermissionTests(unittest.TestCase):
                 )
                 self.assertEqual(self.permission.check(request), PermissionDecision.ALLOW)
 
+    def test_mcp_tool_without_workspace_still_uses_session_permission(self):
+        """MCP Tool 不依赖文件路径，必须进入 Session 权限流。"""
+        tool = Tool(
+            {"name": "mcp__mcp_DEMO00001__search", "parameters": {"type": "object"}},
+            lambda _ctx, **_args: ToolResult.success({"ok": True}),
+            PermissionRequirement(PermissionAction.MCP_TOOL_CALL, None),
+            source_id="mcp:mcp_DEMO00001",
+        )
+        ctx = ExecutionContext(None, "code_editor", "session_001")
+        tools = Tools(ctx)
+        tools.register(tool)
+        request = tools.prepare_call(tool.schema["name"], "{}", "call_mcp").permission_request
+        permission = PermissionManager(PermissionMode.BUILD, ctx.session_id, None)
+
+        self.assertEqual(permission.check(request), PermissionDecision.ASK)
+
 
 if __name__ == "__main__":
     unittest.main()

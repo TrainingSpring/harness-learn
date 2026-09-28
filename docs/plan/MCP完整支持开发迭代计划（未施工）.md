@@ -784,7 +784,7 @@ Session 使用同一个 Server 时请求 ID、订阅、Context 和连接状态�
 - 禁用 MCP Server 不允许建立连接；连接失败不自动重放请求，必须显式 reconnect。
 - 新增阶段 5 回归测试，覆盖初始化、版本不兼容、能力缺失、分页、通知、连接隔离、失败重连、禁用 Server 和 shutdown。
 
-### 阶段 6：Tools 动态映射、权限和 Runtime 接入（未施工）
+### 阶段 6：Tools 动态映射、权限和 Runtime 接入（已完成）
 
 **目标**：MCP Tool 能被当前 Agent 使用，同时不改变 Runtime 的职责。
 
@@ -810,7 +810,19 @@ Session 使用同一个 Server 时请求 ID、订阅、Context 和连接状态�
 **验收**：模型能调用 MCP Tool；权限行为符合 Session 的 plan/build/yolo；MCP Tool 不能
 覆盖内置 Tool，不能扩大权限，不能因为 Server 描述而改变系统规则。
 
-### 阶段 7：Resources、Roots、Prompts 和 Completions（未施工）
+**完成记录（2026-09-28）**：
+
+- 新增 `code/agent/mcp/tools.py`，将 `tools/list` 描述校验为 JSON Schema，并转换为
+  `mcp__<server_id>__<tool_name>` 命名空间 Tool；远端调用名与模型暴露名分离。
+- 新增 `PermissionAction.MCP_TOOL_CALL`，MCP Tool 统一进入 Session 权限确认，不复用文件或
+  Bash 权限，也不要求 Session 必须选择 workspace。
+- `Tools` 支持动态来源的原子替换和删除语义，拒绝与内置 Tool 或其他来源重名；Runtime
+  只看到普通 Tool，不直接依赖 `McpClient`。
+- `AgentFactory` 按 Session/Agent/Server 建立隔离连接并装配 MCP Tool，`SessionExecution.close`
+  释放当前 Session 的 MCP 连接；应用退出释放连接管理器。
+- 新增 MCP Tool、Schema、权限和 Runtime 回归测试。
+
+### 阶段 7：Resources、Roots、Prompts 和 Completions（施工中）
 
 **目标**：完整处理 MCP 的非 Tool 能力，并保持 Context 边界。
 

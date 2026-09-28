@@ -228,6 +228,8 @@ class ModePolicy:
             PermissionAction.PROCESS_STOP,
         }:
             return PermissionDecision.ALLOW
+        if request.action is PermissionAction.MCP_TOOL_CALL:
+            return PermissionDecision.ASK
         if self._project_path is None:
             return PermissionDecision.DENY
         if request.resource is not None and not _is_path_within(

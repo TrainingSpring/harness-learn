@@ -47,3 +47,7 @@ class McpServerCapabilities:
     def supports_list_changed(self, capability: str) -> bool:
         value = self.raw.get(capability)
         return isinstance(value, Mapping) and value.get("listChanged") is True
+
+    def supports_subscriptions(self) -> bool:
+        value = self.raw.get("resources")
+        return isinstance(value, Mapping) and value.get("subscribe") is True

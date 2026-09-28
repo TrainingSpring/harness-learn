@@ -84,6 +84,26 @@ def test_client_initializes_negotiates_capabilities_and_handles_list_changed() -
     assert client.list_tools() == ({"name": "updated"},)
 
 
+def test_client_calls_tool_and_reads_resource_and_prompt() -> None:
+    transport = FakeTransport(
+        {
+            "initialize": [_initialize_result()],
+            "tools/call": [{"content": [{"type": "text", "text": "done"}], "isError": False}],
+            "resources/read": [{"contents": [{"uri": "file:///tmp/readme", "text": "contents"}]}],
+            "prompts/get": [{"description": "Greeting", "messages": []}],
+        }
+    )
+    client = McpClient(transport)
+    client.connect()
+
+    assert client.call_tool("echo", {"value": "x"})["content"][0]["text"] == "done"
+    assert client.read_resource("file:///tmp/readme")["contents"][0]["text"] == "contents"
+    assert client.get_prompt("greeting", {"name": "A"})["description"] == "Greeting"
+    assert [item[0] for item in transport.calls[-3:]] == [
+        "tools/call", "resources/read", "prompts/get"
+    ]
+
+
 def test_client_rejects_incompatible_protocol_or_missing_capability() -> None:
     incompatible = McpClient(FakeTransport({"initialize": [_initialize_result(protocol="2099-01-01")]}))
     with pytest.raises(McpLifecycleError, match="协议版本"):
