@@ -89,17 +89,18 @@ class McpProcessManager:
         self._records: dict[str, _ProcessRecord] = {}
         self._listeners: list[StatusListener] = []
         self._lock = Lock()
+        self._listeners_lock = Lock()
         self._closed = False
 
     def subscribe(self, listener: StatusListener) -> Callable[[], None]:
         """订阅生命周期状态事件，并返回取消订阅函数。"""
         if not callable(listener):
             raise TypeError("listener 必须可调用")
-        with self._lock:
+        with self._listeners_lock:
             self._listeners.append(listener)
 
         def unsubscribe() -> None:
-            with self._lock:
+            with self._listeners_lock:
                 if listener in self._listeners:
                     self._listeners.remove(listener)
 
@@ -108,13 +109,16 @@ class McpProcessManager:
     def start(self, server_id: str) -> McpLocalServerStatus:
         """启动本地 Server；已在运行时返回当前实例快照。"""
         config = self._local_config(server_id)
+        events: list[McpLocalServerStatus] = []
         with self._lock:
             self._raise_if_closed()
             current = self._records.get(server_id)
             if current is not None and current.process.poll() is None:
                 return current.status
             if current is not None:
-                self._mark_finished_locked(current)
+                finished = self._mark_finished_locked(current)
+                if finished is not None:
+                    events.append(finished)
             process = self._spawn(config)
             instance_id = f"mcp_instance_{uuid.uuid4().hex}"
             status = McpLocalServerStatus(
@@ -133,34 +137,43 @@ class McpProcessManager:
                 diagnostics=deque(maxlen=_MAX_DIAGNOSTIC_LINES),
             )
             self._records[server_id] = record
-            self._emit(status)
+            events.append(status)
             Thread(target=self._watch, args=(server_id, record), daemon=True).start()
             self._drain_pipes(record)
-            self._probe_startup_locked(record)
-            return record.status
+            probed = self._probe_startup_locked(record)
+            if probed is not None:
+                events.append(probed)
+            result = record.status
+        for event in events:
+            self._emit(event)
+        return result
 
     def stop(self, server_id: str) -> McpLocalServerStatus:
         """停止本地 Server；不存在运行实例时返回稳定错误。"""
+        event: McpLocalServerStatus | None = None
         with self._lock:
             self._raise_if_closed()
             record = self._records.get(server_id)
             if record is None:
                 raise McpLocalServerError("MCP Server 未运行")
             if record.process.poll() is not None:
-                self._mark_finished_locked(record)
-                return record.status
-            self._terminate(record.process)
-            self._wait_for_exit(record)
-            record.status = replace(
-                record.status,
-                state=McpLocalServerState.STOPPED,
-                ended_at=record.status.ended_at or _timestamp(),
-                exit_code=record.process.returncode,
-                diagnostics=tuple(record.diagnostics),
-            )
-            status = record.status
-            self._emit(status)
-            return status
+                event = self._mark_finished_locked(record)
+                result = record.status
+            else:
+                self._terminate(record.process)
+                self._wait_for_exit(record)
+                record.status = replace(
+                    record.status,
+                    state=McpLocalServerState.STOPPED,
+                    ended_at=record.status.ended_at or _timestamp(),
+                    exit_code=record.process.returncode,
+                    diagnostics=tuple(record.diagnostics),
+                )
+                result = record.status
+                event = result
+        if event is not None:
+            self._emit(event)
+        return result
 
     def restart(self, server_id: str) -> McpLocalServerStatus:
         """停止当前实例后启动全新的本地 Server 实例。"""
@@ -173,6 +186,7 @@ class McpProcessManager:
 
     def status(self, server_id: str) -> McpLocalServerStatus:
         """读取当前状态，并刷新已退出进程的结束信息。"""
+        event: McpLocalServerStatus | None = None
         with self._lock:
             self._raise_if_closed()
             record = self._records.get(server_id)
@@ -182,8 +196,11 @@ class McpProcessManager:
                     raise McpRemoteLifecycleError("远程 MCP Server 没有本地进程状态")
                 return McpLocalServerStatus(server_id=server_id, instance_id=None, state=McpLocalServerState.NOT_RUNNING)
             if record.process.poll() is not None:
-                self._mark_finished_locked(record)
-            return record.status
+                event = self._mark_finished_locked(record)
+            result = record.status
+        if event is not None:
+            self._emit(event)
+        return result
 
     def close(self) -> None:
         """停止所有仍运行的进程并拒绝后续操作。"""
@@ -230,19 +247,18 @@ class McpProcessManager:
         except OSError as error:
             raise McpLocalServerError("MCP Server 启动失败") from error
 
-    def _probe_startup_locked(self, record: _ProcessRecord) -> None:
+    def _probe_startup_locked(self, record: _ProcessRecord) -> McpLocalServerStatus | None:
         try:
             record.process.wait(timeout=self._startup_probe_ms / 1000)
         except subprocess.TimeoutExpired:
             record.status = replace(record.status, state=McpLocalServerState.RUNNING)
-            self._emit(record.status)
-            return
-        self._mark_finished_locked(record)
+            return record.status
+        return self._mark_finished_locked(record)
 
-    def _mark_finished_locked(self, record: _ProcessRecord) -> None:
+    def _mark_finished_locked(self, record: _ProcessRecord) -> McpLocalServerStatus | None:
         code = record.process.returncode
         if code is None:
-            return
+            return None
         state = McpLocalServerState.EXITED if code == 0 else McpLocalServerState.FAILED
         record.status = replace(
             record.status,
@@ -252,16 +268,19 @@ class McpProcessManager:
             diagnostic_code="MCP_CONNECTION_CLOSED" if code != 0 else None,
             diagnostics=tuple(record.diagnostics),
         )
-        self._emit(record.status)
+        return record.status
 
     def _watch(self, server_id: str, record: _ProcessRecord) -> None:
         try:
             record.process.wait()
         except OSError:
             return
+        event: McpLocalServerStatus | None = None
         with self._lock:
             if self._records.get(server_id) is record and record.status.state is not McpLocalServerState.STOPPED:
-                self._mark_finished_locked(record)
+                event = self._mark_finished_locked(record)
+        if event is not None:
+            self._emit(event)
 
     @staticmethod
     def _drain_pipes(record: _ProcessRecord) -> None:
@@ -316,7 +335,8 @@ class McpProcessManager:
             raise McpProcessManagerClosedError("MCP 进程管理器已关闭")
 
     def _emit(self, status: McpLocalServerStatus) -> None:
-        listeners = tuple(self._listeners)
+        with self._listeners_lock:
+            listeners = tuple(self._listeners)
         for listener in listeners:
             try:
                 listener(status)

@@ -93,3 +93,19 @@ def test_manager_rejects_remote_lifecycle_and_missing_local_instances(tmp_path: 
             manager.stop("mcp_LOCAL00001")
     finally:
         manager.close()
+
+
+def test_status_listener_can_query_manager_without_reentrant_deadlock(tmp_path: Path) -> None:
+    manager = McpProcessManager(_registry(tmp_path), startup_probe_ms=20)
+    queried_states = []
+
+    def listener(status) -> None:
+        if status.state is McpLocalServerState.RUNNING:
+            queried_states.append(manager.status(status.server_id).state)
+
+    manager.subscribe(listener)
+    try:
+        manager.start("mcp_LOCAL00001")
+        assert queried_states == [McpLocalServerState.RUNNING]
+    finally:
+        manager.close()

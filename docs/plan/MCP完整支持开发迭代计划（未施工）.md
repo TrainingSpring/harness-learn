@@ -749,7 +749,7 @@ client/web/front/src/api/types.ts
 - 显式启动实例不被 Session 复用为 MCP 协议连接，避免多 Session 竞争一条 stdio 流。
 - 新增生命周期测试，覆盖启动幂等、停止、重启、异常退出、远程拒绝和未启动实例。
 
-### 阶段 5：Lifecycle、Capabilities 和 MCP Client（未施工）
+### 阶段 5：Lifecycle、Capabilities 和 MCP Client（已完成）
 
 **目标**：能建立 MCP Client 并完成初始化、版本和能力发现。
 
@@ -772,6 +772,17 @@ client/web/front/src/api/types.ts
 
 **验收**：版本不兼容、初始化超时、能力缺失、Server 主动断开都能得到稳定状态；两个
 Session 使用同一个 Server 时请求 ID、订阅、Context 和连接状态互不影响。
+
+**完成记录（2026-09-28）**：
+
+- 新增 `lifecycle.py`，实现握手时代协议版本白名单、`initialize` 参数与结果校验、版本协商结果和 Server 身份。
+- 新增 `capabilities.py`，保存能力快照并提供能力声明检查；不把 Server 的 instructions 自动写入 Context。
+- 新增 `client.py`，实现 `initialize`、`notifications/initialized`、`ping`、`shutdown`、能力检查和显式失败状态；Server JSON-RPC 业务错误不会误判为连接断开。
+- 新增 `pagination.py`，统一收集 tools/resources/prompts 的 cursor 分页，并限制最大页数、拒绝重复 cursor 和畸形数据。
+- 新增 `notifications.py`，支持 tools/resources/prompts 的 `listChanged` 订阅，观察者异常不会破坏连接。
+- 新增 `connection_manager.py`，以 `session_id + agent_id + server_id` 为隔离键创建、复用、重连和关闭连接；Session 或 Agent 关闭只影响自身连接。
+- 禁用 MCP Server 不允许建立连接；连接失败不自动重放请求，必须显式 reconnect。
+- 新增阶段 5 回归测试，覆盖初始化、版本不兼容、能力缺失、分页、通知、连接隔离、失败重连、禁用 Server 和 shutdown。
 
 ### 阶段 6：Tools 动态映射、权限和 Runtime 接入（未施工）
 

@@ -98,3 +98,27 @@ class McpProcessManagerClosedError(McpLocalServerError):
     """进程管理器已经关闭。"""
 
     code = "MCP_PROCESS_MANAGER_CLOSED"
+
+
+class McpLifecycleError(McpError):
+    """MCP initialize、协商或关闭生命周期失败。"""
+
+    code = "MCP_LIFECYCLE_ERROR"
+
+
+class McpCapabilityUnavailableError(McpError):
+    """Server 没有声明客户端即将使用的 MCP 能力。"""
+
+    code = "MCP_CAPABILITY_UNAVAILABLE"
+
+
+class McpPaginationError(McpError):
+    """分页响应缺失字段、循环 cursor 或超过受控页数。"""
+
+    code = "MCP_PAGINATION_ERROR"
+
+
+class McpConnectionManagerClosedError(McpError):
+    """连接管理器关闭后继续请求连接。"""
+
+    code = "MCP_CONNECTION_MANAGER_CLOSED"
