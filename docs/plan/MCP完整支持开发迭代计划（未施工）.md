@@ -719,7 +719,7 @@ client/web/front/src/api/types.ts
 - Transport 不负责 `initialize`、能力发现、重连策略或 Tool 映射；404 只清理失效 Session ID 并交给后续 Client 生命周期层重新初始化。
 - 新增 8 个协议与 Transport 回归测试，覆盖并发响应、通知、超时、取消、SSE、会话失效、畸形响应和服务退出。
 
-### 阶段 4：本地服务生命周期（未施工）
+### 阶段 4：本地服务生命周期（已完成）
 
 **目标**：设置页和运行时可以可靠控制本地 MCP 服务。
 
@@ -739,6 +739,15 @@ client/web/front/src/api/types.ts
 
 **验收**：启动、停止、重启状态可查询；停止失败阻止删除；远程服务没有生命周期按钮；
 服务异常退出有可诊断原因。
+
+**完成记录（2026-09-28）**：
+
+- 新增 `process_manager.py`，提供 `start`、`stop`、`restart`、`status`、`close` 和进程状态订阅。
+- 状态仅存在内存快照中，包含实例 ID、PID、退出码、时间戳和有界 stderr 诊断；不会写入 `config.json`。
+- 仅允许 `is_local=true` 的启用 Server 执行进程操作；远程 Server 返回稳定的生命周期不支持错误。
+- 本地进程通过 argv + `shell=False` 运行；停止按 stdin/进程组终止/强制终止的可恢复流程完成。
+- 显式启动实例不被 Session 复用为 MCP 协议连接，避免多 Session 竞争一条 stdio 流。
+- 新增生命周期测试，覆盖启动幂等、停止、重启、异常退出、远程拒绝和未启动实例。
 
 ### 阶段 5：Lifecycle、Capabilities 和 MCP Client（未施工）
 

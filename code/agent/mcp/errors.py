@@ -80,3 +80,21 @@ class McpSessionExpiredError(McpTransportError):
     """Streamable HTTP Server 拒绝当前会话，Client 应重新初始化。"""
 
     code = "MCP_SESSION_EXPIRED"
+
+
+class McpLocalServerError(McpError):
+    """本地 MCP Server 生命周期操作失败。"""
+
+    code = "MCP_LOCAL_SERVER_ERROR"
+
+
+class McpRemoteLifecycleError(McpError):
+    """尝试对远程 MCP Server 执行本地进程操作。"""
+
+    code = "MCP_REMOTE_LIFECYCLE_UNSUPPORTED"
+
+
+class McpProcessManagerClosedError(McpLocalServerError):
+    """进程管理器已经关闭。"""
+
+    code = "MCP_PROCESS_MANAGER_CLOSED"
