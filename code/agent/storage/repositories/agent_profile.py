@@ -118,8 +118,8 @@ class AgentProfileRepository:
                     """
                     INSERT INTO agent_profiles (
                         id, name, description, personality, expertise_json,
-                        llm_profile_id, tools_json, is_enabled, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        llm_profile_id, tools_json, mcp_server_ids_json, is_enabled, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         name = excluded.name,
                         description = excluded.description,
@@ -127,6 +127,7 @@ class AgentProfileRepository:
                         expertise_json = excluded.expertise_json,
                         llm_profile_id = excluded.llm_profile_id,
                         tools_json = excluded.tools_json,
+                        mcp_server_ids_json = excluded.mcp_server_ids_json,
                         is_enabled = excluded.is_enabled,
                         updated_at = excluded.updated_at
                     """,
@@ -142,6 +143,10 @@ class AgentProfileRepository:
                         updated_profile.llm_profile_id,
                         json.dumps(
                             updated_profile.tools,
+                            ensure_ascii=False,
+                        ),
+                        json.dumps(
+                            updated_profile.mcp_server_ids,
                             ensure_ascii=False,
                         ),
                         int(updated_profile.is_enabled),
@@ -202,9 +207,14 @@ class AgentProfileRepository:
         try:
             expertise = json.loads(row["expertise_json"])
             tools = json.loads(row["tools_json"])
+            mcp_server_ids = json.loads(row["mcp_server_ids_json"])
         except (TypeError, json.JSONDecodeError) as error:
             raise StorageFormatError("AgentProfile JSON 字段不是有效 JSON") from error
-        if not isinstance(expertise, list) or not isinstance(tools, list):
+        if (
+            not isinstance(expertise, list)
+            or not isinstance(tools, list)
+            or not isinstance(mcp_server_ids, list)
+        ):
             raise StorageFormatError("AgentProfile JSON 字段必须编码为数组")
         try:
             return AgentProfile(
@@ -216,6 +226,7 @@ class AgentProfileRepository:
                 llm_profile_id=row["llm_profile_id"],
                 tools=tools,
                 skill_ids=skill_ids or [],
+                mcp_server_ids=mcp_server_ids,
                 is_enabled=bool(row["is_enabled"]),
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],

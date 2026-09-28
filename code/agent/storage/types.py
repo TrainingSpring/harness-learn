@@ -103,6 +103,7 @@ class AgentProfile:
         expertise: Agent 擅长的领域标签。
         llm_profile_id: 该 Agent 使用的 LLMProfile ID。
         tools: 该 Agent 配置拥有的工具名称列表。
+        mcp_server_ids: 该 Agent 可连接的 MCP Server 稳定 ID 列表。
         is_enabled: 是否允许用户选择和加载该 Agent。
         created_at: 创建时间。
         updated_at: 最后更新时间。
@@ -116,6 +117,7 @@ class AgentProfile:
     llm_profile_id: str
     tools: list[str]
     skill_ids: list[str] = field(default_factory=list)
+    mcp_server_ids: list[str] = field(default_factory=list)
     is_enabled: bool = True
     created_at: str | None = None
     updated_at: str | None = None
@@ -137,6 +139,22 @@ class AgentProfile:
             raise ValueError("skill_ids 必须是不重复的字符串列表")
         for skill_id in self.skill_ids:
             validate_id("skill", skill_id)
+        if not isinstance(self.mcp_server_ids, list) or not all(
+            isinstance(item, str) and item.strip() for item in self.mcp_server_ids
+        ):
+            raise ValueError("mcp_server_ids 必须是非空字符串列表")
+        # 配置可由 API、迁移或其他宿主构造；领域对象统一保证去重保序。
+        self.mcp_server_ids = list(dict.fromkeys(self.mcp_server_ids))
+        for server_id in self.mcp_server_ids:
+            _validate_mcp_server_id(server_id)
+
+
+def _validate_mcp_server_id(value: str) -> None:
+    """验证 MCP 配置文件允许的稳定 Server ID，避免存储层依赖 MCP 模块。"""
+    import re
+
+    if re.fullmatch(r"mcp_[A-Za-z0-9][A-Za-z0-9_-]{0,63}", value) is None:
+        raise ValueError("非法的 MCP Server ID")
 
 
 @dataclass

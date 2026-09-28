@@ -17,6 +17,7 @@ class AgentSummary(ApiModel):
     expertise: list[str]
     tools: list[str]
     skills: list[str]
+    mcp_server_ids: list[str]
     is_enabled: bool
 
 
@@ -33,6 +34,7 @@ class CreateAgentRequest(ApiModel):
     llm_profile_id: str
     tools: list[str] = Field(default_factory=list)
     skill_ids: list[str] = Field(default_factory=list)
+    mcp_server_ids: list[str] = Field(default_factory=list)
     is_enabled: bool = True
 
 

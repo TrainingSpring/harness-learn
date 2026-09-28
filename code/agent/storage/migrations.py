@@ -5,7 +5,7 @@ import sqlite3
 from .errors import StorageSchemaError
 
 
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 8
 
 
 def migrate(connection: sqlite3.Connection) -> None:
@@ -70,6 +70,9 @@ def migrate(connection: sqlite3.Connection) -> None:
         if version == 6:
             _migrate_version_six_to_seven(connection)
             version = 7
+        if version == 7:
+            _migrate_version_seven_to_eight(connection)
+            version = 8
 
         if version != CURRENT_SCHEMA_VERSION:
             raise StorageSchemaError(
@@ -489,5 +492,17 @@ def _migrate_version_six_to_seven(connection: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_agent_skills_agent_position
             ON agent_skills(agent_id, position);
         UPDATE schema_metadata SET value = '7' WHERE key = 'schema_version';
+        """
+    )
+
+
+def _migrate_version_seven_to_eight(connection: sqlite3.Connection) -> None:
+    """为 Agent 保存 MCP Server 引用，不复制 MCP 配置或连接状态。"""
+    connection.executescript(
+        """
+        ALTER TABLE agent_profiles
+        ADD COLUMN mcp_server_ids_json TEXT NOT NULL DEFAULT '[]';
+
+        UPDATE schema_metadata SET value = '8' WHERE key = 'schema_version';
         """
     )

@@ -31,6 +31,8 @@ from storage.repositories.skill import SkillRepository
 from tools.registry.catalog import ToolCatalog
 from skills.catalog import SkillCatalog
 from skills.sync_service import SkillSyncService
+from mcp.config_store import McpConfigStore
+from mcp.registry import McpServerRegistry
 
 
 def create_app(settings: WebServerSettings) -> FastAPI:
@@ -60,6 +62,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             llm_profiles=llm_profiles,
             agent_profile_assistant=AgentProfileAssistant(llm_profiles),
             tool_catalog=catalog,
+            mcp_servers=McpServerRegistry(McpConfigStore()),
             skill_catalog=skill_catalog,
             skill_profiles=skill_profiles,
             skill_sync_service=SkillSyncService(skill_catalog, skill_profiles),

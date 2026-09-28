@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from storage.errors import StorageConflictError
 from storage.ids import generate_id
 from storage.types import AgentProfile
+from mcp.errors import McpServerNotFoundError
 
 from ..dependencies import ApplicationServices, get_services
 from ..errors import ApiError
@@ -32,6 +33,7 @@ def _summary(profile: AgentProfile) -> AgentSummary:
         expertise=profile.expertise,
         tools=profile.tools,
         skills=profile.skill_ids,
+        mcp_server_ids=profile.mcp_server_ids,
         is_enabled=profile.is_enabled,
     )
 
@@ -115,10 +117,18 @@ def _validated_profile_data(request: CreateAgentRequest, services: ApplicationSe
         if skill is None or skill.status != "AVAILABLE":
             raise ApiError(422, "INVALID_SKILL", "只能关联可用 Skill")
         skills.append(skill.id)
+    if request.mcp_server_ids:
+        try:
+            mcp_server_ids = services.mcp_servers.validate_ids(request.mcp_server_ids)
+        except (McpServerNotFoundError, ValueError) as error:
+            raise ApiError(422, "INVALID_MCP_SERVER", "MCP 服务不存在或 ID 无效") from error
+    else:
+        mcp_server_ids = []
     return {"name": request.name, "description": request.description,
             "personality": request.personality, "expertise": request.expertise,
             "llm_profile_id": request.llm_profile_id, "tools": request.tools,
-            "skill_ids": skills, "is_enabled": request.is_enabled}
+            "skill_ids": skills, "mcp_server_ids": mcp_server_ids,
+            "is_enabled": request.is_enabled}
 
 
 @router.post("", response_model=AgentDetail, status_code=status.HTTP_201_CREATED)

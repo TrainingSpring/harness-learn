@@ -656,7 +656,7 @@ client/web/front/src/api/types.ts
 - 新增 `tests/mcp/` 下 8 个配置与注册表测试。
 - 应用启动接线暂未加入，留到设置 API 阶段，避免产生没有消费者的全局服务依赖。
 
-### 阶段 2：Agent MCP 引用持久化（未施工）
+### 阶段 2：Agent MCP 引用持久化（已完成）
 
 **目标**：Agent 能保存多个 MCP Server ID，且不保存 MCP Server 主配置。
 
@@ -678,6 +678,14 @@ client/web/front/src/api/types.ts
 
 **验收**：创建、编辑、读取、恢复 Agent 后 MCP Server ID 不丢失；同一 Agent 绑定多个 Server；
 没有任何 Tool ID 或连接对象进入 AgentProfile。
+
+**完成记录（2026-09-28）**：
+
+- `AgentProfile` 新增 `mcp_server_ids`，在领域层校验 MCP Server ID 并去重保序。
+- schema 迁移至 v8，在 `agent_profiles.mcp_server_ids_json` 持久化该引用列表；未新增 MCP 相关 SQLite 表。
+- Agent 创建、更新和读取 API 支持 `mcpServerIds`，仅允许引用当前 `McpServerRegistry` 中存在的 Server；禁用 Server 的引用仍允许保存。
+- Web 应用服务容器注入 `McpServerRegistry`，但 Agent、Session、Runtime 不依赖 Store 或配置文件实现。
+- 增加存储与 API 回归测试，覆盖读写去重、已注册 Server 和未知 Server 的拒绝。
 
 ### 阶段 3：JSON-RPC 和 Transport（未施工）
 

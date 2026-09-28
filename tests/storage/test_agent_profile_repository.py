@@ -71,8 +71,26 @@ class AgentProfileRepositoryTests(unittest.TestCase):
         self.assertEqual(loaded.name, "代码专家")
         self.assertEqual(loaded.expertise, ["Python", "代码实现"])
         self.assertEqual(loaded.tools, ["read", "write"])
+        self.assertEqual(loaded.mcp_server_ids, [])
         self.assertFalse(hasattr(loaded, "permission_mode"))
         self.assertIsNotNone(loaded.created_at)
+
+    def test_save_normalizes_mcp_server_ids_in_configured_order(self):
+        """MCP Server 仅保存稳定引用，重复项按首次出现的位置保留。"""
+        profile = self.make_profile()
+        profile.mcp_server_ids = [
+            "mcp_SERVER0001",
+            "mcp_SERVER0002",
+            "mcp_SERVER0001",
+        ]
+
+        self.repository.save(profile)
+
+        assert self.repository.get(profile.id) is not None
+        self.assertEqual(
+            self.repository.get(profile.id).mcp_server_ids,
+            ["mcp_SERVER0001", "mcp_SERVER0002"],
+        )
 
     def test_list_enabled_can_filter_by_expertise(self):
         """列表接口只返回启用 Agent，并支持擅长领域筛选。"""
