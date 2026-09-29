@@ -16,6 +16,7 @@ _SUPPORTED_PREFIXES = frozenset(
         "item",
         "delegation",
         "permission_rule",
+        "mcp",
     }
 )
 

@@ -19,6 +19,9 @@ from tools.registry.catalog import ToolCatalog
 from skills.catalog import SkillCatalog
 from skills.sync_service import SkillSyncService
 from mcp.registry import McpServerRegistry
+from mcp.config_store import McpConfigStore
+from mcp.process_manager import McpProcessManager
+from mcp.connection_manager import McpConnectionManager
 
 from .services.chat_service import ChatService
 from .services.agent_profile_assistant import AgentProfileAssistant
@@ -36,7 +39,10 @@ class ApplicationServices:
         llm_profiles: LLM 配置只读接口使用的仓储。
         agent_profile_assistant: 使用指定 LLM 生成角色草案的服务。
         tool_catalog: 受信任工具元数据目录。
-        mcp_servers: MCP 注册配置的只读查询和 Agent 引用校验入口。
+        mcp_servers: MCP 注册配置查询和 Agent 引用校验入口。
+        mcp_config_store: MCP JSON 配置读写服务。
+        mcp_processes: 本地 MCP 管理进程生命周期服务。
+        mcp_connections: Session 级 MCP 连接生命周期服务。
         session_queries: 面向客户端的 DIRECT 会话聚合查询仓储。
         context_items: 会话时间线查询仓储。
         run_registry: 进程内活动 SessionExecution 注册表。
@@ -50,6 +56,9 @@ class ApplicationServices:
     agent_profile_assistant: AgentProfileAssistant
     tool_catalog: ToolCatalog
     mcp_servers: McpServerRegistry
+    mcp_config_store: McpConfigStore
+    mcp_processes: McpProcessManager
+    mcp_connections: McpConnectionManager
     skill_catalog: SkillCatalog
     skill_profiles: SkillRepository
     skill_sync_service: SkillSyncService

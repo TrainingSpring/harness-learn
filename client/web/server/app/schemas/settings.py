@@ -96,3 +96,64 @@ class SkillSyncResult(ApiModel):
     missing: int
     invalid: int
     items: list[SkillSummary]
+
+
+class McpServerSummary(ApiModel):
+    """MCP Server 的公开配置和运行状态，不包含连接对象或令牌。"""
+
+    id: str
+    name: str
+    description: str
+    is_local: bool
+    transport: Literal["stdio", "streamable_http"]
+    enabled: bool
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
+    cwd: str | None = None
+    env: dict[str, str] = Field(default_factory=dict)
+    url: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
+    auth_mode: Literal["none", "bearer", "oauth"] = "none"
+    status: str
+    instance_id: str | None = None
+    pid: int | None = None
+    diagnostic_code: str | None = None
+    diagnostics: list[str] = Field(default_factory=list)
+
+
+class McpServerListResponse(ApiModel):
+    """MCP Server 列表和配置 revision。"""
+
+    items: list[McpServerSummary]
+    revision: str
+
+
+class CreateMcpServerRequest(ApiModel):
+    """新增 MCP Server 的联合配置请求。"""
+
+    name: str = Field(min_length=1, max_length=8192)
+    description: str = ""
+    is_local: bool
+    enabled: bool = True
+    command: str | None = None
+    args: list[str] = Field(default_factory=list)
+    cwd: str | None = None
+    env: dict[str, str] = Field(default_factory=dict)
+    url: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
+    auth_mode: Literal["none", "bearer", "oauth"] = "none"
+    startup_timeout_ms: int = Field(default=10000, ge=100, le=300000)
+    shutdown_timeout_ms: int = Field(default=5000, ge=100, le=300000)
+    request_timeout_ms: int = Field(default=30000, ge=100, le=300000)
+
+
+class UpdateMcpServerRequest(CreateMcpServerRequest):
+    """编辑 MCP Server 的完整配置，要求携带当前 revision。"""
+
+    revision: str = Field(min_length=1)
+
+
+class McpServerActionResponse(ApiModel):
+    """MCP 本地生命周期操作后的状态。"""
+
+    item: McpServerSummary

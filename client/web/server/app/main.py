@@ -34,6 +34,7 @@ from skills.sync_service import SkillSyncService
 from mcp.config_store import McpConfigStore
 from mcp.registry import McpServerRegistry
 from mcp.connection_manager import McpConnectionManager
+from mcp.process_manager import McpProcessManager
 
 
 def create_app(settings: WebServerSettings) -> FastAPI:
@@ -56,6 +57,8 @@ def create_app(settings: WebServerSettings) -> FastAPI:
         llm_profiles = LLMProfileRepository(database)
         run_registry = RunRegistry()
         mcp_registry = McpServerRegistry(McpConfigStore())
+        mcp_config_store = mcp_registry.config_store
+        mcp_processes = McpProcessManager(mcp_registry)
         mcp_connections = McpConnectionManager()
         session_service = SessionService(
             database,
@@ -70,6 +73,9 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             agent_profile_assistant=AgentProfileAssistant(llm_profiles),
             tool_catalog=catalog,
             mcp_servers=mcp_registry,
+            mcp_config_store=mcp_config_store,
+            mcp_processes=mcp_processes,
+            mcp_connections=mcp_connections,
             skill_catalog=skill_catalog,
             skill_profiles=skill_profiles,
             skill_sync_service=SkillSyncService(skill_catalog, skill_profiles),
@@ -87,6 +93,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             yield
         finally:
             run_registry.clear()
+            mcp_processes.close()
             mcp_connections.close()
             database.close()
 
