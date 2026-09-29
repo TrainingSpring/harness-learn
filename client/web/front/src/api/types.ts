@@ -310,4 +310,8 @@ export type ServerEvent =
   | { type: "tool.completed"; runId: string; sessionId: string; data: { callId: string; itemId?: string; output?: unknown } }
   | { type: "permission.required"; runId: string; sessionId: string; data: PermissionRequest }
   | { type: "run.completed"; runId: string; sessionId: string; data: Record<string, unknown> }
-  | { type: "run.failed"; runId: string; sessionId: string; data: { code?: string; message: string } };
+  | { type: "run.failed"; runId: string; sessionId: string; data: { code?: string; message: string } }
+  | { type: "mcp.progress"; runId: string; sessionId: string; data: { serverId: string; progressToken: string | number; progress: number; total?: number; message?: string } }
+  | { type: "mcp.log"; runId: string; sessionId: string; data: { serverId: string; level: string; message: string } }
+  | { type: "mcp.resource.updated"; runId: string; sessionId: string; data: { serverId: string; uri: string } }
+  | { type: "mcp.interaction.required"; runId: string; sessionId: string; data: { interactionType: "sampling" | "elicitation"; requestId: string; payload: Record<string, unknown> } };

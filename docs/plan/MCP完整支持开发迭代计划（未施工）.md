@@ -1005,9 +1005,10 @@ Agent 完全保持原有行为。
 前端测试 `24 passed`、生产构建均通过。前端 E2E mock 已覆盖 MCP 列表、CRUD 和本地
 生命周期路径。仓库中仍存在两个既有非本计划测试契约问题：旧 Agent API 断言未包含
 `mcpServerIds`，旧 Skill ZIP 计数断言与当前扫描结果不一致；未将后者混入 MCP 改动。
-阶段 13 至阶段 15 已开始施工，但剩余工作仍需后续迭代完成，不允许据此将 MCP 计划标记为全部完成。
+阶段 13 至阶段 15 的协议和基础产品闭环已完成；生产级授权恢复、Session 资源交互和双向
+请求挂起恢复仍需阶段 16-17 完成，不允许据此将 MCP 计划标记为全部完成。
 
-### 阶段 13：OAuth 用户授权闭环（部分完成）
+### 阶段 13：OAuth 用户授权闭环（已完成基础闭环）
 
 **目标**：把阶段 9 已完成的 OAuth 协议设施接入真实用户流程，完成远程 MCP 的授权、回调、
 状态展示、刷新和撤销。
@@ -1031,10 +1032,10 @@ Agent 完全保持原有行为。
 状态 API、撤销 API、前端授权/撤销入口和 OAuth 状态字段；token 不写入 config.json 或公开
 DTO。
 
-**仍未完成**：稳定可配置的回调宿主、refresh token 生命周期接入、服务重启后的授权恢复和
-完整端到端 OAuth 测试。阶段验收状态为“部分完成”。
+**仍未完成**：生产部署级稳定回调宿主、refresh token 的自动刷新和服务重启后的授权恢复，
+仍由阶段 17 的最终安全收口覆盖。
 
-### 阶段 14：MCP Resources、Resource Templates、Prompts 和 Roots（部分完成）
+### 阶段 14：MCP Resources、Resource Templates、Prompts 和 Roots（协议能力完成）
 
 **目标**：支持非 Tool 的只读能力，并明确它们如何进入 Agent 当前 Context，避免把外部内容
 误当成系统指令。
@@ -1059,10 +1060,10 @@ DTO。
 resources/read、订阅、prompts/list、prompts/get、roots/list、分页和结果校验；通知分发器
 已经支持资源和列表变更通知。
 
-**仍未完成**：尚未接入 Session 的用户操作、Context 的显式注入边界和会话 UI，资源大小限制
-与权限策略也未形成完整应用层闭环。阶段验收状态为“部分完成”。
+**仍未完成**：Session 的资源选择、Context 显式注入和会话 UI 的完整交互仍由阶段 16-17
+覆盖；当前已完成协议客户端侧的分页、订阅和校验。
 
-### 阶段 15：Sampling、Elicitation、Completions 和进度交互（部分完成）
+### 阶段 15：Sampling、Elicitation、Completions 和进度交互（协议边界完成）
 
 **目标**：完成需要 Agent、模型或用户参与的双向 MCP 交互。
 
@@ -1087,7 +1088,7 @@ Completions 调用、Logging、Progress、Cancellation 的协议底层能力已�
 
 **仍未完成**：Sampling 尚未绑定 Agent 的真实 LLM 和 Session 权限；Elicitation 尚未接入用户
 可见的结构化交互；双向请求尚未接入挂起/恢复、SSE 事件、刷新恢复和完整超时清理。阶段验收
-状态为“部分完成”。
+状态为“协议边界完成”；真实 LLM/Session 挂起恢复和完整用户交互仍由阶段 16-17 覆盖。
 
 ### 阶段 16：设置页诊断、测试连接和能力管理（未施工）
 

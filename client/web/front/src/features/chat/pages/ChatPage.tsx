@@ -10,6 +10,7 @@ import { getSession, listMessages, updateSessionPermissionMode, updateSessionWor
 import { ChatHeader } from "../components/ChatHeader";
 import { Composer } from "../components/Composer";
 import { MessageList } from "../components/MessageList";
+import { McpInteractionDialog } from "../components/McpInteractionDialog";
 import { useChatRun } from "../hooks/useChatRun";
 
 interface ChatNavigationState { initialMessage?: string }
@@ -75,6 +76,7 @@ export function ChatPage() {
         />
       </footer>
       {run.permission && <PermissionDialog request={run.permission} isSubmitting={run.permissionSubmitting} onDecision={(decision, scope) => { void run.resolvePermission(decision, scope); }} />}
+      {run.mcpInteraction && <McpInteractionDialog interaction={run.mcpInteraction} onSubmit={() => { /* 交互恢复 API 在后续 Session 端点接入 */ }} />}
     </div>
   );
 }

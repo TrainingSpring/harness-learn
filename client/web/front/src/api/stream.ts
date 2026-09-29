@@ -10,6 +10,10 @@ const EVENT_TYPES = new Set<ServerEvent["type"]>([
   "permission.required",
   "run.completed",
   "run.failed",
+  "mcp.progress",
+  "mcp.log",
+  "mcp.resource.updated",
+  "mcp.interaction.required",
 ]);
 
 const TERMINAL_EVENT_TYPES = new Set<ServerEvent["type"]>([
@@ -51,6 +55,7 @@ export function parseServerEvent(value: unknown): ServerEvent {
       || !validScopes
     ) invalidEvent("权限请求事件结构不完整");
   }
+  if (type === "mcp.interaction.required" && (data.interactionType !== "sampling" && data.interactionType !== "elicitation")) invalidEvent("MCP 交互类型无效");
 
   return value as ServerEvent;
 }

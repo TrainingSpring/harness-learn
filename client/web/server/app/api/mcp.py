@@ -127,6 +127,9 @@ def _status_for(server: McpServerConfig, services: ApplicationServices) -> McpSe
         "pid": None,
         "diagnostic_code": None,
         "diagnostics": [],
+        "oauth_authorized": False,
+        "oauth_expires_at": None,
+        "oauth_error": None,
     }
     if isinstance(server, LocalMcpServerConfig):
         data.update(command=server.command, args=list(server.args), cwd=server.cwd, env=dict(server.env))

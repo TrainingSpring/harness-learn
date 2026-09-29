@@ -6,6 +6,7 @@ import type { PermissionDecision, PermissionRequest, PermissionResponse, Permiss
 
 type RunStatus = "idle" | "running" | "waiting";
 export type ToolEventState = { data: ToolEventData; completed: boolean };
+export type McpInteraction = Extract<ServerEvent, { type: "mcp.interaction.required" }>["data"];
 
 function summarizeOutput(value: unknown): string | undefined {
   if (typeof value === "string") return value;
@@ -43,6 +44,7 @@ export function useChatRun(sessionId: string) {
   const [permission, setPermission] = useState<PermissionRequest | null>(null);
   const [permissionSubmitting, setPermissionSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mcpInteraction, setMcpInteraction] = useState<McpInteraction | null>(null);
 
   const applyEvent = useCallback((event: ServerEvent) => {
     runIdRef.current = event.runId;
@@ -51,16 +53,19 @@ export function useChatRun(sessionId: string) {
     if (event.type === "tool.completed") setToolEvents((current) => mergeCompletedToolEvent(current, event.data));
     if (event.type === "message.completed") setStreamingText("");
     if (event.type === "permission.required") { setPermission(event.data); setStatus("waiting"); }
+    if (event.type === "mcp.interaction.required") { setMcpInteraction(event.data); setStatus("waiting"); }
     if (event.type === "run.failed") {
       runIdRef.current = null;
       setStreamingText("");
       setPermission(null);
+      setMcpInteraction(null);
       setError(event.data.message);
       setStatus("idle");
     }
     if (event.type === "run.completed") {
       runIdRef.current = null;
       setPermission(null);
+      setMcpInteraction(null);
       setStatus("idle");
     }
   }, []);
@@ -88,6 +93,7 @@ export function useChatRun(sessionId: string) {
     setStreamingText("");
     setToolEvents([]);
     setPermission(null);
+    setMcpInteraction(null);
     setStatus("running");
     try {
       await consume(`/api/sessions/${encodeURIComponent(sessionId)}/messages`, { text });
@@ -147,5 +153,5 @@ export function useChatRun(sessionId: string) {
     }
   }, [permission]);
 
-  return { status, streamingText, toolEvents, permission, permissionSubmitting, error, send, resolvePermission, stop };
+  return { status, streamingText, toolEvents, permission, mcpInteraction, permissionSubmitting, error, send, resolvePermission, stop };
 }
