@@ -150,7 +150,7 @@ def test_connection_manager_isolates_clients_by_session_agent_and_server() -> No
         created.append(transport)
         return transport
 
-    config = LocalMcpServerConfig(id="mcp_LOCAL00001", name="Local", command="python")
+    config = LocalMcpServerConfig(id="mcp_LOCAL00001", name="Local", command="python", directory=".")
     manager = McpConnectionManager(transport_factory=factory)
     first_key = McpConnectionKey("session_ONE0001", "agent_AGENT0001", "mcp_LOCAL00001")
     second_key = McpConnectionKey("session_TWO0001", "agent_AGENT0001", "mcp_LOCAL00001")

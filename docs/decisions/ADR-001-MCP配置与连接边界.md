@@ -36,7 +36,7 @@ MCP Server 配置既需要由 Harness 的 UI 修改，也需要允许用户直�
 
 每个 Server 必须具有 `is_local` 字段：
 
-- `is_local: true`：当前阶段使用 `stdio`，包含 command、args、cwd、env 等本地字段。
+- `is_local: true`：当前阶段使用 `stdio`，包含 command、args、directory、env 等本地字段；directory 是 MCP 服务自身的启动目录，不是 Session workspace。
 - `is_local: false`：使用 `streamable_http`，包含 URL、headers、auth_mode 等远程字段。
 
 两种配置不能混用字段；连接状态、PID、工具快照和临时授权状态不写入 JSON。

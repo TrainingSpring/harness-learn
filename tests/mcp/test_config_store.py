@@ -21,7 +21,7 @@ def local_server(server_id: str = "mcp_LOCAL00001") -> LocalMcpServerConfig:
         name="Local Files",
         command="node",
         args=["server.js"],
-        cwd="/tmp/project",
+        directory="/tmp/project",
     )
 
 
@@ -78,7 +78,7 @@ def test_store_round_trips_local_and_remote_discriminated_configs(tmp_path: Path
                 "transport": "stdio",
                 "command": "node",
                 "args": ["server.js"],
-                "cwd": "/tmp/project",
+                "directory": "/tmp/project",
                 "env": {},
                 "enabled": True,
                 "startup_timeout_ms": 10000,

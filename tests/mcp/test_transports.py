@@ -52,6 +52,7 @@ def _local_config(tmp_path: Path) -> LocalMcpServerConfig:
         name="Test",
         command=sys.executable,
         args=[str(script)],
+        directory=str(tmp_path),
         startup_timeout_ms=1_000,
         shutdown_timeout_ms=1_000,
     )

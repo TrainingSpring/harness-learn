@@ -1,6 +1,10 @@
 """MCP Server 配置和本地生命周期管理路由。"""
 
-from fastapi import APIRouter, Depends, status
+import json
+from pathlib import Path
+import tomllib
+
+from fastapi import APIRouter, Depends, Query, status
 
 from mcp.config_store import McpConfigStore
 from mcp.errors import (
@@ -26,10 +30,98 @@ from ..schemas.settings import (
     McpServerSummary,
     UpdateMcpServerRequest,
     McpDiagnosticsResponse,
+    McpDirectoryMetadata,
+    McpDirectory,
+    McpDirectoryListResponse,
 )
 
 
 router = APIRouter(prefix="/settings/mcp", tags=["mcp"])
+
+
+def _read_directory_description(directory: Path) -> str:
+    """按常见项目清单推断描述，不执行目录中的代码。"""
+    package_json = directory / "package.json"
+    if package_json.is_file():
+        try:
+            value = json.loads(package_json.read_text(encoding="utf-8"))
+            description = value.get("description") if isinstance(value, dict) else None
+            if isinstance(description, str) and description.strip():
+                return description.strip()[:8192]
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            pass
+
+    pyproject = directory / "pyproject.toml"
+    if pyproject.is_file():
+        try:
+            value = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+            project = value.get("project") if isinstance(value, dict) else None
+            description = project.get("description") if isinstance(project, dict) else None
+            if isinstance(description, str) and description.strip():
+                return description.strip()[:8192]
+        except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+            pass
+
+    readme = next((directory / name for name in ("README.md", "README", "readme.md") if (directory / name).is_file()), None)
+    if readme is not None:
+        try:
+            paragraph: list[str] = []
+            for line in readme.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    if paragraph:
+                        break
+                    continue
+                if stripped.startswith("#"):
+                    continue
+                paragraph.append(stripped)
+            if paragraph:
+                return " ".join(paragraph)[:8192]
+        except (OSError, UnicodeDecodeError):
+            pass
+    return ""
+
+
+@router.get("/directory-metadata", response_model=McpDirectoryMetadata)
+async def get_mcp_directory_metadata(
+    path: str = Query(..., min_length=1, max_length=2000),
+) -> McpDirectoryMetadata:
+    """返回 MCP 服务目录的名称和可选项目描述。"""
+    directory = Path(path).expanduser()
+    if directory.is_symlink() or not directory.is_dir():
+        raise ApiError(422, "INVALID_MCP_DIRECTORY", "MCP 服务目录无效")
+    directory = directory.resolve()
+    return McpDirectoryMetadata(
+        path=str(directory),
+        name=directory.name or str(directory),
+        description=_read_directory_description(directory),
+    )
+
+
+@router.get("/directories", response_model=McpDirectoryListResponse)
+async def list_mcp_directories(
+    path: str = Query(default=".", max_length=2000),
+) -> McpDirectoryListResponse:
+    """列出指定 MCP 服务目录及其直接子目录。"""
+    directory = Path(path).expanduser()
+    if directory.is_symlink() or not directory.is_dir():
+        raise ApiError(422, "INVALID_MCP_DIRECTORY", "MCP 服务目录无效")
+    directory = directory.resolve()
+    try:
+        children = [
+            McpDirectory(path=str(child.resolve()), name=child.name)
+            for child in sorted(directory.iterdir(), key=lambda item: item.name.casefold())
+            if not child.name.startswith(".") and child.is_dir() and not child.is_symlink()
+        ]
+    except OSError as error:
+        raise ApiError(422, "INVALID_MCP_DIRECTORY", "无法读取 MCP 服务目录") from error
+    parent = directory.parent if directory.parent != directory else None
+    return McpDirectoryListResponse(
+        path=str(directory),
+        name=directory.name or str(directory),
+        parent_path=None if parent is None else str(parent),
+        directories=children,
+    )
 
 
 def _oauth_metadata(server: RemoteMcpServerConfig, services: ApplicationServices) -> OAuthMetadata:
@@ -134,7 +226,7 @@ def _status_for(server: McpServerConfig, services: ApplicationServices) -> McpSe
         "oauth_error": None,
     }
     if isinstance(server, LocalMcpServerConfig):
-        data.update(command=server.command, args=list(server.args), cwd=server.cwd, env=dict(server.env))
+        data.update(command=server.command, args=list(server.args), directory=server.directory, env=dict(server.env))
         try:
             current = services.mcp_processes.status(server.id)
         except (McpRemoteLifecycleError, McpServerNotFoundError):
@@ -173,17 +265,22 @@ def _build_config(server_id: str, request: CreateMcpServerRequest) -> McpServerC
     if request.is_local:
         if not request.command:
             raise ApiError(422, "MCP_CONFIG_INVALID", "本地 MCP 必须填写 command")
+        if not request.directory:
+            raise ApiError(422, "MCP_CONFIG_INVALID", "本地 MCP 必须选择服务目录")
         if request.url is not None:
             raise ApiError(422, "MCP_CONFIG_INVALID", "本地 MCP 不能填写 url")
+        directory = Path(request.directory).expanduser()
+        if directory.is_symlink() or not directory.is_dir():
+            raise ApiError(422, "INVALID_MCP_DIRECTORY", "MCP 服务目录无效")
         return LocalMcpServerConfig(
             id=server_id, name=request.name, description=request.description,
-            command=request.command, args=request.args, cwd=request.cwd, env=request.env,
+            command=request.command, args=request.args, directory=str(directory.resolve()), env=request.env,
             enabled=request.enabled, startup_timeout_ms=request.startup_timeout_ms,
             shutdown_timeout_ms=request.shutdown_timeout_ms,
         )
     if not request.url:
         raise ApiError(422, "MCP_CONFIG_INVALID", "远程 MCP 必须填写 url")
-    if request.command is not None or request.args or request.cwd is not None or request.env:
+    if request.command is not None or request.args or request.directory is not None or request.env:
         raise ApiError(422, "MCP_CONFIG_INVALID", "远程 MCP 不能填写本地进程字段")
     return RemoteMcpServerConfig(
         id=server_id, name=request.name, description=request.description,

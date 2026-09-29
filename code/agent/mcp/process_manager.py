@@ -47,7 +47,7 @@ class McpLocalServerStatus:
     state: McpLocalServerState
     pid: int | None = None
     command: str | None = None
-    cwd: str | None = None
+    directory: str | None = None
     started_at: str | None = None
     ended_at: str | None = None
     exit_code: int | None = None
@@ -127,7 +127,7 @@ class McpProcessManager:
                 state=McpLocalServerState.STARTING,
                 pid=process.pid,
                 command=config.command,
-                cwd=config.cwd,
+                directory=config.directory,
                 started_at=_timestamp(),
             )
             record = _ProcessRecord(
@@ -236,7 +236,7 @@ class McpProcessManager:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=config.cwd,
+                cwd=config.directory,
                 env=environment,
                 shell=False,
                 bufsize=0,

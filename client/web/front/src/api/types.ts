@@ -220,7 +220,7 @@ export interface McpServerSummary {
   enabled: boolean;
   command: string | null;
   args: string[];
-  cwd: string | null;
+  directory: string | null;
   env: Record<string, string>;
   url: string | null;
   headers: Record<string, string>;
@@ -235,6 +235,24 @@ export interface McpServerSummary {
   oauthError: string | null;
 }
 
+export interface McpDirectoryMetadata {
+  path: string;
+  name: string;
+  description: string;
+}
+
+export interface McpDirectory {
+  path: string;
+  name: string;
+}
+
+export interface McpDirectoryListResponse {
+  path: string;
+  name: string;
+  parentPath: string | null;
+  directories: McpDirectory[];
+}
+
 export interface McpServerListResponse {
   items: McpServerSummary[];
   revision: string;
@@ -247,7 +265,7 @@ export interface CreateMcpServerRequest {
   enabled: boolean;
   command?: string | null;
   args?: string[];
-  cwd?: string | null;
+  directory?: string | null;
   env?: Record<string, string>;
   url?: string | null;
   headers?: Record<string, string>;

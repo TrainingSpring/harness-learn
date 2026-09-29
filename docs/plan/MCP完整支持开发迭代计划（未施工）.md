@@ -131,7 +131,7 @@ Runtime
       "transport": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"],
-      "cwd": null,
+      "directory": null,
       "env": {},
       "enabled": true
     },
@@ -170,7 +170,7 @@ Runtime
 | `transport` | `"stdio"` 或本地 HTTP 类型 | stdio 是当前必须支持的本地方式 |
 | `command` | `string` | 启动命令；与 `args` 分离执行，禁止 shell 拼接 |
 | `args` | `string[]` | 参数数组，保留参数边界 |
-| `cwd` | `string \| null` | 子进程工作目录；启动前规范化并校验 |
+| `directory` | `string \| null` | MCP 服务所在目录，也是本地子进程启动目录；不承担 Session workspace 职责 |
 | `env` | `object` | 子进程环境变量；敏感值在日志中脱敏 |
 | `startup_timeout_ms` | `integer` | 可选，启动超时 |
 | `shutdown_timeout_ms` | `integer` | 可选，停止超时 |
@@ -401,7 +401,7 @@ MCP Server 的描述、Tool annotations、Prompt 内容不能绕过上述规则�
 ### 8.3 安全
 
 - stdio 的 command 和 args 分离传递，禁止 shell 拼接。
-- 本地 `cwd`、环境变量和命令路径经过规范化及策略校验。
+- 本地 `directory`、环境变量和命令路径经过规范化及策略校验；Session workspace 由 Session 单独提供。
 - 远程 URL 限制 scheme、重定向、私网访问和 DNS rebinding，防止 SSRF。
 - Token/header/env 中的敏感值不写日志、不进入普通 API 响应、不进入 Context。
 - 配置文件中的敏感字段返回掩码值；编辑时支持保留原值而不是强制回传明文。
@@ -561,7 +561,7 @@ client/web/front/src/features/settings/api.ts
 新增/编辑 Modal：
 
 - 先选择本地或远程，再显示对应字段。
-- 本地填写 command、args、cwd、env、超时。
+- 本地填写 command、args、directory、env、超时。
 - 远程填写 URL、headers、认证模式、超时。
 - 保存前展示字段校验错误，不允许把本地和远程字段混合提交。
 - 敏感字段显示掩码；未修改时提交“保留原值”，不能因为 UI 回显掩码而覆盖真实值。
@@ -1171,7 +1171,7 @@ Completions 调用、Logging、Progress、Cancellation 的协议底层能力已�
 |---|---|---|
 | 用户手工修改 config.json | UI 覆盖外部修改 | 读取摘要、原子写入、冲突检测和刷新 |
 | stdio 被多个 Session 共享 | 请求和响应错配、上下文泄露 | 每个 Agent/Session 保持独立 MCP Client/流 |
-| 本地命令不可信 | 任意代码执行 | argv 启动、cwd/命令策略、明确展示和用户控制 |
+| 本地命令不可信 | 任意代码执行 | argv 启动、directory/命令策略、明确展示和用户控制 |
 | 远程 MCP 不可用 | Agent 等待或失败 | 超时、取消、重连退避和降级状态 |
 | Server Tool 提示注入 | 模型越权或改变规则 | 外部数据标记、系统规则优先、权限独立判断 |
 | MCP Tool 覆盖内置 Tool | 核心能力被替换 | 强制 namespace 和同名拒绝 |

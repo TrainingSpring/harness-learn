@@ -17,6 +17,8 @@ import type {
   UpdateMcpServerRequest,
   McpAuthorizationStartResponse,
   McpDiagnosticsResponse,
+  McpDirectoryMetadata,
+  McpDirectoryListResponse,
 } from "../../api/types";
 
 export function listLlmProfiles(): Promise<ListResponse<LLMProfileSummary>> {
@@ -79,6 +81,14 @@ export function importSkill(file: File): Promise<SkillSyncResult> {
 
 export function listMcpServers(): Promise<McpServerListResponse> {
   return apiClient.get("/api/settings/mcp");
+}
+
+export function getMcpDirectoryMetadata(path: string): Promise<McpDirectoryMetadata> {
+  return apiClient.get(`/api/settings/mcp/directory-metadata?path=${encodeURIComponent(path)}`);
+}
+
+export function listMcpDirectories(path = "."): Promise<McpDirectoryListResponse> {
+  return apiClient.get(`/api/settings/mcp/directories?path=${encodeURIComponent(path)}`);
 }
 
 export function createMcpServer(request: CreateMcpServerRequest): Promise<McpServerSummary> {

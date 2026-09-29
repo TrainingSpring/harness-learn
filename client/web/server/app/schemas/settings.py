@@ -109,7 +109,7 @@ class McpServerSummary(ApiModel):
     enabled: bool
     command: str | None = None
     args: list[str] = Field(default_factory=list)
-    cwd: str | None = None
+    directory: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
     url: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
@@ -122,6 +122,30 @@ class McpServerSummary(ApiModel):
     oauth_authorized: bool = False
     oauth_expires_at: float | None = None
     oauth_error: str | None = None
+
+
+class McpDirectoryMetadata(ApiModel):
+    """从本地 MCP 服务目录推断的表单初始元数据。"""
+
+    path: str
+    name: str
+    description: str = ""
+
+
+class McpDirectory(ApiModel):
+    """可供 MCP 设置选择的本机目录。"""
+
+    path: str
+    name: str
+
+
+class McpDirectoryListResponse(ApiModel):
+    """当前 MCP 目录及直接子目录。"""
+
+    path: str
+    name: str
+    parent_path: str | None
+    directories: list[McpDirectory]
 
 
 class McpServerListResponse(ApiModel):
@@ -140,7 +164,7 @@ class CreateMcpServerRequest(ApiModel):
     enabled: bool = True
     command: str | None = None
     args: list[str] = Field(default_factory=list)
-    cwd: str | None = None
+    directory: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
     url: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)

@@ -172,7 +172,7 @@ class StdioMcpTransport:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=self.config.cwd,
+                cwd=self.config.directory,
                 env=environment,
                 shell=False,
                 bufsize=0,

@@ -126,6 +126,9 @@ code, pre { font-family: var(--font-mono); }
 .project-picker__item:hover { color: var(--text-primary); background: var(--bg-subtle); }
 .project-picker__state { display: flex; align-items: center; gap: 7px; min-height: 90px; color: var(--text-muted); }
 .project-picker__actions { margin-top: 18px; }
+.form-field__input-action { display: flex; gap: 8px; align-items: center; }
+.form-field__input-action input { min-width: 0; flex: 1; }
+.form-field__input-action .button { flex: 0 0 auto; }
 .inline-error { margin: 0 4px 8px; color: var(--danger); font-size: 12px; }
 
 .chat-header { display: flex; align-items: center; justify-content: space-between; }

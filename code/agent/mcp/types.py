@@ -69,7 +69,7 @@ class LocalMcpServerConfig:
     command: str
     description: str = ""
     args: tuple[str, ...] = ()
-    cwd: str | None = None
+    directory: str | None = None
     env: dict[str, str] = field(default_factory=dict)
     enabled: bool = True
     startup_timeout_ms: int = 10_000
@@ -87,8 +87,8 @@ class LocalMcpServerConfig:
         if not isinstance(self.args, tuple) or len(self.args) > _MAX_ARGS:
             raise McpConfigFormatError(f"args 必须是长度不超过 {_MAX_ARGS} 的字符串数组")
         object.__setattr__(self, "args", tuple(_require_text(arg, "args", allow_empty=True) for arg in self.args))
-        if self.cwd is not None:
-            object.__setattr__(self, "cwd", _require_text(self.cwd, "cwd"))
+        if self.directory is not None:
+            object.__setattr__(self, "directory", _require_text(self.directory, "directory"))
         object.__setattr__(self, "env", _require_string_map(self.env, "env"))
         if not isinstance(self.enabled, bool):
             raise McpConfigFormatError("enabled 必须是布尔值")
