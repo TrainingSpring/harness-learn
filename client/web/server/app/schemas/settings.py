@@ -119,6 +119,9 @@ class McpServerSummary(ApiModel):
     pid: int | None = None
     diagnostic_code: str | None = None
     diagnostics: list[str] = Field(default_factory=list)
+    oauth_authorized: bool = False
+    oauth_expires_at: float | None = None
+    oauth_error: str | None = None
 
 
 class McpServerListResponse(ApiModel):
@@ -145,6 +148,8 @@ class CreateMcpServerRequest(ApiModel):
     startup_timeout_ms: int = Field(default=10000, ge=100, le=300000)
     shutdown_timeout_ms: int = Field(default=5000, ge=100, le=300000)
     request_timeout_ms: int = Field(default=30000, ge=100, le=300000)
+    oauth_client_id: str | None = None
+    oauth_scopes: list[str] = Field(default_factory=list)
 
 
 class UpdateMcpServerRequest(CreateMcpServerRequest):

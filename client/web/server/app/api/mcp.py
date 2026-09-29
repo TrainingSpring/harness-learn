@@ -13,6 +13,7 @@ from mcp.errors import (
 )
 from mcp.process_manager import McpLocalServerState, McpProcessManager
 from mcp.types import LocalMcpServerConfig, McpServerConfig, RemoteMcpServerConfig
+from mcp.oauth import OAuthClient, OAuthMetadata
 from storage.ids import generate_id
 
 from ..dependencies import ApplicationServices, get_services
@@ -27,6 +28,90 @@ from ..schemas.settings import (
 
 
 router = APIRouter(prefix="/settings/mcp", tags=["mcp"])
+
+
+def _oauth_metadata(server: RemoteMcpServerConfig, services: ApplicationServices) -> OAuthMetadata:
+    # Metadata discovery remains an explicit user action; it never runs during list.
+    from mcp.oauth import OAuthClient
+    client = OAuthClient(
+        client_id=server.oauth_client_id or "harness-learn",
+        redirect_uri="http://127.0.0.1:8765/oauth/mcp/callback",
+        scopes=server.oauth_scopes,
+        resource=server.url,
+    )
+    try:
+        return client.discover(server.url)
+    finally:
+        client.close()
+
+
+def _oauth_client(server: RemoteMcpServerConfig) -> OAuthClient:
+    return OAuthClient(
+        client_id=server.oauth_client_id or "harness-learn",
+        redirect_uri="http://127.0.0.1:8765/oauth/mcp/callback",
+        scopes=server.oauth_scopes,
+        resource=server.url,
+    )
+
+
+@router.get("/oauth/callback")
+async def oauth_callback(
+    authorization_id: str,
+    code: str,
+    state: str,
+    services: ApplicationServices = Depends(get_services),
+) -> dict[str, str]:
+    try:
+        services.mcp_authorization.complete(authorization_id, code=code, state=state)
+    except Exception as error:
+        raise ApiError(400, getattr(error, "code", "MCP_AUTH_FAILED"), "OAuth 授权回调失败") from error
+    return {"status": "authorized"}
+
+
+@router.get("/{server_id}/oauth/start")
+async def oauth_start(server_id: str, services: ApplicationServices = Depends(get_services)) -> dict[str, str]:
+    try:
+        server = services.mcp_servers.get(server_id)
+    except McpServerNotFoundError as error:
+        raise ApiError(404, error.code, "MCP Server 不存在") from error
+    if not isinstance(server, RemoteMcpServerConfig) or server.auth_mode != "oauth":
+        raise ApiError(409, "MCP_AUTH_REQUIRED", "当前 MCP Server 未启用 OAuth")
+    client = _oauth_client(server)
+    try:
+        metadata = _oauth_metadata(server, services)
+        authorization_id, url = services.mcp_authorization.begin(server.id, client, metadata)
+    except Exception as error:
+        client.close()
+        raise ApiError(409, getattr(error, "code", "MCP_AUTH_FAILED"), "无法发起 OAuth 授权") from error
+    return {"authorizationId": authorization_id, "authorizationUrl": url}
+
+
+@router.get("/{server_id}/oauth/status", response_model=McpServerSummary)
+async def oauth_status(server_id: str, services: ApplicationServices = Depends(get_services)) -> McpServerSummary:
+    try:
+        server = services.mcp_servers.get(server_id)
+    except McpServerNotFoundError as error:
+        raise ApiError(404, error.code, "MCP Server 不存在") from error
+    return _summary(server, services)
+
+
+@router.post("/{server_id}/oauth/revoke", response_model=McpServerSummary)
+async def oauth_revoke(server_id: str, services: ApplicationServices = Depends(get_services)) -> McpServerSummary:
+    try:
+        server = services.mcp_servers.get(server_id)
+    except McpServerNotFoundError as error:
+        raise ApiError(404, error.code, "MCP Server 不存在") from error
+    if not isinstance(server, RemoteMcpServerConfig) or server.auth_mode != "oauth":
+        raise ApiError(409, "MCP_AUTH_REQUIRED", "当前 MCP Server 未启用 OAuth")
+    metadata = _oauth_metadata(server, services)
+    client = _oauth_client(server)
+    try:
+        services.mcp_authorization.revoke(server.id, client, metadata)
+    except Exception as error:
+        raise ApiError(409, getattr(error, "code", "MCP_AUTH_FAILED"), "OAuth 撤销失败") from error
+    finally:
+        client.close()
+    return _summary(server, services)
 
 
 def _status_for(server: McpServerConfig, services: ApplicationServices) -> McpServerSummary:
@@ -59,6 +144,13 @@ def _status_for(server: McpServerConfig, services: ApplicationServices) -> McpSe
             )
     else:
         data.update(url=server.url, headers=dict(server.headers), auth_mode=server.auth_mode)
+        if server.auth_mode == "oauth":
+            auth = services.mcp_authorization.status(server.id)
+            data.update(
+                oauth_authorized=auth.authorized,
+                oauth_expires_at=auth.expires_at,
+                oauth_error=auth.error,
+            )
     return McpServerSummary(**data)
 
 
@@ -92,6 +184,8 @@ def _build_config(server_id: str, request: CreateMcpServerRequest) -> McpServerC
         id=server_id, name=request.name, description=request.description,
         url=request.url, headers=request.headers, auth_mode=request.auth_mode,
         enabled=request.enabled, request_timeout_ms=request.request_timeout_ms,
+        oauth_client_id=request.oauth_client_id,
+        oauth_scopes=tuple(request.oauth_scopes),
     )
 
 

@@ -35,6 +35,7 @@ from mcp.config_store import McpConfigStore
 from mcp.registry import McpServerRegistry
 from mcp.connection_manager import McpConnectionManager
 from mcp.process_manager import McpProcessManager
+from mcp.auth_session import McpAuthorizationManager
 
 
 def create_app(settings: WebServerSettings) -> FastAPI:
@@ -60,6 +61,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
         mcp_config_store = mcp_registry.config_store
         mcp_processes = McpProcessManager(mcp_registry)
         mcp_connections = McpConnectionManager()
+        mcp_authorization = McpAuthorizationManager()
         session_service = SessionService(
             database,
             mcp_registry=mcp_registry,
@@ -76,6 +78,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             mcp_config_store=mcp_config_store,
             mcp_processes=mcp_processes,
             mcp_connections=mcp_connections,
+            mcp_authorization=mcp_authorization,
             skill_catalog=skill_catalog,
             skill_profiles=skill_profiles,
             skill_sync_service=SkillSyncService(skill_catalog, skill_profiles),
@@ -95,6 +98,7 @@ def create_app(settings: WebServerSettings) -> FastAPI:
             run_registry.clear()
             mcp_processes.close()
             mcp_connections.close()
+            mcp_authorization.close()
             database.close()
 
     app = FastAPI(

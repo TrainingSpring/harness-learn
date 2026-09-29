@@ -35,13 +35,15 @@ export function CreateMcpDialog({ isOpen, server = null, revision = "", isSubmit
   const [url, setUrl] = useState("");
   const [headers, setHeaders] = useState("");
   const [authMode, setAuthMode] = useState<McpAuthMode>("none");
+  const [oauthClientId, setOauthClientId] = useState("");
+  const [oauthScopes, setOauthScopes] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setName(server?.name ?? ""); setDescription(server?.description ?? ""); setIsLocal(server?.isLocal ?? true); setEnabled(server?.enabled ?? true);
     setCommand(server?.command ?? ""); setArgs(server?.args.join("\n") ?? ""); setCwd(server?.cwd ?? ""); setEnv(server ? JSON.stringify(server.env, null, 2) : "");
-    setUrl(server?.url ?? ""); setHeaders(server ? JSON.stringify(server.headers, null, 2) : ""); setAuthMode(server?.authMode ?? "none"); setFormError(null);
+    setUrl(server?.url ?? ""); setHeaders(server ? JSON.stringify(server.headers, null, 2) : ""); setAuthMode(server?.authMode ?? "none"); setOauthClientId(""); setOauthScopes(""); setFormError(null);
   }, [isOpen, server?.id]);
 
   if (!isOpen) return null;
@@ -51,7 +53,7 @@ export function CreateMcpDialog({ isOpen, server = null, revision = "", isSubmit
       const base = { name: name.trim(), description: description.trim(), isLocal, enabled };
       const request: CreateMcpServerRequest = isLocal
         ? { ...base, command: command.trim(), args: args.split("\n").map((item) => item.trim()).filter(Boolean), cwd: cwd.trim() || null, env: parseMap(env) }
-        : { ...base, url: url.trim(), headers: parseMap(headers), authMode };
+        : { ...base, url: url.trim(), headers: parseMap(headers), authMode, oauthClientId: oauthClientId.trim() || null, oauthScopes: oauthScopes.split(/[,\n]/).map((item) => item.trim()).filter(Boolean) };
       onSubmit(server ? { ...request, revision } : request);
     } catch (cause) { setFormError(cause instanceof Error ? cause.message : "配置格式无效"); }
   };
@@ -70,7 +72,7 @@ export function CreateMcpDialog({ isOpen, server = null, revision = "", isSubmit
         <label className="form-field"><span>服务地址</span><input type="url" value={url} onChange={(event) => setUrl(event.target.value)} required placeholder="https://example.com/mcp" /></label>
         <label className="form-field"><span>请求头 JSON</span><textarea value={headers} onChange={(event) => setHeaders(event.target.value)} rows={3} placeholder='{"X-API-Key":"..."}' /></label>
         <label className="form-field"><span>认证模式</span><select value={authMode} onChange={(event) => setAuthMode(event.target.value as McpAuthMode)}><option value="none">无</option><option value="bearer">Bearer</option><option value="oauth">OAuth</option></select></label>
-        {authMode === "oauth" && <p className="form-notice">OAuth 协议基础设施已就绪，浏览器授权入口将在授权 UI 接入后显示。</p>}
+        {authMode === "oauth" && <><label className="form-field"><span>OAuth Client ID</span><input value={oauthClientId} onChange={(event) => setOauthClientId(event.target.value)} /></label><label className="form-field"><span>OAuth Scopes</span><input value={oauthScopes} onChange={(event) => setOauthScopes(event.target.value)} placeholder="多个 scope 用逗号分隔" /></label><p className="form-notice">保存后可在服务列表发起浏览器授权。</p></>}
       </>}
       <label className="checkbox-option"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /><span>允许角色使用</span></label>
       {(formError || error) && <p className="inline-error" role="alert">{formError || error}</p>}

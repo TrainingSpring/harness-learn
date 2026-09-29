@@ -230,6 +230,9 @@ export interface McpServerSummary {
   pid: number | null;
   diagnosticCode: string | null;
   diagnostics: string[];
+  oauthAuthorized: boolean;
+  oauthExpiresAt: number | null;
+  oauthError: string | null;
 }
 
 export interface McpServerListResponse {
@@ -252,6 +255,8 @@ export interface CreateMcpServerRequest {
   startupTimeoutMs?: number;
   shutdownTimeoutMs?: number;
   requestTimeoutMs?: number;
+  oauthClientId?: string | null;
+  oauthScopes?: string[];
 }
 
 export interface UpdateMcpServerRequest extends CreateMcpServerRequest {
@@ -260,6 +265,11 @@ export interface UpdateMcpServerRequest extends CreateMcpServerRequest {
 
 export interface McpServerActionResponse {
   item: McpServerSummary;
+}
+
+export interface McpAuthorizationStartResponse {
+  authorizationId: string;
+  authorizationUrl: string;
 }
 
 export type PermissionScope = "once" | "session";

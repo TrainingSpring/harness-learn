@@ -28,4 +28,14 @@ class PendingToolCall:
     command: str | None
 
 
-RuntimeEvent = LLMResponse | PermissionRequiredEvent
+@dataclass(frozen=True)
+class ExternalInteractionEvent:
+    """MCP 交互等待事件，由 Session 侧负责展示和恢复。"""
+
+    type: Literal["mcp_interaction"]
+    interaction_type: Literal["sampling", "elicitation"]
+    request_id: str
+    payload: dict
+
+
+RuntimeEvent = LLMResponse | PermissionRequiredEvent | ExternalInteractionEvent

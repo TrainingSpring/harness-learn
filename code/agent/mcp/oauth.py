@@ -113,6 +113,15 @@ class OAuthStateStore:
             raise McpOAuthError("OAuth state 无效或已过期")
         return item[0]
 
+    def discard_expired(self) -> int:
+        """清理过期授权状态，返回清理数量。"""
+        now = time.time()
+        with self._lock:
+            expired = [state for state, (_, expires_at) in self._states.items() if expires_at <= now]
+            for state in expired:
+                self._states.pop(state, None)
+        return len(expired)
+
 
 class OAuthClient:
     """执行 metadata discovery、PKCE 授权码交换和 refresh。"""

@@ -1,8 +1,9 @@
-# MCP 完整支持开发迭代计划（已完成）
+# MCP 完整支持开发迭代计划（阶段 13-17 未施工）
 
-> 状态：阶段 0 至阶段 12 已完成。OAuth 协议基础设施已完成；当前设置页可识别 OAuth
-> 配置并显示能力提示，但浏览器授权回调和用户授权状态管理仍未接入，因此不能把 OAuth
-> UI 宣称为完整授权闭环。
+> 状态：阶段 0 至阶段 12 已完成；阶段 13 至阶段 17 尚未施工。
+> 阶段 0 至阶段 12 已完成的是 MCP 核心连接、Tool 映射、Agent 配置、基础设置页和协议
+> 基础设施，不等于完整 MCP 产品能力。后续阶段专门收口 OAuth 用户授权、非 Tool 能力、
+> 诊断交互和完整安全回归。
 >
 > 本计划根据当前产品设定重新收口。MCP Server 注册配置由用户可编辑的
 > `~/harness-learn/mcp/config.json` 管理；SQLite 只保存 Agent 对 MCP Server 的引用，
@@ -27,6 +28,10 @@
     Cancellation、Sampling、Elicitation、Completions 和列表变更通知。
 11. 支持本地 stdio 和远程 Streamable HTTP；协议扩展不得破坏没有 MCP 的 Agent。
 12. 在设置页、角色编辑页和会话页中显示可诊断的 MCP 状态、来源和错误。
+
+阶段 0 至阶段 12 当前只实现了上述目标中的核心子集：本地/远程连接、初始化、能力发现、
+Tools 映射、Agent 分配、权限和基础状态 UI。第 10 项中的非 Tool 能力，以及第 12 项中
+更完整的诊断交互，必须通过阶段 13 至阶段 17 完成后才可宣称达成。
 
 最终职责边界：
 
@@ -979,7 +984,7 @@ Session workspace、Roots 和 PermissionManager。
 权限允许时调用对应 Server；编辑 Agent 后重新创建 Session 能看到新配置；没有选择 MCP 的
 Agent 完全保持原有行为。
 
-### 阶段 12：完整测试、兼容性和文档收口（已完成）
+### 阶段 12：核心能力测试、兼容性和阶段性文档收口（已完成）
 
 **目标**：确认完整 MCP 支持不会破坏现有 Agent、Session、Tools、Skills 和权限功能。
 
@@ -1000,7 +1005,134 @@ Agent 完全保持原有行为。
 前端测试 `24 passed`、生产构建均通过。前端 E2E mock 已覆盖 MCP 列表、CRUD 和本地
 生命周期路径。仓库中仍存在两个既有非本计划测试契约问题：旧 Agent API 断言未包含
 `mcpServerIds`，旧 Skill ZIP 计数断言与当前扫描结果不一致；未将后者混入 MCP 改动。
-计划中实际未完成的 OAuth 浏览器授权闭环已在文首和阶段 10 验收中明确标记。
+阶段 13 至阶段 15 已开始施工，但剩余工作仍需后续迭代完成，不允许据此将 MCP 计划标记为全部完成。
+
+### 阶段 13：OAuth 用户授权闭环（部分完成）
+
+**目标**：把阶段 9 已完成的 OAuth 协议设施接入真实用户流程，完成远程 MCP 的授权、回调、
+状态展示、刷新和撤销。
+
+**修改/新增**：
+
+- 后端 OAuth 授权会话、回调和状态 API
+- OAuth state/PKCE 临时存储与过期清理
+- 前端授权按钮、回调页、授权中/成功/失败/过期状态组件
+- MCP 设置 API 类型和错误处理
+- OAuth 授权、回调重放、state mismatch、撤销和刷新测试
+
+**实现要求**：
+
+- 授权前校验 Server 配置和 HTTPS 策略。
+- redirect URI、state、PKCE verifier 与发起用户和 MCP Server 绑定。
+- token 只进入受控凭据存储或内存生命周期，不进入 config.json、日志、Context 或 URL。
+- 授权失败必须保留可诊断错误，但不得返回 token 或完整 Authorization header。
+
+**完成记录（当前迭代）**：新增内存授权会话、PKCE state 消费、授权开始 API、回调 API、
+状态 API、撤销 API、前端授权/撤销入口和 OAuth 状态字段；token 不写入 config.json 或公开
+DTO。
+
+**仍未完成**：稳定可配置的回调宿主、refresh token 生命周期接入、服务重启后的授权恢复和
+完整端到端 OAuth 测试。阶段验收状态为“部分完成”。
+
+### 阶段 14：MCP Resources、Resource Templates、Prompts 和 Roots（部分完成）
+
+**目标**：支持非 Tool 的只读能力，并明确它们如何进入 Agent 当前 Context，避免把外部内容
+误当成系统指令。
+
+**修改/新增**：
+
+- MCP Resource/Template/Prompt/Roots 客户端与适配器
+- Session 级 MCP 能力缓存和列表变更处理
+- Resource 内容分页、大小限制、MIME 类型和结构化结果模型
+- Prompt 选择/展开 API 和 Context 注入边界
+- 会话端资源浏览、Prompt 选择和错误状态 UI
+- 对应协议、分页、取消、变更通知和提示注入测试
+
+**实现要求**：
+
+- Resource 和 Prompt 内容作为外部数据或用户明确选择的上下文输入，不得提升为系统指令。
+- Roots 只反映 Session 工作目录和明确授权的根，不自动扩大文件权限。
+- 大资源必须分页或摘要，不能一次性无限写入 Context。
+- 所有 MCP 能力复用 Session 权限，不绕过现有 PermissionManager。
+
+**完成记录（已有能力）**：协议客户端已经支持 resources/list、resource templates、
+resources/read、订阅、prompts/list、prompts/get、roots/list、分页和结果校验；通知分发器
+已经支持资源和列表变更通知。
+
+**仍未完成**：尚未接入 Session 的用户操作、Context 的显式注入边界和会话 UI，资源大小限制
+与权限策略也未形成完整应用层闭环。阶段验收状态为“部分完成”。
+
+### 阶段 15：Sampling、Elicitation、Completions 和进度交互（部分完成）
+
+**目标**：完成需要 Agent、模型或用户参与的双向 MCP 交互。
+
+**修改/新增**：
+
+- Sampling 请求转发器和 Session 权限确认
+- Elicitation 结构化用户请求、确认/拒绝/取消/超时流程
+- Completions 请求与结果适配
+- Progress、Logging、Cancellation 的统一事件模型和前端展示
+- Runtime/Session 之间的挂起恢复接口，保持 Runtime 不实现 MCP 协议细节
+- 双向请求、并发、取消、超时和权限测试
+
+**实现要求**：
+
+- Sampling 不能绕过当前 Agent 的 LLM、Context 和 Session 权限。
+- Elicitation 必须在用户可见交互中完成，不能让远程 Server 直接代替用户作决定。
+- 所有挂起请求都要绑定 Session、连接和 request id，断线后可明确失败或取消。
+- 进度和日志只能作为运行信息，不得自动成为系统规则。
+
+**完成记录（已有能力）**：Sampling、Elicitation 参数和结果校验、Server request handler、
+Completions 调用、Logging、Progress、Cancellation 的协议底层能力已存在。
+
+**仍未完成**：Sampling 尚未绑定 Agent 的真实 LLM 和 Session 权限；Elicitation 尚未接入用户
+可见的结构化交互；双向请求尚未接入挂起/恢复、SSE 事件、刷新恢复和完整超时清理。阶段验收
+状态为“部分完成”。
+
+### 阶段 16：设置页诊断、测试连接和能力管理（未施工）
+
+**目标**：让用户能够在不创建正式会话的情况下验证 MCP 配置和连接状态。
+
+**修改/新增**：
+
+- “测试连接” API 和 UI
+- “刷新能力” API 和 UI
+- MCP 初始化版本、能力摘要、最近错误、连接耗时和进程诊断展示
+- 本地/远程状态轮询或事件刷新
+- 远程不可用、本地退出、协议不兼容和禁用状态的恢复操作
+- 诊断数据脱敏和生命周期测试
+
+**实现要求**：
+
+- 测试连接使用隔离的短生命周期 Client，不复用正式 Session 的连接。
+- 能力刷新不能修改 Agent 的绑定列表，也不能把 Tool 快照写入 config.json。
+- 诊断信息不显示 token、完整敏感 header、环境变量值或原始凭据。
+
+**验收**：用户可以测试本地和远程 Server，看到明确的成功、失败、能力和诊断信息；测试
+连接不会影响已有会话或管理进程。
+
+### 阶段 17：完整 MCP 安全、兼容性和最终收口（未施工）
+
+**目标**：完成完整 MCP 产品的最终验证，只有本阶段完成后计划才能标记为全部完成。
+
+**测试范围**：
+
+- OAuth 浏览器流程、凭据隔离、撤销、过期、重放和跨 Server audience
+- Resources、Prompts、Roots、Sampling、Elicitation、Completions 的协议与 UI
+- stdio/Streamable HTTP 的并发、断线、重连、取消、超时和资源释放
+- Windows/macOS 路径、进程、信号、环境变量和工作目录
+- SSRF、命令注入、提示注入、路径越权、敏感信息泄露和资源耗尽
+- 多 Agent、多 Session、禁用/删除/外部修改 config.json 的一致性
+- 无 MCP 配置时 read/write/edit/bash/process、Skills、Session 和 Agent 的完整回归
+
+**文档收口**：
+
+- 同步实际 API、错误码、配置字段、状态模型和文件清单。
+- 删除已经废弃或不再使用的兼容性描述。
+- 记录 OAuth、非 Tool 能力和测试连接的最终产品行为。
+
+**最终验收**：上述能力均有实现和回归证据，核心与完整 MCP 功能均通过测试；此时才能将
+标题改为“已完成”，并将阶段 13 至阶段 17全部标记为已完成。
 
 ## 12. 错误码约定
 

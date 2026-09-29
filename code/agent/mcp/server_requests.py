@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from threading import Event
 from typing import Any
 
 from .errors import McpCapabilityUnavailableError, McpProtocolError
@@ -21,6 +22,7 @@ class McpServerRequestHandler:
     def __init__(self, *, workspace: str | None = None) -> None:
         self.workspace = workspace
         self._handlers: dict[str, RequestCallback] = {}
+        self._pending: dict[str | int, Event] = {}
 
     def register(self, method: str, callback: RequestCallback) -> None:
         if method not in {"sampling/createMessage", "elicitation/create"}:
@@ -49,3 +51,7 @@ class McpServerRequestHandler:
                 id=request.id,
                 error=JsonRpcError(-32601 if isinstance(error, McpCapabilityUnavailableError) else -32602, str(error)),
             )
+
+    def pending_ids(self) -> tuple[str | int, ...]:
+        """返回正在处理的 Server request ID，供 Session 取消和诊断。"""
+        return tuple(self._pending)

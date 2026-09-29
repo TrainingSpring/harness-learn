@@ -22,6 +22,7 @@ from mcp.registry import McpServerRegistry
 from mcp.config_store import McpConfigStore
 from mcp.process_manager import McpProcessManager
 from mcp.connection_manager import McpConnectionManager
+from mcp.auth_session import McpAuthorizationManager
 
 from .services.chat_service import ChatService
 from .services.agent_profile_assistant import AgentProfileAssistant
@@ -59,6 +60,7 @@ class ApplicationServices:
     mcp_config_store: McpConfigStore
     mcp_processes: McpProcessManager
     mcp_connections: McpConnectionManager
+    mcp_authorization: McpAuthorizationManager
     skill_catalog: SkillCatalog
     skill_profiles: SkillRepository
     skill_sync_service: SkillSyncService

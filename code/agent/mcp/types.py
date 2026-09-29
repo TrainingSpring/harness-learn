@@ -108,6 +108,8 @@ class RemoteMcpServerConfig:
     auth_mode: str = "none"
     enabled: bool = True
     request_timeout_ms: int = 30_000
+    oauth_client_id: str | None = None
+    oauth_scopes: tuple[str, ...] = ()
     is_local: bool = field(default=False, init=False)
     transport: str = field(default="streamable_http", init=False)
 
@@ -127,6 +129,13 @@ class RemoteMcpServerConfig:
             raise McpConfigFormatError("auth_mode 必须是 none、bearer 或 oauth")
         if not isinstance(self.enabled, bool):
             raise McpConfigFormatError("enabled 必须是布尔值")
+        if self.oauth_client_id is not None:
+            object.__setattr__(self, "oauth_client_id", _require_text(self.oauth_client_id, "oauth_client_id"))
+        if isinstance(self.oauth_scopes, list):
+            object.__setattr__(self, "oauth_scopes", tuple(self.oauth_scopes))
+        if not isinstance(self.oauth_scopes, tuple):
+            raise McpConfigFormatError("oauth_scopes 必须是字符串数组")
+        object.__setattr__(self, "oauth_scopes", tuple(_require_text(scope, "oauth_scopes") for scope in self.oauth_scopes))
         object.__setattr__(self, "request_timeout_ms", _require_timeout(self.request_timeout_ms, "request_timeout_ms", 30_000))
 
 
