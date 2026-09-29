@@ -16,6 +16,7 @@ import type {
   McpServerSummary,
   UpdateMcpServerRequest,
   McpAuthorizationStartResponse,
+  McpDiagnosticsResponse,
 } from "../../api/types";
 
 export function listLlmProfiles(): Promise<ListResponse<LLMProfileSummary>> {
@@ -110,4 +111,8 @@ export function startMcpAuthorization(serverId: string): Promise<McpAuthorizatio
 
 export function revokeMcpAuthorization(serverId: string): Promise<McpServerSummary> {
   return apiClient.post<void, McpServerSummary>(`/api/settings/mcp/${encodeURIComponent(serverId)}/oauth/revoke`);
+}
+
+export function diagnoseMcpServer(serverId: string): Promise<McpDiagnosticsResponse> {
+  return apiClient.post<void, McpDiagnosticsResponse>(`/api/settings/mcp/${encodeURIComponent(serverId)}/diagnostics`);
 }

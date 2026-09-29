@@ -162,3 +162,16 @@ class McpServerActionResponse(ApiModel):
     """MCP 本地生命周期操作后的状态。"""
 
     item: McpServerSummary
+
+
+class McpDiagnosticsResponse(ApiModel):
+    """一次隔离 MCP 连接探测的脱敏能力摘要。"""
+
+    server_id: str
+    status: Literal["ok", "failed"]
+    diagnostic_code: str | None = None
+    message: str | None = None
+    capabilities: dict[str, Any] = Field(default_factory=dict)
+    counts: dict[str, int] = Field(default_factory=dict)
+    protocol_version: str | None = None
+    duration_ms: float | None = None

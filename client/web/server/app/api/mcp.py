@@ -13,6 +13,7 @@ from mcp.errors import (
 )
 from mcp.process_manager import McpLocalServerState, McpProcessManager
 from mcp.types import LocalMcpServerConfig, McpServerConfig, RemoteMcpServerConfig
+from mcp.connection_manager import McpConnectionKey
 from mcp.oauth import OAuthClient, OAuthMetadata
 from storage.ids import generate_id
 
@@ -24,6 +25,7 @@ from ..schemas.settings import (
     McpServerListResponse,
     McpServerSummary,
     UpdateMcpServerRequest,
+    McpDiagnosticsResponse,
 )
 
 
@@ -283,3 +285,23 @@ async def stop_mcp_server(server_id: str, services: ApplicationServices = Depend
 @router.post("/{server_id}/restart", response_model=McpServerActionResponse)
 async def restart_mcp_server(server_id: str, services: ApplicationServices = Depends(get_services)) -> McpServerActionResponse:
     return _action(server_id, "restart", services)
+
+
+@router.post("/{server_id}/diagnostics", response_model=McpDiagnosticsResponse)
+async def diagnose_mcp_server(server_id: str, services: ApplicationServices = Depends(get_services)) -> McpDiagnosticsResponse:
+    try:
+        server = services.mcp_servers.require_enabled(server_id)
+        if isinstance(server, LocalMcpServerConfig):
+            # Diagnostic probes use their own stdio process and never reuse the
+            # settings-page control process or a Session connection.
+            pass
+        result = services.mcp_connections.probe(McpConnectionKey("diagnostic", "diagnostic", server_id), server)
+        return McpDiagnosticsResponse(
+            server_id=server_id, status="ok", protocol_version=result["protocolVersion"],
+            capabilities=result["capabilities"], counts=result["counts"], duration_ms=result["durationMs"],
+        )
+    except Exception as error:
+        return McpDiagnosticsResponse(
+            server_id=server_id, status="failed", diagnostic_code=getattr(error, "code", "MCP_CONNECTION_FAILED"),
+            message="MCP 连接测试失败",
+        )

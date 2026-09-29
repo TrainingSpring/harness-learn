@@ -267,6 +267,17 @@ export interface McpServerActionResponse {
   item: McpServerSummary;
 }
 
+export interface McpDiagnosticsResponse {
+  serverId: string;
+  status: "ok" | "failed";
+  diagnosticCode: string | null;
+  message: string | null;
+  capabilities: Record<string, unknown>;
+  counts: Record<string, number>;
+  protocolVersion: string | null;
+  durationMs: number | null;
+}
+
 export interface McpAuthorizationStartResponse {
   authorizationId: string;
   authorizationUrl: string;

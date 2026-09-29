@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from threading import Lock
+from time import monotonic
 
 from .client import McpClient
 from .errors import McpConnectionManagerClosedError, McpServerDisabledError
@@ -100,6 +101,27 @@ class McpConnectionManager:
 
     def close_server(self, server_id: str) -> None:
         self._close_matching(lambda key: key.server_id == server_id)
+
+    def probe(self, key: McpConnectionKey, config: McpServerConfig) -> dict:
+        """创建隔离连接，执行 ping 和能力发现后立即释放。"""
+        started = monotonic()
+        transport = self._transport_factory(config, lambda _notification: None)
+        client = McpClient(transport)
+        try:
+            initialization = client.connect()
+            tools = client.list_tools() if initialization.capabilities.supports("tools") else ()
+            resources = client.list_resources() if initialization.capabilities.supports("resources") else ()
+            prompts = client.list_prompts() if initialization.capabilities.supports("prompts") else ()
+            client.ping()
+            return {
+                "protocolVersion": initialization.protocol_version,
+                "server": initialization.server_info.to_dict(),
+                "capabilities": initialization.capabilities.raw,
+                "counts": {"tools": len(tools), "resources": len(resources), "prompts": len(prompts)},
+                "durationMs": round((monotonic() - started) * 1000, 2),
+            }
+        finally:
+            client.close()
 
     def close(self) -> None:
         with self._lock:
