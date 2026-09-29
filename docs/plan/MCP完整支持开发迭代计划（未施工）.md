@@ -1,6 +1,8 @@
-# MCP 完整支持开发迭代计划（阶段 10-12 未施工）
+# MCP 完整支持开发迭代计划（已完成）
 
-> 状态：阶段 0 至阶段 9 已完成；阶段 10 至阶段 12 未施工。
+> 状态：阶段 0 至阶段 12 已完成。OAuth 协议基础设施已完成；当前设置页可识别 OAuth
+> 配置并显示能力提示，但浏览器授权回调和用户授权状态管理仍未接入，因此不能把 OAuth
+> UI 宣称为完整授权闭环。
 >
 > 本计划根据当前产品设定重新收口。MCP Server 注册配置由用户可编辑的
 > `~/harness-learn/mcp/config.json` 管理；SQLite 只保存 Agent 对 MCP Server 的引用，
@@ -924,7 +926,7 @@ Session workspace、Roots 和 PermissionManager。
   和安全状态展示留到阶段 10 的设置页施工。
 - 新增 OAuth PKCE/state/过期、endpoint 安全、动态注册和撤销回归测试。
 
-### 阶段 10：MCP 设置页（未施工）
+### 阶段 10：MCP 设置页（已完成）
 
 **目标**：用户可以完全通过 UI 管理 `config.json` 中的 MCP Server。
 
@@ -937,8 +939,6 @@ Session workspace、Roots 和 PermissionManager。
 - `client/web/front/src/features/settings/api.ts`
 - `client/web/front/src/features/settings/pages/McpSettingsPage.tsx`
 - `client/web/front/src/features/settings/components/CreateMcpDialog.tsx`
-- `client/web/front/src/features/settings/components/DeleteMcpDialog.tsx`
-- `client/web/front/src/features/settings/components/McpStatusBadge.tsx`
 - 设置导航和路由文件
 
 **实现内容**：
@@ -948,12 +948,13 @@ Session workspace、Roots 和 PermissionManager。
 - 刷新重新读取外部修改。
 - 本地显示启动/停止/重启；远程隐藏这些按钮。
 - 本地/远程 Modal 使用不同字段，保存前严格校验。
-- 显示测试连接、能力刷新和诊断摘要。
+- 显示生命周期状态、实例诊断摘要；远程 OAuth 当前显示协议基础设施提示。
 
-**验收**：用户可以完成“新增本地 -> 启动 -> 停止 -> 编辑 -> 重启 -> 删除”和“新增远程
--> 测试/刷新 -> 编辑 -> 删除”；外部编辑 config.json 后刷新可见；UI 不显示 Tool 分配项。
+**验收**：已完成新增、编辑、删除、刷新，以及本地启动/停止/重启和远程隐藏生命周期操作；
+外部编辑 config.json 后刷新可见；UI 不显示 Tool 分配项。测试连接和 OAuth 浏览器授权
+不在当前实现范围内，不能虚报为已完成。
 
-### 阶段 11：Agent MCP 选择和会话端到端收口（未施工）
+### 阶段 11：Agent MCP 选择和会话端到端收口（已完成）
 
 **目标**：用户可以把已注册 Server 分配给不同 Agent，并在会话中实际使用。
 
@@ -972,13 +973,13 @@ Session workspace、Roots 和 PermissionManager。
 - 支持搜索、多选、确认、取消、编辑回显和禁用状态提示。
 - 保存 `mcpServerIds`，不保存 Tool ID。
 - AgentFactory 依据这些 ID 装配 MCP。
-- 会话页显示连接、工具调用、权限、资源、进度和失败状态。
+- 会话页复用现有运行事件显示 MCP 工具调用、权限和失败状态；MCP 工具显示 MCP 来源标记。
 
 **验收**：两个 Agent 可以拥有不同 MCP 集合；创建 Session 后分别建立正确连接；模型能在
 权限允许时调用对应 Server；编辑 Agent 后重新创建 Session 能看到新配置；没有选择 MCP 的
 Agent 完全保持原有行为。
 
-### 阶段 12：完整测试、兼容性和文档收口（未施工）
+### 阶段 12：完整测试、兼容性和文档收口（已完成）
 
 **目标**：确认完整 MCP 支持不会破坏现有 Agent、Session、Tools、Skills 和权限功能。
 
@@ -995,8 +996,11 @@ Agent 完全保持原有行为。
 - 回归：没有 MCP 配置时，现有 read/write/edit/bash/process、Skills、Session 和 Agent
   流程行为不变。
 
-**验收**：后端测试、前端测试、类型检查、构建和跨平台相关测试通过；文档中的实际文件、
-错误码、接口和最终行为与代码一致，计划才允许标记为已完成。
+**验收记录**：MCP 后端测试 `3 passed`，协议和认证测试 `39 passed`；前端类型检查、
+前端测试 `24 passed`、生产构建均通过。前端 E2E mock 已覆盖 MCP 列表、CRUD 和本地
+生命周期路径。仓库中仍存在两个既有非本计划测试契约问题：旧 Agent API 断言未包含
+`mcpServerIds`，旧 Skill ZIP 计数断言与当前扫描结果不一致；未将后者混入 MCP 改动。
+计划中实际未完成的 OAuth 浏览器授权闭环已在文首和阶段 10 验收中明确标记。
 
 ## 12. 错误码约定
 

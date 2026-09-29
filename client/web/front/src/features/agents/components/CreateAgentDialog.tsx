@@ -3,6 +3,7 @@ import { LoaderCircle, Plus, Sparkles, X } from "lucide-react";
 import { Button } from "../../../components/Button";
 import { useModalFocus } from "../../../hooks/useModalFocus";
 import { SkillPickerDialog } from "./SkillPickerDialog";
+import { McpServerPickerDialog } from "./McpServerPickerDialog";
 import type {
   AgentProfileSuggestion,
   AgentProfileSuggestionRequest,
@@ -10,6 +11,7 @@ import type {
   LLMProfileSummary,
   ToolSummary,
   SkillSummary,
+  McpServerSummary,
   AgentDetail,
 } from "../../../api/types";
 
@@ -20,6 +22,7 @@ interface CreateAgentDialogProps {
   llmProfiles: LLMProfileSummary[];
   tools: ToolSummary[];
   skills: SkillSummary[];
+  mcpServers: McpServerSummary[];
   isSuggesting: boolean;
   onClose: () => void;
   onSubmit: (request: CreateAgentRequest) => void;
@@ -36,6 +39,7 @@ export function CreateAgentDialog({
   llmProfiles,
   tools,
   skills,
+  mcpServers,
   isSuggesting,
   onClose,
   onSubmit,
@@ -51,10 +55,12 @@ export function CreateAgentDialog({
   const [llmProfileId, setLlmProfileId] = useState("");
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [selectedMcpServers, setSelectedMcpServers] = useState<string[]>([]);
   const [isEnabled, setIsEnabled] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [isSkillPickerOpen, setIsSkillPickerOpen] = useState(false);
+  const [isMcpPickerOpen, setIsMcpPickerOpen] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -65,10 +71,12 @@ export function CreateAgentDialog({
     setLlmProfileId(initialAgent?.llmProfileId ?? "");
     setSelectedTools(initialAgent?.tools ?? []);
     setSelectedSkills(initialAgent?.skills ?? []);
+    setSelectedMcpServers(initialAgent?.mcpServerIds ?? []);
     setIsEnabled(initialAgent?.isEnabled ?? true);
     setFormError(null);
     setSuggestionError(null);
     setIsSkillPickerOpen(false);
+    setIsMcpPickerOpen(false);
   }, [isOpen]);
 
   useEffect(() => {
@@ -103,6 +111,7 @@ export function CreateAgentDialog({
       llmProfileId,
       tools: selectedTools,
       skillIds: selectedSkills,
+      mcpServerIds: selectedMcpServers,
       isEnabled,
     });
   };
@@ -174,6 +183,10 @@ export function CreateAgentDialog({
             {tools.length === 0 && <p className="form-hint">当前没有可配置工具。</p>}
             <div className="checkbox-grid">{tools.map((tool) => <label className="checkbox-option" key={tool.name}><input type="checkbox" checked={selectedTools.includes(tool.name)} onChange={() => toggleTool(tool.name)} /><span>{tool.name}</span></label>)}</div>
           </fieldset>
+          <fieldset className="form-field form-fieldset"><legend>MCP 服务</legend>
+            {mcpServers.length === 0 && <p className="form-hint">当前没有可用的 MCP 服务。</p>}
+            {mcpServers.length > 0 && <button type="button" className="skill-picker-trigger" onClick={() => setIsMcpPickerOpen(true)}><span>{selectedMcpServers.length > 0 ? `已选择 ${selectedMcpServers.length} 个 MCP 服务` : "选择 MCP 服务"}</span><span aria-hidden="true">→</span></button>}
+          </fieldset>
           <fieldset className="form-field form-fieldset"><legend>Skills</legend>
             {skills.length === 0 && <p className="form-hint">当前没有可用 Skill。</p>}
             {skills.length > 0 && <button type="button" className="skill-picker-trigger" onClick={() => setIsSkillPickerOpen(true)}>
@@ -193,6 +206,7 @@ export function CreateAgentDialog({
         onClose={() => setIsSkillPickerOpen(false)}
         onConfirm={setSelectedSkills}
       />
+      <McpServerPickerDialog isOpen={isMcpPickerOpen} servers={mcpServers} selectedServerIds={selectedMcpServers} onClose={() => setIsMcpPickerOpen(false)} onConfirm={setSelectedMcpServers} />
     </div>
   );
 }

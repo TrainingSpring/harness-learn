@@ -14,6 +14,7 @@ it("展示角色能力并将角色 id 带入新对话链接", () => {
         expertise: ["Python", "API"],
         tools: ["read", "write", "bash", "edit"],
         skills: [],
+        mcpServerIds: [],
         isEnabled: true,
       }} />
     </MemoryRouter>,

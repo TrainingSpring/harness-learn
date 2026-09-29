@@ -54,7 +54,7 @@ export function MessageList({ messages, optimisticUserText, streamingText, toolE
           if (item.kind === "AGENT_MESSAGE") return <AgentMessage key={item.id} text={payloadText(item)} />;
           if (item.kind === "FUNCTION_CALL") {
             const output = item.callId ? outputs.get(item.callId) : undefined;
-            return <ToolEvent key={item.id} completed={Boolean(output)} event={{ callId: item.callId ?? item.id, toolName: String(item.payload.name ?? "tool"), summary: outputSummary(output?.payload.output) }} />;
+            return <ToolEvent key={item.id} completed={Boolean(output)} event={{ callId: item.callId ?? item.id, toolName: String(item.payload.name ?? "tool"), summary: outputSummary(output?.payload.output), source: item.payload.source === "mcp" ? "mcp" : "builtin", serverName: typeof item.payload.serverName === "string" ? item.payload.serverName : undefined }} />;
           }
           if (item.kind === "FUNCTION_CALL_OUTPUT") return null;
           return null;

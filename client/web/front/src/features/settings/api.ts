@@ -10,6 +10,11 @@ import type {
   SkillSummary,
   SkillSyncResult,
   UpdateLLMProfileRequest,
+  CreateMcpServerRequest,
+  McpServerActionResponse,
+  McpServerListResponse,
+  McpServerSummary,
+  UpdateMcpServerRequest,
 } from "../../api/types";
 
 export function listLlmProfiles(): Promise<ListResponse<LLMProfileSummary>> {
@@ -68,4 +73,32 @@ export function importSkill(file: File): Promise<SkillSyncResult> {
   const body = new FormData();
   body.append("file", file);
   return apiClient.postForm<SkillSyncResult>("/api/settings/skills/import", body);
+}
+
+export function listMcpServers(): Promise<McpServerListResponse> {
+  return apiClient.get("/api/settings/mcp");
+}
+
+export function createMcpServer(request: CreateMcpServerRequest): Promise<McpServerSummary> {
+  return apiClient.post<CreateMcpServerRequest, McpServerSummary>("/api/settings/mcp", request);
+}
+
+export function updateMcpServer(serverId: string, request: UpdateMcpServerRequest): Promise<McpServerSummary> {
+  return apiClient.put<UpdateMcpServerRequest, McpServerSummary>(`/api/settings/mcp/${encodeURIComponent(serverId)}`, request);
+}
+
+export function deleteMcpServer(serverId: string, revision: string): Promise<void> {
+  return apiClient.delete(`/api/settings/mcp/${encodeURIComponent(serverId)}?revision=${encodeURIComponent(revision)}`);
+}
+
+export function startMcpServer(serverId: string): Promise<McpServerActionResponse> {
+  return apiClient.post<void, McpServerActionResponse>(`/api/settings/mcp/${encodeURIComponent(serverId)}/start`);
+}
+
+export function stopMcpServer(serverId: string): Promise<McpServerActionResponse> {
+  return apiClient.post<void, McpServerActionResponse>(`/api/settings/mcp/${encodeURIComponent(serverId)}/stop`);
+}
+
+export function restartMcpServer(serverId: string): Promise<McpServerActionResponse> {
+  return apiClient.post<void, McpServerActionResponse>(`/api/settings/mcp/${encodeURIComponent(serverId)}/restart`);
 }

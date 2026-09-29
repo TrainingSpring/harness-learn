@@ -24,6 +24,7 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
         { name: "bash", description: "执行命令", inputSchema: {}, permissionAction: "process.exec" },
       ]}
       skills={[]}
+      mcpServers={[]}
       onClose={vi.fn()}
       onSubmit={onSubmit}
       isSuggesting={false}
@@ -53,6 +54,7 @@ it("提交角色表单时组装领域标签、LLM 和工具配置", async () => 
     llmProfileId: "llm_OPENAI0001",
     tools: ["read"],
     skillIds: [],
+    mcpServerIds: [],
     isEnabled: true,
   });
 });
@@ -66,6 +68,7 @@ it("创建角色弹窗不可见时不渲染表单", () => {
       llmProfiles={[]}
       tools={[]}
       skills={[]}
+      mcpServers={[]}
       onClose={vi.fn()}
       onSubmit={vi.fn()}
       isSuggesting={false}
@@ -94,6 +97,7 @@ it("只有填写描述并选择 LLM 后才启用 AI 生成按钮", async () => {
       }]}
       tools={[]}
       skills={[]}
+      mcpServers={[]}
       onClose={vi.fn()}
       onSubmit={vi.fn()}
       isSuggesting={false}
@@ -115,7 +119,7 @@ it("Skills 使用选择弹窗并回填选中的 Skill ID", async () => {
   render(<CreateAgentDialog isOpen isSubmitting={false} error={null} llmProfiles={[]} tools={[]} skills={[
     { id: "skill_REVIEW0001", name: "代码审查", description: "", status: "AVAILABLE", validationError: null, license: null, compatibility: null, agentCount: 0, updatedAt: "" },
     { id: "skill_DOCS000001", name: "文档编写", description: "", status: "AVAILABLE", validationError: null, license: null, compatibility: null, agentCount: 0, updatedAt: "" },
-  ]} onClose={vi.fn()} onSubmit={onSubmit} isSuggesting={false} onSuggest={vi.fn()} />);
+  ]} mcpServers={[]} onClose={vi.fn()} onSubmit={onSubmit} isSuggesting={false} onSuggest={vi.fn()} />);
   await user.click(screen.getByRole("button", { name: "选择 Skills" }));
   await user.click(screen.getByLabelText("代码审查"));
   await user.click(screen.getByRole("button", { name: "确认选择" }));

@@ -1,4 +1,4 @@
-import { Bot, BookOpen, Palette, Wrench } from "lucide-react";
+import { Bot, BookOpen, Palette, Server, Wrench } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 /** 设置模块的局部导航。 */
@@ -9,6 +9,7 @@ export function SettingsNav() {
       <NavLink to="/settings/llms"><Bot size={16} />LLM</NavLink>
       <NavLink to="/settings/tools"><Wrench size={16} />工具</NavLink>
       <NavLink to="/settings/skills"><BookOpen size={16} />Skills</NavLink>
+      <NavLink to="/settings/mcp"><Server size={16} />MCP</NavLink>
     </nav>
   );
 }

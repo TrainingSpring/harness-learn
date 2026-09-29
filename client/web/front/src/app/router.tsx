@@ -15,6 +15,7 @@ const AppearanceSettingsPage = lazy(() => import("../features/settings/pages/App
 const LLMSettingsPage = lazy(() => import("../features/settings/pages/LLMSettingsPage").then((module) => ({ default: module.LLMSettingsPage })));
 const ToolSettingsPage = lazy(() => import("../features/settings/pages/ToolSettingsPage").then((module) => ({ default: module.ToolSettingsPage })));
 const SkillSettingsPage = lazy(() => import("../features/settings/pages/SkillSettingsPage").then((module) => ({ default: module.SkillSettingsPage })));
+const McpSettingsPage = lazy(() => import("../features/settings/pages/McpSettingsPage").then((module) => ({ default: module.McpSettingsPage })));
 
 function deferred(page: ReactNode) {
   return <Suspense fallback={<div className="page"><Skeleton rows={5} /></div>}>{page}</Suspense>;
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
           { path: "llms", element: deferred(<LLMSettingsPage />) },
           { path: "tools", element: deferred(<ToolSettingsPage />) },
           { path: "skills", element: deferred(<SkillSettingsPage />) },
+          { path: "mcp", element: deferred(<McpSettingsPage />) },
         ],
       },
       { path: "*", element: <NotFoundPage /> },

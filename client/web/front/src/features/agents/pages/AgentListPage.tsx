@@ -9,7 +9,7 @@ import { createAgent, generateAgentProfileSuggestion, getAgent, listAgents, upda
 import { AgentCard } from "../components/AgentCard";
 import { CreateAgentDialog } from "../components/CreateAgentDialog";
 import type { AgentDetail } from "../../../api/types";
-import { listLlmProfiles, listSkills, listTools } from "../../settings/api";
+import { listLlmProfiles, listMcpServers, listSkills, listTools } from "../../settings/api";
 
 /** 已启用角色的发现页。 */
 export function AgentListPage() {
@@ -19,6 +19,7 @@ export function AgentListPage() {
   const llmProfiles = useQuery({ queryKey: ["llm-profiles"], queryFn: listLlmProfiles });
   const tools = useQuery({ queryKey: ["tools"], queryFn: listTools });
   const skills = useQuery({ queryKey: ["skills"], queryFn: listSkills });
+  const mcpServers = useQuery({ queryKey: ["mcp-servers"], queryFn: listMcpServers });
   const createMutation = useMutation({
     mutationFn: createAgent,
     onSuccess: async () => {
@@ -51,6 +52,7 @@ export function AgentListPage() {
         llmProfiles={llmProfiles.data?.items ?? []}
         tools={tools.data?.items ?? []}
         skills={skills.data?.items.filter((skill) => skill.status === "AVAILABLE") ?? []}
+        mcpServers={mcpServers.data?.items ?? []}
         isSuggesting={suggestionMutation.isPending}
         onClose={() => { if (!createMutation.isPending) setIsCreateOpen(false); }}
         onSubmit={(request) => { createMutation.mutate(request); }}
@@ -66,6 +68,7 @@ export function AgentListPage() {
         llmProfiles={llmProfiles.data?.items ?? []}
         tools={tools.data?.items ?? []}
         skills={skills.data?.items ?? []}
+        mcpServers={mcpServers.data?.items ?? []}
         isSuggesting={suggestionMutation.isPending}
         onClose={() => { if (!updateMutation.isPending) setEditingAgent(null); }}
         onSubmit={(request) => { updateMutation.mutate(request); }}

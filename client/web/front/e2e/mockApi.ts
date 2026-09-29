@@ -7,6 +7,8 @@ const agent = {
   personality: "直接、严谨、重视证据",
   expertise: ["Python", "TypeScript", "架构"],
   tools: ["read", "write", "edit", "bash"],
+  skills: [],
+  mcpServerIds: ["mcp_FILES01"],
   isEnabled: true,
 };
 
@@ -35,6 +37,27 @@ const session = {
   isWorkspaceLocked: false,
 };
 
+const mcpServer = {
+  id: "mcp_FILES01",
+  name: "工作区文件服务",
+  description: "本地文件 MCP 服务",
+  isLocal: true,
+  transport: "stdio",
+  enabled: true,
+  command: "node",
+  args: ["server.js"],
+  cwd: "/workspace",
+  env: {},
+  url: null,
+  headers: {},
+  authMode: "none",
+  status: "running",
+  instanceId: "mcp-instance-1",
+  pid: 1234,
+  diagnosticCode: null,
+  diagnostics: [],
+};
+
 const list = <T,>(items: T[]) => ({ items, pagination: { limit: 100, offset: 0, hasMore: false } });
 const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 const event = (type: string, data: unknown) => `data: ${JSON.stringify({ type, runId: "run_DIRECT01", sessionId: session.id, data })}\n\n`;
@@ -44,6 +67,7 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
   let hasSession = options.hasSession ?? false;
   let agents = [agent];
   let llmProfiles = [llmProfile];
+  let mcpServers = [mcpServer];
   const messages: Array<Record<string, unknown>> = [];
   const contextItem = (
     id: string,
@@ -77,6 +101,7 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
         expertise: string[];
         llmProfileId: string;
         tools: string[];
+        mcpServerIds: string[];
         isEnabled: boolean;
       };
       const createdAgent = {
@@ -86,6 +111,8 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
         personality: requestBody.personality,
         expertise: requestBody.expertise,
         tools: requestBody.tools,
+        skills: [],
+        mcpServerIds: requestBody.mcpServerIds,
         isEnabled: requestBody.isEnabled,
         llmProfileId: requestBody.llmProfileId,
       };
@@ -102,6 +129,29 @@ export async function installMockApi(page: Page, options: { hasSession?: boolean
       });
     }
     if (path === `/api/agents/${agent.id}`) return json(route, { ...agent, llmProfileId: "llm_LOCAL01" });
+    if (path === "/api/settings/mcp" && method === "GET") return json(route, { items: mcpServers, revision: "mcp-revision-1" });
+    if (path === "/api/settings/mcp" && method === "POST") {
+      const requestBody = request.postDataJSON() as Record<string, unknown>;
+      const created = { ...mcpServer, ...requestBody, id: "mcp_CREATED01", status: requestBody.isLocal ? "stopped" : "remote" };
+      mcpServers = [...mcpServers, created];
+      return json(route, { item: created, revision: "mcp-revision-2" }, 201);
+    }
+    const mcpMatch = path.match(/^\/api\/settings\/mcp\/([^/]+)$/);
+    if (mcpMatch && method === "PUT") {
+      const requestBody = request.postDataJSON() as Record<string, unknown>;
+      mcpServers = mcpServers.map((item) => item.id === mcpMatch[1] ? { ...item, ...requestBody } : item);
+      return json(route, { item: mcpServers.find((item) => item.id === mcpMatch[1]) });
+    }
+    if (mcpMatch && method === "DELETE") {
+      mcpServers = mcpServers.filter((item) => item.id !== mcpMatch[1]);
+      return route.fulfill({ status: 204 });
+    }
+    const mcpActionMatch = path.match(/^\/api\/settings\/mcp\/([^/]+)\/(start|stop|restart)$/);
+    if (mcpActionMatch && method === "POST") {
+      const status = mcpActionMatch[2] === "stop" ? "stopped" : "running";
+      mcpServers = mcpServers.map((item) => item.id === mcpActionMatch[1] ? { ...item, status } : item);
+      return json(route, { item: mcpServers.find((item) => item.id === mcpActionMatch[1]) });
+    }
     if (path === "/api/sessions" && method === "GET") return json(route, list(hasSession ? [session] : []));
     if (path === "/api/sessions" && method === "POST") {
       const requestBody = request.postDataJSON() as { permissionMode?: string; workspacePath?: string | null };

@@ -12,6 +12,7 @@ const agents: AgentSummary[] = [{
   expertise: ["代码"],
   tools: [],
   skills: [],
+  mcpServerIds: [],
   isEnabled: true,
 }];
 

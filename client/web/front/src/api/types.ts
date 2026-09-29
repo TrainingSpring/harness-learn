@@ -30,6 +30,7 @@ export interface AgentSummary extends AgentReference {
   expertise: string[];
   tools: string[];
   skills: string[];
+  mcpServerIds?: string[];
   isEnabled: boolean;
 }
 
@@ -42,6 +43,7 @@ export interface CreateAgentRequest {
   llmProfileId: string;
   tools: string[];
   skillIds: string[];
+  mcpServerIds: string[];
   isEnabled: boolean;
 }
 
@@ -206,6 +208,60 @@ export interface SkillSyncResult {
   items: SkillSummary[];
 }
 
+export type McpAuthMode = "none" | "bearer" | "oauth";
+export type McpServerStatus = "not_running" | "starting" | "running" | "exited" | "failed" | "stopped" | "remote";
+
+export interface McpServerSummary {
+  id: string;
+  name: string;
+  description: string;
+  isLocal: boolean;
+  transport: "stdio" | "streamable_http";
+  enabled: boolean;
+  command: string | null;
+  args: string[];
+  cwd: string | null;
+  env: Record<string, string>;
+  url: string | null;
+  headers: Record<string, string>;
+  authMode: McpAuthMode;
+  status: McpServerStatus;
+  instanceId: string | null;
+  pid: number | null;
+  diagnosticCode: string | null;
+  diagnostics: string[];
+}
+
+export interface McpServerListResponse {
+  items: McpServerSummary[];
+  revision: string;
+}
+
+export interface CreateMcpServerRequest {
+  name: string;
+  description: string;
+  isLocal: boolean;
+  enabled: boolean;
+  command?: string | null;
+  args?: string[];
+  cwd?: string | null;
+  env?: Record<string, string>;
+  url?: string | null;
+  headers?: Record<string, string>;
+  authMode?: McpAuthMode;
+  startupTimeoutMs?: number;
+  shutdownTimeoutMs?: number;
+  requestTimeoutMs?: number;
+}
+
+export interface UpdateMcpServerRequest extends CreateMcpServerRequest {
+  revision: string;
+}
+
+export interface McpServerActionResponse {
+  item: McpServerSummary;
+}
+
 export type PermissionScope = "once" | "session";
 export type PermissionDecision = "allow" | "deny";
 
@@ -232,13 +288,15 @@ export interface ToolEventData {
   status?: string;
   durationMs?: number;
   summary?: string;
+  source?: "builtin" | "mcp";
+  serverName?: string;
 }
 
 export type ServerEvent =
   | { type: "run.started"; runId: string; sessionId: string; data: { status: string } }
   | { type: "message.delta"; runId: string; sessionId: string; data: { text: string } }
   | { type: "message.completed"; runId: string; sessionId: string; data: { itemId?: string; text?: string } }
-  | { type: "tool.started"; runId: string; sessionId: string; data: { callId: string; toolName: string; itemId?: string; arguments?: unknown } }
+  | { type: "tool.started"; runId: string; sessionId: string; data: { callId: string; toolName: string; itemId?: string; arguments?: unknown; source?: "builtin" | "mcp"; serverName?: string } }
   | { type: "tool.completed"; runId: string; sessionId: string; data: { callId: string; itemId?: string; output?: unknown } }
   | { type: "permission.required"; runId: string; sessionId: string; data: PermissionRequest }
   | { type: "run.completed"; runId: string; sessionId: string; data: Record<string, unknown> }
