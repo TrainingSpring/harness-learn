@@ -15,6 +15,7 @@ for source_path in (SERVER_SOURCE, REPOSITORY_ROOT, AGENT_SOURCE):
     if str(source_path) not in sys.path:
         sys.path.insert(0, str(source_path))
 
+from app import config
 from app.config import WebServerSettings
 from app.main import create_app
 from storage.database import StateDatabase
@@ -24,9 +25,12 @@ from storage.types import AgentProfile, LLMProfile
 
 
 @pytest.fixture
-def client(tmp_path: Path) -> Iterator[TestClient]:
-    """创建绑定临时 workspace 的 API 客户端，并预置可查询配置。"""
-    database = StateDatabase(str(tmp_path))
+def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """创建绑定临时数据目录的 API 客户端，并预置可查询配置。"""
+    data_dir = tmp_path / "data"
+    monkeypatch.setattr(config, "DEFAULT_DATA_DIR", data_dir)
+    monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
+    database = StateDatabase(str(data_dir))
     database.initialize()
     try:
         LLMProfileRepository(database).save(
@@ -68,7 +72,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
     finally:
         database.close()
 
-    app = create_app(WebServerSettings(workspace=tmp_path))
+    app = create_app(WebServerSettings())
     app.state.skill_root = tmp_path / "skills"
     with TestClient(app) as test_client:
         yield test_client

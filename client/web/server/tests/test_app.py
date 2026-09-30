@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app import config
 from app.config import WebServerSettings
 from app.main import create_app
 from storage.repositories.agent_profile import AgentProfileRepository
@@ -35,17 +36,17 @@ def test_validation_error_uses_public_error_shape(client) -> None:
     assert response.json()["error"]["details"] is not None
 
 
-def test_frontend_dist_serves_assets_and_spa_routes(tmp_path: Path) -> None:
+def test_frontend_dist_serves_assets_and_spa_routes(tmp_path: Path, monkeypatch) -> None:
     """生产模式同源提供静态文件，并为前端路由回退 index。"""
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
     frontend_dist = tmp_path / "dist"
     assets = frontend_dist / "assets"
     assets.mkdir(parents=True)
     (frontend_dist / "index.html").write_text("<main>Harness</main>", encoding="utf-8")
     (assets / "app.js").write_text("console.log('ok')", encoding="utf-8")
+    monkeypatch.setattr(config, "DEFAULT_DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
     app = create_app(
-        WebServerSettings(workspace=workspace, frontend_dist=frontend_dist)
+        WebServerSettings(frontend_dist=frontend_dist)
     )
 
     with TestClient(app) as static_client:

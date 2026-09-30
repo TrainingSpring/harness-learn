@@ -128,7 +128,7 @@ async def create_session(
     if request.workspace_path is not None:
         try:
             workspace_path = _resolve_workspace_path(
-                services.database.workspace,
+                Path.home(),
                 request.workspace_path,
             )
         except ValueError as error:
@@ -191,10 +191,10 @@ async def list_workspace_directories(
 ) -> WorkspaceDirectoryResponse:
     """列出当前本机工作目录及其直接子目录。"""
     try:
-        resolved = _resolve_workspace_path(services.database.workspace, path)
+        resolved = _resolve_workspace_path(Path.home(), path)
     except ValueError as error:
         raise ApiError(422, "INVALID_PROJECT_PATH", "工作目录无效") from error
-    directory = Path(resolved or services.database.workspace)
+    directory = Path(resolved or Path.home())
     children: list[WorkspaceDirectory] = []
     for child in sorted(directory.iterdir(), key=lambda item: item.name.lower()):
         if child.name.startswith(".") or not child.is_dir() or child.is_symlink():
@@ -265,7 +265,7 @@ async def update_workspace(
     if _is_workspace_locked(services, session_id):
         raise ApiError(409, "PROJECT_LOCKED", "首条消息发送后不能更改工作目录")
     try:
-        absolute_path = _resolve_workspace_path(services.database.workspace, request.workspace_path)
+        absolute_path = _resolve_workspace_path(Path.home(), request.workspace_path)
         services.session_service.sessions.update_project_path_before_first_message(
             session_id,
             absolute_path,

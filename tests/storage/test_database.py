@@ -16,15 +16,15 @@ from storage.errors import StorageSchemaError  # noqa: E402
 class StateDatabaseTests(unittest.TestCase):
     """验证本地状态数据库的创建、迁移和事务边界。"""
 
-    def test_initialize_creates_workspace_local_database(self):
-        """数据库应创建在 workspace/.harness/state.db。"""
-        with tempfile.TemporaryDirectory() as workspace:
-            database = StateDatabase(workspace)
+    def test_initialize_creates_data_directory_database(self):
+        """数据库应创建在应用数据目录的 state.db。"""
+        with tempfile.TemporaryDirectory() as data_dir:
+            database = StateDatabase(data_dir)
             database.initialize()
 
             self.assertEqual(
                 database.path,
-                Path(workspace).resolve() / ".harness" / "state.db",
+                Path(data_dir).resolve() / "state.db",
             )
             self.assertTrue(database.path.is_file())
             self.assertEqual(database.connection.execute("PRAGMA foreign_keys").fetchone()[0], 1)

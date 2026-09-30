@@ -9,6 +9,7 @@ from storage.errors import StorageConflictError
 from storage.ids import generate_id
 from storage.types import LLMProfile
 
+from ..config import DEFAULT_DATA_DIR, load_data_dir, save_data_dir
 from ..dependencies import ApplicationServices, get_services
 from ..errors import ApiError
 from ..schemas.common import ListResponse, Pagination
@@ -18,15 +19,68 @@ from ..schemas.settings import (
     LLMProfileSummary,
     ModelDiscoveryRequest,
     ModelListResponse,
+    StorageDirectory,
+    StorageDirectoryListResponse,
+    StorageSettingsResponse,
     ToolSummary,
     SkillSummary,
     SkillSyncResult,
     UpdateLLMProfileRequest,
+    UpdateStorageSettingsRequest,
 )
 from ..services.llm_model_discovery import ModelDiscoveryError, discover_models
 
 
 router = APIRouter(prefix="/settings", tags=["settings"])
+
+
+@router.get("/storage", response_model=StorageSettingsResponse)
+async def get_storage_settings() -> StorageSettingsResponse:
+    """返回当前应用数据目录。"""
+    return StorageSettingsResponse(data_dir=str(load_data_dir()), default_data_dir=str(DEFAULT_DATA_DIR))
+
+
+@router.put("/storage", response_model=StorageSettingsResponse)
+async def update_storage_settings(
+    request: UpdateStorageSettingsRequest,
+) -> StorageSettingsResponse:
+    """设置下次启动的数据目录，并标记需要重启后迁移。"""
+    current = load_data_dir()
+    try:
+        target = save_data_dir(request.data_dir, migration_source=current)
+    except (OSError, ValueError) as error:
+        raise ApiError(422, "INVALID_DATA_DIR", "存储目录不可用") from error
+    return StorageSettingsResponse(
+        data_dir=str(target),
+        default_data_dir=str(DEFAULT_DATA_DIR),
+        restart_required=True,
+    )
+
+
+@router.get("/directories", response_model=StorageDirectoryListResponse)
+async def list_storage_directories(
+    path: str = Query(default=".", max_length=2000),
+) -> StorageDirectoryListResponse:
+    """列出可选的本机数据目录，供基础设置中的目录选择器使用。"""
+    try:
+        directory = Path(path).expanduser().resolve(strict=True)
+        if not directory.is_dir():
+            raise ValueError("存储目录必须是目录")
+        children = [
+            StorageDirectory(path=str(child.resolve()), name=child.name)
+            for child in sorted(directory.iterdir(), key=lambda item: item.name.lower())
+            if child.is_dir()
+        ]
+    except (OSError, ValueError) as error:
+        raise ApiError(422, "INVALID_DATA_DIR", "存储目录不可用") from error
+
+    parent = directory.parent if directory.parent != directory else None
+    return StorageDirectoryListResponse(
+        path=str(directory),
+        name=directory.name or str(directory),
+        parent_path=None if parent is None else str(parent),
+        directories=children,
+    )
 
 
 def _llm_summary(profile: LLMProfile) -> LLMProfileSummary:

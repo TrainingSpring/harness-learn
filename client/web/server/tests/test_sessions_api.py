@@ -33,9 +33,9 @@ def test_create_direct_session_binds_selected_agent(client) -> None:
     assert payload["isWorkspaceLocked"] is False
 
 
-def test_session_settings_are_session_scoped_and_workspace_is_relative(client) -> None:
+def test_session_settings_are_session_scoped_and_workspace_is_absolute(client) -> None:
     """权限模式与工作目录应写入 Session，并支持本机绝对路径。"""
-    project = client.app.state.services.database.workspace / "demo"
+    project = client.app.state.services.database.data_dir / "demo"
     project.mkdir()
     created = client.post(
         "/api/sessions",
@@ -48,14 +48,14 @@ def test_session_settings_are_session_scoped_and_workspace_is_relative(client) -
     )
     project_response = client.patch(
         f"/api/sessions/{created['id']}/workspace",
-        json={"workspacePath": "demo"},
+        json={"workspacePath": str(project)},
     )
 
     assert mode.status_code == project_response.status_code == 200
     assert mode.json()["permissionMode"] == "yolo"
     assert project_response.json()["workspacePath"] == str(project)
     assert project_response.json()["isWorkspaceLocked"] is False
-    listing = client.get("/api/sessions/projects?path=.").json()
+    listing = client.get("/api/sessions/projects", params={"path": str(project.parent)}).json()
     assert listing["directories"] == [{"path": str(project), "name": "demo"}]
     assert listing["parentPath"] is not None
     rejected = client.patch(
@@ -68,13 +68,13 @@ def test_session_settings_are_session_scoped_and_workspace_is_relative(client) -
 
 def test_project_directory_list_excludes_symlinks_outside_workspace(client, tmp_path) -> None:
     """项目目录浏览跳过软链接，但允许选择 workspace 外的真实目录。"""
-    workspace = client.app.state.services.database.workspace
+    workspace = client.app.state.services.database.data_dir
     external_directory = tmp_path.parent / "external-project"
     external_directory.mkdir()
     (workspace / "inside").mkdir()
     (workspace / "outside-link").symlink_to(external_directory, target_is_directory=True)
 
-    response = client.get("/api/sessions/projects?path=.")
+    response = client.get("/api/sessions/projects", params={"path": str(workspace)})
 
     assert response.status_code == 200
     assert response.json()["directories"] == [{"path": str(workspace / "inside"), "name": "inside"}]
@@ -140,7 +140,7 @@ def test_active_run_rejects_session_setting_changes(client) -> None:
 def test_project_is_locked_after_first_user_message(client) -> None:
     """首条用户消息后，项目修改必须返回稳定冲突错误。"""
     created = _create_session(client)
-    database = StateDatabase(str(client.app.state.services.database.workspace))
+    database = StateDatabase(str(client.app.state.services.database.data_dir))
     database.initialize()
     try:
         ContextService(ContextItemRepository(database), created["id"]).append_user_message("锁定项目")
@@ -199,7 +199,7 @@ def test_messages_returns_business_context_in_sequence_order(client) -> None:
     """消息接口返回 ContextItem DTO，并支持 sequence 增量读取。"""
     created = _create_session(client)
     # 使用独立连接预置上下文，避免测试线程直接操作应用线程持有的连接。
-    database = StateDatabase(str(client.app.state.services.database.workspace))
+    database = StateDatabase(str(client.app.state.services.database.data_dir))
     database.initialize()
     try:
         context = ContextService(ContextItemRepository(database), created["id"])

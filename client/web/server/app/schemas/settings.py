@@ -64,6 +64,36 @@ class ModelListResponse(ApiModel):
     models: list[str]
 
 
+class StorageSettingsResponse(ApiModel):
+    """当前应用数据目录及默认目录。"""
+
+    data_dir: str
+    default_data_dir: str
+    restart_required: bool = False
+
+
+class UpdateStorageSettingsRequest(ApiModel):
+    """设置下次启动时使用的应用数据目录。"""
+
+    data_dir: str = Field(min_length=1, max_length=2000)
+
+
+class StorageDirectory(ApiModel):
+    """可作为应用数据目录的本机目录。"""
+
+    path: str
+    name: str
+
+
+class StorageDirectoryListResponse(ApiModel):
+    """目录选择器当前目录及其直接子目录。"""
+
+    path: str
+    name: str
+    parent_path: str | None
+    directories: list[StorageDirectory]
+
+
 class ToolSummary(ApiModel):
     """供设置页展示的受信任工具元数据。"""
 

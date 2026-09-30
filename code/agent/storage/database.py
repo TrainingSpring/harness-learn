@@ -9,24 +9,24 @@ from .migrations import migrate
 
 
 class StateDatabase:
-    """管理一个 workspace 对应的本地状态数据库。
+    """管理应用数据目录对应的本地 SQLite 状态数据库。
 
     Attributes:
-        workspace: 规范化后的 workspace 目录。
-        path: 状态数据库文件路径，固定为 workspace/.harness/state.db。
+        data_dir: 规范化后的应用数据目录。
+        path: 状态数据库文件路径，固定为 data_dir/state.db。
 
     该类只负责连接、事务和 schema 迁移，不负责把数据库行转换为业务对象，
     也不负责权限判断或创建运行时 Agent。
     """
 
-    def __init__(self, workspace: str) -> None:
+    def __init__(self, data_dir: str) -> None:
         """创建数据库管理器，但不立即打开文件。
 
         Args:
-            workspace: 当前项目的工作目录。
+            data_dir: 应用数据目录，不是会话项目工作目录。
         """
-        self.workspace = Path(workspace).expanduser().resolve()
-        self.path = self.workspace / ".harness" / "state.db"
+        self.data_dir = Path(data_dir).expanduser().resolve()
+        self.path = self.data_dir / "state.db"
         self._connection: sqlite3.Connection | None = None
 
     @property

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
+from . import config
 from .bootstrap import install_agent_source_path
 
 # API 模块会直接导入当前尚未独立打包的 runtime/storage，因此 bootstrap
@@ -39,7 +40,7 @@ from mcp.auth_session import McpAuthorizationManager
 
 
 def create_app(settings: WebServerSettings) -> FastAPI:
-    """创建绑定指定 workspace 的 FastAPI 应用。
+    """创建使用用户存储目录的 FastAPI 应用。
 
     Args:
         settings: 已校验的本地服务启动参数。
@@ -48,7 +49,16 @@ def create_app(settings: WebServerSettings) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         """初始化一次共享数据库与核心服务，并在退出时释放连接。"""
-        database = StateDatabase(str(settings.workspace))
+        data_dir = config.load_data_dir()
+        source_dir = config.pending_migration_source()
+        if source_dir is not None:
+            config.migrate_database(source_dir, data_dir)
+            config.clear_pending_migration()
+        elif data_dir == config.DEFAULT_DATA_DIR and not (data_dir / "state.db").exists():
+            legacy_dir = Path(__file__).resolve().parents[4] / ".harness"
+            config.migrate_database(legacy_dir, data_dir)
+        database = StateDatabase(str(data_dir))
+        app.state.data_dir = data_dir
         database.initialize()
         catalog = ToolCatalog()
         session_queries = SessionQueryRepository(database)
@@ -115,8 +125,8 @@ def create_app(settings: WebServerSettings) -> FastAPI:
 
 
 def default_app() -> FastAPI:
-    """为 ``uvicorn app.main:app`` 创建以当前目录为 workspace 的应用。"""
-    return create_app(WebServerSettings(workspace=Path.cwd()))
+    """为 ``uvicorn app.main:app`` 创建默认应用。"""
+    return create_app(WebServerSettings())
 
 
 app = default_app()
