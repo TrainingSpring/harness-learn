@@ -70,7 +70,7 @@ class LLM:
         """调用 Responses，并转换为内部流式事件。"""
         with self._openai_client().responses.stream(
             model=self.model, instructions=self._instructions(instructions),
-            input=input, tools=tools,
+            input=self._responses_input(input), tools=tools,
         ) as response:
             has_call = False
             for event in response:
@@ -110,7 +110,7 @@ class LLM:
         """调用 Responses；保留 SDK 原始对象兼容旧调用方。"""
         return self._openai_client().responses.create(
             model=self.model, instructions=self._instructions(instructions),
-            input=input, tools=tools,
+            input=self._responses_input(input), tools=tools,
         )
 
     def call_completions_stream(self, input, tools=None, instructions=None):
@@ -249,6 +249,35 @@ class LLM:
                                  "content": cls._content_text(item.get("content", ""))})
         return messages
 
+    @classmethod
+    def _responses_input(cls, input):
+        """将 Context 内部消息转换为 Responses API 的 ``input`` 项。"""
+        if isinstance(input, str):
+            return [{"type": "message", "role": "user", "content": input}]
+        items = []
+        for item in input:
+            kind = item.get("kind", item.get("type", "message"))
+            if kind in {"tool_call", "function_call"}:
+                items.append({
+                    "type": "function_call",
+                    "call_id": item.get("tool_call_id", item.get("call_id")),
+                    "name": item.get("tool_name", item.get("name")),
+                    "arguments": cls._arguments_json(item.get("arguments")),
+                })
+            elif kind in {"tool_result", "function_call_output"}:
+                items.append({
+                    "type": "function_call_output",
+                    "call_id": item.get("tool_call_id", item.get("call_id")),
+                    "output": cls._responses_output(item.get("output", item.get("content", ""))),
+                })
+            else:
+                items.append({
+                    "type": "message",
+                    "role": item.get("role", "user"),
+                    "content": cls._responses_content(item.get("content", "")),
+                })
+        return items
+
     @staticmethod
     def _completions_tools(tools):
         if tools is None:
@@ -268,7 +297,7 @@ class LLM:
             kind = item.get("kind", item.get("type", "message"))
             if kind in {"tool_call", "function_call"}:
                 messages.append({"role": "assistant", "content": [{"type": "tool_use", "id": item.get("tool_call_id", item.get("call_id")),
-                    "name": item.get("tool_name", item.get("name")), "input": item.get("arguments", {})}]})
+                    "name": item.get("tool_name", item.get("name")), "input": cls._parse_arguments(item.get("arguments"))}]})
             elif kind in {"tool_result", "function_call_output"}:
                 messages.append({"role": "user", "content": [{"type": "tool_result", "tool_use_id": item.get("tool_call_id", item.get("call_id")),
                     "content": cls._content_text(item.get("output", item.get("content", "")))}]})
@@ -290,3 +319,13 @@ class LLM:
     @staticmethod
     def _content_text(content):
         return content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+
+    @staticmethod
+    def _responses_content(content):
+        """保留 Responses message 可接受的文本或内容项数组。"""
+        return content if isinstance(content, (str, list)) else json.dumps(content, ensure_ascii=False)
+
+    @staticmethod
+    def _responses_output(output):
+        """保留工具结果中的 Responses 多模态内容项。"""
+        return output if isinstance(output, (str, list)) else json.dumps(output, ensure_ascii=False)
