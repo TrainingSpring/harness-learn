@@ -11,11 +11,11 @@
 ./.venv/bin/pip install -e 'client/web/server[test]'
 ```
 
-启动 API，并显式指定 Agent workspace：
+启动 API：
 
 ```bash
 cd client/web/server
-../../../.venv/bin/python -m app.cli --workspace ../../..
+../../../.venv/bin/python -m app.cli
 ```
 
 也可使用启动脚本：
@@ -25,11 +25,13 @@ cd client/web/server
 ./start.sh
 ```
 
-指定其他 workspace 或端口：
+指定其他端口：
 
 ```bash
-./start.sh --workspace /path/to/workspace --port 9000
+./start.sh --port 9000
 ```
+
+应用数据默认保存到 `~/.harness/data/state.db`。可在 Web 设置的“基础 / 存储”中选择其他目录；保存后重启服务，现有数据库会迁移到新目录。会话的项目工作目录则在创建会话时单独选择，与应用数据目录无关。
 
 另开终端启动前端：
 
@@ -58,7 +60,6 @@ npm run build
 ```bash
 cd client/web/server
 ../../../.venv/bin/python -m app.cli \
-  --workspace ../../.. \
   --frontend-dist ../front/dist
 ```
 
