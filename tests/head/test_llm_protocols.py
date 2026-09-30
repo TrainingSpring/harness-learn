@@ -121,6 +121,72 @@ class LLMProtocolTests(unittest.TestCase):
 
         self.assertEqual(input_items[0]["output"], content)
 
+    def test_responses_preserves_model_state_item(self):
+        """推理模型的历史状态必须原样回放，不能被转换为普通消息。"""
+        state = {
+            "type": "reasoning",
+            "id": "rs_001",
+            "summary": [{"type": "summary_text", "text": "需要读取项目文件"}],
+            "encrypted_content": "opaque-state",
+        }
+
+        input_items = LLM._responses_input([
+            {"kind": "model_state", "protocol": "responses", "item": state},
+        ])
+
+        self.assertEqual(input_items, [state])
+
+    def test_responses_reuses_raw_function_call_item(self):
+        """历史 function_call 要保留服务端生成的 id 和完成状态。"""
+        function_call = {
+            "type": "function_call",
+            "id": "fc_001",
+            "call_id": "call_read_001",
+            "name": "read",
+            "arguments": '{"target_path":"README.md"}',
+            "status": "completed",
+        }
+
+        input_items = LLM._responses_input([{
+            "kind": "tool_call",
+            "tool_call_id": "call_read_001",
+            "tool_name": "read",
+            "arguments": {"target_path": "README.md"},
+            "responses_item": function_call,
+        }])
+
+        self.assertEqual(input_items, [function_call])
+
+    @patch("head.llm.OpenAI")
+    def test_responses_stream_keeps_raw_reasoning_output_item(self, openai_class):
+        """SDK 输出的 reasoning 字段必须完整进入 Runtime 可消费的结果。"""
+        raw_state = {
+            "type": "reasoning",
+            "id": "rs_001",
+            "summary": [{"type": "summary_text", "text": "正在分析"}],
+            "encrypted_content": "opaque-state",
+        }
+        reasoning_item = SimpleNamespace(
+            type="reasoning",
+            id="rs_001",
+            content=None,
+            name=None,
+            arguments=None,
+            call_id=None,
+            status="completed",
+            model_dump=lambda **_kwargs: raw_state,
+        )
+        completed = SimpleNamespace(
+            type="response.completed",
+            response=SimpleNamespace(output=[reasoning_item], usage=None),
+        )
+        response_stream = openai_class.return_value.responses.stream.return_value
+        response_stream.__enter__.return_value = [completed]
+
+        events = list(LLM("https://example.test", "key", "model").call_responses_stream("继续"))
+
+        self.assertEqual(events[0].data[0].raw, raw_state)
+
     def test_completions_converts_internal_tool_turn(self):
         """Chat Completions 必须将内部工具调用配对为 assistant/tool 两条消息。"""
         messages = LLM._completions_messages(self._internal_tool_turn(), "遵守工具结果")

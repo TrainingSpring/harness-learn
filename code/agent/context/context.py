@@ -148,6 +148,18 @@ class Context:
             raise ValueError("消息类型必须是 function_call_output")
         return self._append(normalized)
 
+    def append_model_state(self, item: dict[str, Any], *, protocol: str) -> dict[str, Any]:
+        """保存模型返回的协议连续性状态，供同协议的下一轮调用原样回放。"""
+        if not isinstance(item, dict):
+            raise TypeError("模型状态必须是字典")
+        if not isinstance(protocol, str) or not protocol:
+            raise ValueError("模型状态必须标明来源协议")
+        return self._append({
+            "kind": "model_state",
+            "protocol": protocol,
+            "item": copy.deepcopy(item),
+        })
+
     def _append(
         self,
         msg: LLMResponseOutputItem | dict[str, Any] | str,
@@ -247,7 +259,7 @@ class Context:
         if isinstance(msg, str):
             return {"kind": type, "role": role, "content": msg}
         if hasattr(msg, "type") and hasattr(msg, "name") and hasattr(msg, "arguments"):
-            return Context._normalize_message({
+            item = {
                 "type": msg.type,
                 "id": msg.id,
                 "content": msg.content,
@@ -255,7 +267,10 @@ class Context:
                 "arguments": msg.arguments,
                 "call_id": msg.call_id,
                 "status": msg.status,
-            })
+            }
+            if isinstance(getattr(msg, "raw", None), dict):
+                item["responses_item"] = copy.deepcopy(msg.raw)
+            return Context._normalize_message(item)
         if isinstance(msg, dict):
             item = copy.deepcopy(msg)
             legacy_type = item.pop("type", None)

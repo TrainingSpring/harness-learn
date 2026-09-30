@@ -39,6 +39,28 @@ class FakeLLM:
         )
 
 
+class ReasoningFakeLLM:
+    """模拟含有需要在下一轮回放的 Responses reasoning 输出。"""
+
+    def call_responses_stream(self, _input, _tools):
+        item = LLMResponseOutputItem(
+            type="reasoning",
+            id="rs_001",
+            content=None,
+            name=None,
+            arguments=None,
+            call_id=None,
+            status="completed",
+        )
+        item.raw = {
+            "type": "reasoning",
+            "id": "rs_001",
+            "summary": [{"type": "summary_text", "text": "正在分析"}],
+            "encrypted_content": "opaque-state",
+        }
+        yield LLMResponse(type="done", data=[item], is_stop=True)
+
+
 class RuntimePersistenceTests(unittest.TestCase):
     """验证 Runtime 只修改调用方提供的上下文。"""
 
@@ -70,6 +92,41 @@ class RuntimePersistenceTests(unittest.TestCase):
         self.assertEqual(context.messages[0]["content"], "请完成任务")
         self.assertEqual(context.messages[1]["content"], "已完成")
         self.assertFalse(hasattr(runtime, "context_service"))
+
+    def test_run_records_responses_reasoning_state_for_next_turn(self):
+        """Runtime 不能在工具循环之间丢弃推理模型的连续性状态。"""
+        ctx = ExecutionContext(
+            "/workspace",
+            "agent_1V3ASAXQ2A",
+            "session_reasoning",
+        )
+        tools = Tools(ctx)
+        context = Context(ReasoningFakeLLM(), session_id=ctx.session_id)
+        runtime = Runtime(
+            ReasoningFakeLLM(),
+            tools,
+            ctx,
+            PermissionManager(
+                mode=PermissionMode.BUILD,
+                session_id=ctx.session_id,
+                project_path=ctx.project_path,
+                protected_resource_policy=ProtectedResourcePolicy(["/system"]),
+            ),
+            context,
+        )
+
+        list(runtime.run())
+
+        self.assertEqual(context.messages, [{
+            "kind": "model_state",
+            "protocol": "responses",
+            "item": {
+                "type": "reasoning",
+                "id": "rs_001",
+                "summary": [{"type": "summary_text", "text": "正在分析"}],
+                "encrypted_content": "opaque-state",
+            },
+        }])
 
 
 if __name__ == "__main__":

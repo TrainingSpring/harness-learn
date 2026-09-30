@@ -236,6 +236,8 @@ class LLM:
             return messages + [{"role": "user", "content": input}]
         for item in input:
             kind = item.get("kind", item.get("type", "message"))
+            if kind == "model_state":
+                continue
             if kind in {"tool_call", "function_call"}:
                 messages.append({"role": "assistant", "content": None, "tool_calls": [{
                     "id": item.get("tool_call_id", item.get("call_id")), "type": "function",
@@ -257,13 +259,20 @@ class LLM:
         items = []
         for item in input:
             kind = item.get("kind", item.get("type", "message"))
-            if kind in {"tool_call", "function_call"}:
-                items.append({
-                    "type": "function_call",
-                    "call_id": item.get("tool_call_id", item.get("call_id")),
-                    "name": item.get("tool_name", item.get("name")),
-                    "arguments": cls._arguments_json(item.get("arguments")),
-                })
+            if kind == "model_state":
+                if item.get("protocol") == "responses" and isinstance(item.get("item"), dict):
+                    items.append(item["item"])
+            elif kind in {"tool_call", "function_call"}:
+                raw_item = item.get("responses_item")
+                if isinstance(raw_item, dict):
+                    items.append(raw_item)
+                else:
+                    items.append({
+                        "type": "function_call",
+                        "call_id": item.get("tool_call_id", item.get("call_id")),
+                        "name": item.get("tool_name", item.get("name")),
+                        "arguments": cls._arguments_json(item.get("arguments")),
+                    })
             elif kind in {"tool_result", "function_call_output"}:
                 items.append({
                     "type": "function_call_output",
@@ -295,6 +304,8 @@ class LLM:
         messages = []
         for item in input:
             kind = item.get("kind", item.get("type", "message"))
+            if kind == "model_state":
+                continue
             if kind in {"tool_call", "function_call"}:
                 messages.append({"role": "assistant", "content": [{"type": "tool_use", "id": item.get("tool_call_id", item.get("call_id")),
                     "name": item.get("tool_name", item.get("name")), "input": cls._parse_arguments(item.get("arguments"))}]})

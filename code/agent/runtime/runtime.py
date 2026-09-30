@@ -169,6 +169,11 @@ class Runtime:
         """
         usage = response.usage
         for item in response.data or []:
+            if item.type == "reasoning":
+                raw = getattr(item, "raw", None)
+                if isinstance(raw, dict):
+                    self.context.append_model_state(raw, protocol="responses")
+                continue
             if item.type == "message":
                 self.context.append_agent_message(
                     self.execution_context.agent_id,

@@ -69,7 +69,9 @@ class LLMResponseOutputItem:
     arguments:str|None
     call_id:str|None
     status:str|None
-    def __init__(self,type,id,content,name,arguments,call_id,status):
+    raw:dict[str, Any]|None
+
+    def __init__(self,type,id,content,name,arguments,call_id,status,raw=None):
         self.type = type
         self.id = id
         self.content = content
@@ -77,6 +79,7 @@ class LLMResponseOutputItem:
         self.arguments = arguments
         self.call_id = call_id
         self.status = status
+        self.raw = raw
 
     @staticmethod
     def to_LLMResponseOutputItem(item: Any):
@@ -88,7 +91,19 @@ class LLMResponseOutputItem:
             arguments=getattr(item,"arguments",None),
             call_id=getattr(item,"call_id",None),
             status=getattr(item,"status",None),
+            raw=LLMResponseOutputItem._raw_item(item),
         )
+
+    @staticmethod
+    def _raw_item(item: Any) -> dict[str, Any] | None:
+        """保留 SDK 输出项的完整字段，供协议连续性状态在下一轮回放。"""
+        if isinstance(item, dict):
+            return dict(item)
+        dump = getattr(item, "model_dump", None)
+        if callable(dump):
+            value = dump(exclude_none=True)
+            return value if isinstance(value, dict) else None
+        return None
     @staticmethod
     def to_LLMResponseOutputItems(items: list[Any]):
         return [LLMResponseOutputItem.to_LLMResponseOutputItem(item) for item in items]

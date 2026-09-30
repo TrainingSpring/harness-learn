@@ -47,6 +47,14 @@ class ContextGovernanceTests(unittest.TestCase):
             arguments='{"target_path":"README.md"}',
             call_id="call_001",
             status="completed",
+            raw={
+                "type": "function_call",
+                "id": "item_001",
+                "call_id": "call_001",
+                "name": "read",
+                "arguments": '{"target_path":"README.md"}',
+                "status": "completed",
+            },
         )
 
         context.append_user_message("检查项目")
@@ -60,7 +68,26 @@ class ContextGovernanceTests(unittest.TestCase):
         self.assertEqual(context.messages[0]["role"], "user")
         self.assertEqual(context.messages[1]["role"], "assistant")
         self.assertEqual(context.messages[2]["kind"], "tool_call")
+        self.assertEqual(context.messages[2]["responses_item"]["id"], "item_001")
         self.assertEqual(context.messages[3]["kind"], "tool_result")
+
+    def test_model_state_keeps_raw_responses_item(self):
+        """Context 必须保留 Responses 推理项的全部不透明字段。"""
+        context = Context(FakeLLM(), session_id="session_model_state")
+        reasoning = {
+            "type": "reasoning",
+            "id": "rs_001",
+            "summary": [{"type": "summary_text", "text": "正在分析"}],
+            "encrypted_content": "opaque-state",
+        }
+
+        context.append_model_state(reasoning, protocol="responses")
+
+        self.assertEqual(context.export(), [{
+            "kind": "model_state",
+            "protocol": "responses",
+            "item": reasoning,
+        }])
 
     def test_function_call_governance_accepts_dict_messages(self):
         """治理不能假设消息一定是 SDK 对象。"""
