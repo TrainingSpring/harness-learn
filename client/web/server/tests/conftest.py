@@ -16,8 +16,10 @@ for source_path in (SERVER_SOURCE, REPOSITORY_ROOT, AGENT_SOURCE):
         sys.path.insert(0, str(source_path))
 
 from app import config
+import app.main as app_main
 from app.config import WebServerSettings
 from app.main import create_app
+from skills.catalog import SkillCatalog
 from storage.database import StateDatabase
 from storage.repositories.agent_profile import AgentProfileRepository
 from storage.repositories.llm_profile import LLMProfileRepository
@@ -30,6 +32,7 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
     data_dir = tmp_path / "data"
     monkeypatch.setattr(config, "DEFAULT_DATA_DIR", data_dir)
     monkeypatch.setattr(config, "SETTINGS_PATH", tmp_path / "settings.json")
+    monkeypatch.setattr(app_main, "SkillCatalog", lambda: SkillCatalog(tmp_path / "skills"))
     database = StateDatabase(str(data_dir))
     database.initialize()
     try:
@@ -73,6 +76,5 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
         database.close()
 
     app = create_app(WebServerSettings())
-    app.state.skill_root = tmp_path / "skills"
     with TestClient(app) as test_client:
         yield test_client

@@ -20,12 +20,12 @@ def test_skills_list_reads_database_and_refresh_imports_zip(client):
         files={"file": ("demo.zip", _skill_zip(), "application/zip")},
     )
     assert response.status_code == 200
-    assert response.json()["added"] == 2
+    assert response.json()["added"] == 1
     assert response.json()["items"][0]["name"] == "demo"
 
     response = client.post("/api/settings/skills/refresh")
     assert response.status_code == 200
-    assert response.json()["unchanged"] == 2
+    assert response.json()["unchanged"] == 1
 
 
 def test_skill_import_rejects_path_traversal(client):

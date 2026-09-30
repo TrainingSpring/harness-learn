@@ -14,9 +14,10 @@ def test_list_agents_returns_only_enabled_profiles(client) -> None:
         "description": "负责实现和审查代码",
         "personality": "直接、严谨",
         "expertise": ["Python", "API"],
-        "tools": ["read", "bash"],
-        "skills": [],
-        "isEnabled": True,
+            "tools": ["read", "bash"],
+            "skills": [],
+            "mcpServerIds": [],
+            "isEnabled": True,
     }
     assert payload["pagination"] == {"limit": 20, "offset": 0, "hasMore": False}
 
