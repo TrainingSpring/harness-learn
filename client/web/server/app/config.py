@@ -9,8 +9,8 @@ from threading import RLock
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-DEFAULT_DATA_DIR = Path.home() / ".harness" / "data"
-SETTINGS_PATH = Path.home() / ".harness" / "settings.json"
+DEFAULT_DATA_DIR = Path.home() / ".harness-learn" / "data"
+SETTINGS_PATH = Path.home() / ".harness-learn" / "settings.json"
 _SETTINGS_LOCK = RLock()
 
 

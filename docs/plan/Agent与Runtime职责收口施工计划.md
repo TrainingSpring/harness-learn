@@ -904,7 +904,7 @@ git diff --check
 6. `清理旧Runtime调用路径`
 7. `更新Agent运行架构文档`
 
-每次只暂存本阶段相关文件，不得包含 `.harness/state.db` 或其他用户已有改动。
+每次只暂存本阶段相关文件，不得包含 `.harness-learn/state.db` 或其他用户已有改动。
 
 ## 9. 风险与处理
 

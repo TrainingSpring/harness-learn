@@ -68,6 +68,7 @@ class LLM:
 
     def call_responses_stream(self, input, tools=None, instructions=None):
         """调用 Responses，并转换为内部流式事件。"""
+        print("====发送input====",input)
         with self._openai_client().responses.stream(
             model=self.model, instructions=self._instructions(instructions),
             input=self._responses_input(input), tools=tools,

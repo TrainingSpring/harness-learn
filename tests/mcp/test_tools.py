@@ -54,8 +54,16 @@ def test_mcp_tools_are_namespaced_and_validate_before_call():
 
 
 def test_mcp_tool_definition_rejects_invalid_name_or_schema():
+    for name in ("tru.android.devices.list", "tru.mouse.double_click", "bad-name"):
+        tools = build_mcp_tools("mcp_DEMO00001", FakeClient([{"name": name}]))
+        assert tools[0].schema["name"] == f"mcp__mcp_DEMO00001__{name}"
+
     with pytest.raises(McpToolDefinitionError):
-        build_mcp_tools("mcp_DEMO00001", FakeClient([{"name": "bad-name"}]))
+        build_mcp_tools("mcp_DEMO00001", FakeClient([{"name": "bad name"}]))
+    with pytest.raises(McpToolDefinitionError):
+        build_mcp_tools("mcp_DEMO00001", FakeClient([{"name": "bad,name"}]))
+    with pytest.raises(McpToolDefinitionError):
+        build_mcp_tools("mcp_DEMO00001", FakeClient([{"name": "x" * 129}]))
     with pytest.raises(McpToolDefinitionError):
         build_mcp_tools(
             "mcp_DEMO00001",

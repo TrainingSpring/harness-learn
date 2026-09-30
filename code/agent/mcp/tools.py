@@ -15,7 +15,10 @@ from .client import McpClient
 from .errors import McpProtocolError, McpRemoteError
 
 
-_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+# MCP tool names are broader than the function-name subset accepted by some
+# model APIs. Keep the server-provided name intact; protocol-specific model
+# name adaptation belongs at the LLM boundary.
+_NAME = re.compile(r"[A-Za-z0-9_.-]{1,128}")
 _MAX_RESULT_BYTES = 4 * 1024 * 1024
 
 

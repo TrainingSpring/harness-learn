@@ -678,6 +678,6 @@ docs: document transient child sessions
 
 - 运行本阶段相关测试。
 - 检查 `git diff` 和暂存内容。
-- 不提交 `.harness/state.db`。
+- 不提交 `.harness-learn/state.db`。
 - 不混入无关格式化或目录重构。
 - 如果实际施工发现必须修改 Runtime、Context 或新增存储层，先更新本计划并说明现有接口为何无法满足。

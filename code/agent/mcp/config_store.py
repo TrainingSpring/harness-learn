@@ -150,7 +150,7 @@ def _document_to_dict(document: McpConfigDocument) -> dict[str, Any]:
 class McpConfigStore:
     """独立管理 MCP 注册 JSON，不依赖 Web、Session 或 SQLite。
 
-    默认位置是当前用户 home 下的 `harness-learn/mcp/config.json`。
+    默认位置是当前用户 home 下的 `.harness-learn/mcp/config.json`。
     测试和调用方可以显式注入文件路径。
     """
 
@@ -158,7 +158,7 @@ class McpConfigStore:
         self.path = (
             Path(path).expanduser().resolve()
             if path is not None
-            else Path.home() / "harness-learn" / "mcp" / "config.json"
+            else Path.home() / ".harness-learn" / "mcp" / "config.json"
         )
         self._lock = RLock()
 

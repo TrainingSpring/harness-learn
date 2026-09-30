@@ -42,7 +42,7 @@ class McpClient:
         client_capabilities: dict[str, Any] | None = None,
     ) -> None:
         self.transport = transport
-        self.client_info = client_info or McpImplementation("harness-learn", "0.1.0")
+        self.client_info = client_info or McpImplementation(".harness-learn", "0.1.0")
         self.client_capabilities = dict(client_capabilities or {})
         self.notifications = McpNotificationDispatcher()
         self._state = McpClientState.NEW

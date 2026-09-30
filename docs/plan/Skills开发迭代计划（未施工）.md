@@ -493,7 +493,7 @@ CREATE INDEX idx_agent_skills_agent_position
 
 - 迁移必须显式、可重复执行且不能依赖“表是否存在”猜版本。
 - 旧 Agent 没有 Skill 时迁移后关联为空，不能影响现有会话。
-- 不修改或覆盖 `.harness/state.db` 中用户已有数据；测试迁移使用临时数据库。
+- 不修改或覆盖 `.harness-learn/state.db` 中用户已有数据；测试迁移使用临时数据库。
 - 迁移失败要回滚，数据库版本不能写成新版本。
 
 ### 7.3 新增 Repository
@@ -1187,7 +1187,7 @@ Skill allowed-tools（未声明时表示不额外限制，仍受 Agent tools 限
 6. `接入 Skills 动态模型指令`
 7. `补齐 Skills 安全、回归测试和文档`
 
-每个提交前执行与变更范围匹配的测试；最终执行完整 Python 测试、Web 测试、类型检查和构建。不得把 `.harness/state.db` 的用户已有修改暂存或提交。
+每个提交前执行与变更范围匹配的测试；最终执行完整 Python 测试、Web 测试、类型检查和构建。不得把 `.harness-learn/state.db` 的用户已有修改暂存或提交。
 
 ## 18. 待实施前需要确认的决策
 

@@ -128,7 +128,7 @@ def _oauth_metadata(server: RemoteMcpServerConfig, services: ApplicationServices
     # Metadata discovery remains an explicit user action; it never runs during list.
     from mcp.oauth import OAuthClient
     client = OAuthClient(
-        client_id=server.oauth_client_id or "harness-learn",
+        client_id=server.oauth_client_id or ".harness-learn",
         redirect_uri="http://127.0.0.1:8765/oauth/mcp/callback",
         scopes=server.oauth_scopes,
         resource=server.url,
@@ -141,7 +141,7 @@ def _oauth_metadata(server: RemoteMcpServerConfig, services: ApplicationServices
 
 def _oauth_client(server: RemoteMcpServerConfig) -> OAuthClient:
     return OAuthClient(
-        client_id=server.oauth_client_id or "harness-learn",
+        client_id=server.oauth_client_id or ".harness-learn",
         redirect_uri="http://127.0.0.1:8765/oauth/mcp/callback",
         scopes=server.oauth_scopes,
         resource=server.url,
