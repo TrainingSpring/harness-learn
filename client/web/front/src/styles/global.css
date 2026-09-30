@@ -183,6 +183,11 @@ code, pre { font-family: var(--font-mono); }
 .settings-section__actions { display: flex; align-items: center; gap: 5px; }
 .settings-section h2 { margin: 0 0 3px; font-size: 17px; }
 .settings-section p { margin: 0; color: var(--text-secondary); }
+.basic-settings { max-width: 620px; }
+.basic-settings__group { display: grid; gap: 10px; padding: 18px 0; border-top: 1px solid var(--border); }
+.basic-settings__group h3 { margin: 0; font-size: 14px; }
+.basic-settings__group:first-of-type { border-top: 0; padding-top: 0; }
+.basic-settings__actions { display: flex; align-items: center; gap: 12px; }
 .segmented { display: inline-flex; padding: 3px; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .segmented button { display: flex; align-items: center; gap: 7px; min-height: 34px; padding: 5px 11px; color: var(--text-secondary); background: transparent; border: 0; border-radius: var(--radius-sm); }
 .segmented button.is-selected { color: var(--text); background: var(--bg-surface); box-shadow: 0 1px 4px rgb(0 0 0 / 10%); }

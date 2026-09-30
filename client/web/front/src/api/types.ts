@@ -19,6 +19,28 @@ export interface ApiErrorBody {
   };
 }
 
+export interface StorageSettings {
+  dataDir: string;
+  defaultDataDir: string;
+  restartRequired: boolean;
+}
+
+export interface UpdateStorageSettingsRequest {
+  dataDir: string;
+}
+
+export interface StorageDirectory {
+  path: string;
+  name: string;
+}
+
+export interface StorageDirectoryListResponse {
+  path: string;
+  name: string;
+  parentPath: string | null;
+  directories: StorageDirectory[];
+}
+
 export interface AgentReference {
   id: string;
   name: string;

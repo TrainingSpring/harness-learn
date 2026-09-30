@@ -19,7 +19,22 @@ import type {
   McpDiagnosticsResponse,
   McpDirectoryMetadata,
   McpDirectoryListResponse,
+  StorageSettings,
+  StorageDirectoryListResponse,
+  UpdateStorageSettingsRequest,
 } from "../../api/types";
+
+export function getStorageSettings(): Promise<StorageSettings> {
+  return apiClient.get("/api/settings/storage");
+}
+
+export function updateStorageSettings(request: UpdateStorageSettingsRequest): Promise<StorageSettings> {
+  return apiClient.put<UpdateStorageSettingsRequest, StorageSettings>("/api/settings/storage", request);
+}
+
+export function listStorageDirectories(path = "."): Promise<StorageDirectoryListResponse> {
+  return apiClient.get(`/api/settings/directories?path=${encodeURIComponent(path)}`);
+}
 
 export function listLlmProfiles(): Promise<ListResponse<LLMProfileSummary>> {
   return apiClient.get("/api/settings/llm-profiles?limit=100&offset=0");

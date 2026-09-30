@@ -11,7 +11,7 @@ const AgentDetailPage = lazy(() => import("../features/agents/pages/AgentDetailP
 const NewChatPage = lazy(() => import("../features/chat/pages/NewChatPage").then((module) => ({ default: module.NewChatPage })));
 const ChatPage = lazy(() => import("../features/chat/pages/ChatPage").then((module) => ({ default: module.ChatPage })));
 const SettingsLayout = lazy(() => import("../features/settings/pages/SettingsLayout").then((module) => ({ default: module.SettingsLayout })));
-const AppearanceSettingsPage = lazy(() => import("../features/settings/pages/AppearanceSettingsPage").then((module) => ({ default: module.AppearanceSettingsPage })));
+const BasicSettingsPage = lazy(() => import("../features/settings/pages/BasicSettingsPage").then((module) => ({ default: module.BasicSettingsPage })));
 const LLMSettingsPage = lazy(() => import("../features/settings/pages/LLMSettingsPage").then((module) => ({ default: module.LLMSettingsPage })));
 const ToolSettingsPage = lazy(() => import("../features/settings/pages/ToolSettingsPage").then((module) => ({ default: module.ToolSettingsPage })));
 const SkillSettingsPage = lazy(() => import("../features/settings/pages/SkillSettingsPage").then((module) => ({ default: module.SkillSettingsPage })));
@@ -46,8 +46,9 @@ export const router = createBrowserRouter([
         path: "/settings",
         element: deferred(<SettingsLayout />),
         children: [
-          { index: true, element: <Navigate replace to="appearance" /> },
-          { path: "appearance", element: deferred(<AppearanceSettingsPage />) },
+          { index: true, element: <Navigate replace to="basic" /> },
+          { path: "basic", element: deferred(<BasicSettingsPage />) },
+          { path: "appearance", element: <Navigate replace to="/settings/basic" /> },
           { path: "llms", element: deferred(<LLMSettingsPage />) },
           { path: "tools", element: deferred(<ToolSettingsPage />) },
           { path: "skills", element: deferred(<SkillSettingsPage />) },
